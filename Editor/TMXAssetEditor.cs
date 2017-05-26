@@ -25,6 +25,28 @@ class TMXAssetEditor : Editor {
         }
     }
 
+    private static Material _mat;
+    public static Material mat {
+        get {
+            if (_mat == null) _mat = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            return _mat;
+        }
+    }
+
+    private Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
+    private Texture2D GetTileSetTexture (TmxTileset tileSet) {
+        if (tileSetTextures.ContainsKey(tileSet.Image.Source)) {
+            return tileSetTextures[tileSet.Image.Source];
+        }
+        else {
+            string texturePath = Path.GetFullPath(tileSet.Image.Source);
+            texturePath = texturePath.Replace(Application.dataPath, "Assets");
+            Texture2D tex = AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D)) as Texture2D;
+            tileSetTextures[tileSet.Image.Source] = tex;
+            return tex;
+        }
+    }
+
 	public override void OnInspectorGUI() {
         if (isValid) TMXInspectorGUI();
         else base.OnInspectorGUI();
@@ -36,6 +58,19 @@ class TMXAssetEditor : Editor {
         EditorGUILayout.LabelField("Height: " + tmxMap.Height);
         EditorGUILayout.LabelField("TileWidth: " + tmxMap.TileWidth);
         EditorGUILayout.LabelField("TileHeight: " + tmxMap.TileHeight);
+
+        EditorGUILayout.LabelField("TileSets:");
+        foreach (TmxTileset tileSet in tmxMap.Tilesets){
+            EditorGUILayout.LabelField(tileSet.Name);
+            Texture2D tex = GetTileSetTexture(tileSet);
+            if (tex == null) continue; // TODO: Fix GetTileSetTexture missing textures
+            Rect r = GUILayoutUtility.GetRect(tex.width, tex.height);
+            EditorGUI.DrawPreviewTexture(r, tex, mat);
+            foreach (int tileIndex in tileSet.Tiles.Keys) {
+                TmxTilesetTile tile = tileSet.Tiles[tileIndex];
+
+            }
+        }
     }
 
     void OnEnable () {
@@ -62,6 +97,7 @@ class TMXAssetEditor : Editor {
             DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
 
             if (eventType == EventType.DragPerform) {
+                bool foundTMX = false;
                 foreach (Object o in DragAndDrop.objectReferences) {
                     string path = AssetDatabase.GetAssetPath(o);
                     if (Path.GetExtension(path) == ".tmx") {
@@ -69,10 +105,13 @@ class TMXAssetEditor : Editor {
                         // GameObject map = CreateTileMap(path);
                         // place map at mouse position in scene view
                         // place at origin relative to object dropped on in Hierarchy
+                        foundTMX = true;
                     }
                 }
-                DragAndDrop.AcceptDrag();
-                Event.current.Use();
+                if (foundTMX) {
+                    DragAndDrop.AcceptDrag();
+                    Event.current.Use();
+                }
             }
         }
     }
@@ -91,7 +130,7 @@ class TMXAssetEditor : Editor {
         GameObject root = new GameObject(name);
         Undo.RegisterCreatedObjectUndo (root, "Created '" + name + "' from TMX file.");
 
-        for (int i = 0; i < 1; i++) {//tmxMap.Layers.Count; i++) {
+        for (int i = 0; i < tmxMap.Layers.Count; i++) {
             GameObject layer = CreateTileLayer(tmxMap, i, offset);
             if (layer != null) layer.transform.SetParent(root.transform);
         }
@@ -112,8 +151,11 @@ class TMXAssetEditor : Editor {
 
         int submeshCount = 1 + layerData.Tiles.Count * 4 / 65000;
         for (int submesh = 0; submesh < submeshCount; submesh++) {
-            GameObject meshObject = new GameObject(layerData.Name + "_" + submesh);
-            meshObject.transform.SetParent(layer.transform);
+            GameObject meshObject = layer;
+            if (submeshCount > 1) {
+                meshObject = new GameObject(layerData.Name + "_submesh" + submesh);
+                meshObject.transform.SetParent(layer.transform);
+            }
 
             List<Vector3> verts = new List<Vector3>();
             List<Vector3> norms = new List<Vector3>();
@@ -191,7 +233,8 @@ class TMXAssetEditor : Editor {
             }
 
             Mesh mesh = new Mesh();
-            mesh.name = layerData.Name + "_" + submesh;
+            mesh.name = layerData.Name;
+            if (submeshCount > 1) mesh.name += "_submesh" + submesh;
             mesh.vertices = verts.ToArray();
             mesh.normals = norms.ToArray();
             mesh.uv = uvs.ToArray();
@@ -203,7 +246,7 @@ class TMXAssetEditor : Editor {
             meshFilter.mesh = mesh;
 
             MeshRenderer meshRenderer = meshObject.AddComponent<MeshRenderer>();
-            meshRenderer.sharedMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            meshRenderer.sharedMaterial = mat;
             //set material property block?
         }
 
