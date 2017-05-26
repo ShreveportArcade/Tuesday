@@ -3,7 +3,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.IO;
 using System.Xml;
-using ClipperLib;
+using TiledSharp;
 
 [InitializeOnLoad]
 [CustomEditor(typeof(DefaultAsset))]
@@ -17,14 +17,11 @@ class TMXAssetEditor : Editor {
         get { return Path.GetExtension(path) == ".tmx"; }
     } 
 
-    private XmlDocument _document;
-    public XmlDocument document {
+    private TmxMap _tmxMap;
+    public TmxMap tmxMap {
         get {
-            if (_document == null) {
-                _document = new XmlDocument();
-                _document.Load(path);
-            }
-            return _document;
+            if (_tmxMap == null) _tmxMap = new TmxMap(path);
+            return _tmxMap;
         }
     }
 
@@ -34,15 +31,11 @@ class TMXAssetEditor : Editor {
     }
  
     private void TMXInspectorGUI () {  
-        XmlNode map = document.SelectSingleNode("map");
-
-        // separators, drop downs 
-        EditorGUILayout.LabelField("Map Properties:");
-        foreach (XmlAttribute attribute in map.Attributes) {
-            EditorGUILayout.LabelField(attribute.Name + ": " + attribute.Value);
-        }
-
-        EditorGUILayout.LabelField("Tiles:");
+        EditorGUILayout.LabelField("Version: " + tmxMap.Version);
+        EditorGUILayout.LabelField("Width: " + tmxMap.Width);
+        EditorGUILayout.LabelField("Height: " + tmxMap.Height);
+        EditorGUILayout.LabelField("TileWidth: " + tmxMap.TileWidth);
+        EditorGUILayout.LabelField("TileHeight: " + tmxMap.TileHeight);
     }
 
     void OnEnable () {
@@ -55,11 +48,11 @@ class TMXAssetEditor : Editor {
         SceneView.onSceneGUIDelegate += SceneGUICallback;
     }
 
-    static void HierarchyGUICallback(int pID, Rect pRect) {
+    private static void HierarchyGUICallback(int pID, Rect pRect) {
         DragAndDropTMXFile();
     }
 
-    public void SceneGUICallback (SceneView sceneView) {
+    private static void SceneGUICallback (SceneView sceneView) {
         DragAndDropTMXFile();
     }
 
@@ -68,171 +61,151 @@ class TMXAssetEditor : Editor {
         if (eventType == EventType.DragUpdated || eventType == EventType.DragPerform) {
             DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
 
-            if (eventType == EventType.DragPerform)
+            if (eventType == EventType.DragPerform) {
                 foreach (Object o in DragAndDrop.objectReferences) {
                     string path = AssetDatabase.GetAssetPath(o);
                     if (Path.GetExtension(path) == ".tmx") {
                         CreateTileMap(path);
+                        // GameObject map = CreateTileMap(path);
+                        // place map at mouse position in scene view
+                        // place at origin relative to object dropped on in Hierarchy
                     }
                 }
                 DragAndDrop.AcceptDrag();
-
-            Event.current.Use();
+                Event.current.Use();
+            }
         }
     }
 
-    public static GameObject CreateTileMap (string tileMapPath) {
-        XmlDocument document = new XmlDocument();
-        document.Load(tileMapPath);
+    private static GameObject CreateTileMap (string tmxFilePath) {
+        TmxMap tmxMap = new TmxMap(tmxFilePath);
 
-        XmlNode map = document.SelectSingleNode("map");
-
-        int tileWidth = 0;
-        int tileHeight = 0;
-        int.TryParse(map.Attributes["tilewidth"].Value, out tileWidth);
-        int.TryParse(map.Attributes["tileheight"].Value, out tileHeight);
-
-        string renderOrder = map.Attributes["renderorder"].Value;
-        string[] xyDirections = renderOrder.Split('-');
+        bool right = (tmxMap.RenderOrder == RenderOrderType.RightDown || tmxMap.RenderOrder == RenderOrderType.RightUp);
+        bool up = (tmxMap.RenderOrder == RenderOrderType.RightUp || tmxMap.RenderOrder == RenderOrderType.LeftUp);
         Vector2 offset = new Vector2(
-            (xyDirections[0] == "right") ? tileWidth : -tileWidth,
-            (xyDirections[1] == "up") ? tileHeight : -tileHeight
-            );
+            right ? tmxMap.TileWidth : -tmxMap.TileWidth,
+            up ? tmxMap.TileHeight : -tmxMap.TileHeight
+        );
 
-        string name = Path.GetFileNameWithoutExtension(tileMapPath);
+        string name = Path.GetFileNameWithoutExtension(tmxFilePath);
         GameObject root = new GameObject(name);
         Undo.RegisterCreatedObjectUndo (root, "Created '" + name + "' from TMX file.");
 
-        XmlNode tileSetData = map.SelectSingleNode("tileset");
-        foreach (XmlNode layerData in map.SelectNodes("layer")) {
-            GameObject layer = CreateTileLayer(layerData, tileSetData, offset);
-            layer.transform.SetParent(root.transform);
+        for (int i = 0; i < 1; i++) {//tmxMap.Layers.Count; i++) {
+            GameObject layer = CreateTileLayer(tmxMap, i, offset);
+            if (layer != null) layer.transform.SetParent(root.transform);
         }
 
         return root;
     }
 
-    public static GameObject CreateTileLayer (XmlNode layerData, XmlNode tileSetData, Vector2 offset) {
-        string layerName = layerData.Attributes["name"].Value;
+    public static GameObject CreateTileLayer (TmxMap tmxMap, int layerIndex, Vector2 offset) {
+        TmxLayer layerData = tmxMap.Layers[layerIndex];
+        GameObject layer = new GameObject(layerData.Name);
+        
+        TmxTileset tileSet = tmxMap.Tilesets[0];
+        int columns = tileSet.Columns == null ? 1 : tileSet.Columns.Value;
+        int tileCount = tileSet.TileCount == null ? 1 : tileSet.TileCount.Value;
+        int textureWidth = tileSet.TileWidth * columns + tileSet.Spacing * (columns - 1) + 2 * tileSet.Margin;
+        int tileSetRows = tileCount / columns;
+        int textureHeight = tileSet.TileHeight * tileSetRows + tileSet.Spacing * (tileSetRows - 1) + 2 * tileSet.Margin;
 
-        GameObject layer = new GameObject(layerName);
-        MeshFilter meshFilter = layer.AddComponent<MeshFilter>();
-        MeshRenderer meshRenderer = layer.AddComponent<MeshRenderer>();
-        meshRenderer.sharedMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+        int submeshCount = 1 + layerData.Tiles.Count * 4 / 65000;
+        for (int submesh = 0; submesh < submeshCount; submesh++) {
+            GameObject meshObject = new GameObject(layerData.Name + "_" + submesh);
+            meshObject.transform.SetParent(layer.transform);
 
-        Mesh mesh = new Mesh();
-        mesh.name = layerName;
+            List<Vector3> verts = new List<Vector3>();
+            List<Vector3> norms = new List<Vector3>();
+            List<Vector2> uvs = new List<Vector2>();
+            List<Color> colors = new List<Color>();
+            List<int> tris = new List<int>();
 
-        List<Vector3> verts = new List<Vector3>();
-        List<Vector3> norms = new List<Vector3>();
-        List<Vector2> uvs = new List<Vector2>();
-        List<Color> colors = new List<Color>();
-        List<int> tris = new List<int>();
+            int tilesPlaced = 0;
+            for (int tile = submesh * 16250; tile < Mathf.Min((submesh+1) * 16250, layerData.Tiles.Count); tile++) {        
+                TmxLayerTile tileData = layerData.Tiles[tile];
+                int tileIndex = tileData.Gid - tileSet.FirstGid;
+                if (tileIndex < 0) continue;
 
-        int width = 0;
-        int height = 0;
-        int.TryParse(layerData.Attributes["width"].Value, out width);
-        int.TryParse(layerData.Attributes["height"].Value, out height);
+                Vector3 pos = new Vector3(tileData.X * offset.x, tileData.Y * offset.y, 0);
+                verts.AddRange(new Vector3[] {
+                    pos,
+                    pos + Vector3.up * offset.y,
+                    pos + (Vector3)offset,
+                    pos + Vector3.right * offset.x
+                });
 
-        int tileWidth = 0;
-        int tileHeight = 0;
-        int spacing = 0;
-        int margin = 0;
-        int tileCount = 0;
-        int tileSetColumns = 0;
-        int.TryParse(tileSetData.Attributes["tilewidth"].Value, out tileWidth);
-        int.TryParse(tileSetData.Attributes["tileheight"].Value, out tileHeight);
-        int.TryParse(tileSetData.Attributes["spacing"].Value, out spacing);
-        int.TryParse(tileSetData.Attributes["margin"].Value, out margin);
-        int.TryParse(tileSetData.Attributes["tilecount"].Value, out tileCount);
-        int.TryParse(tileSetData.Attributes["columns"].Value, out tileSetColumns);
-        int textureWidth = tileWidth * tileSetColumns + spacing * (tileSetColumns - 1) + 2 * margin;
-        int tileSetRows = tileCount / tileSetColumns;
-        int textureHeight = tileHeight * tileSetRows + spacing * (tileSetRows - 1) + 2 * margin;
+                norms.AddRange(new Vector3[] {
+                    Vector3.forward,
+                    Vector3.forward,
+                    Vector3.forward,
+                    Vector3.forward
+                });
 
-        int tilesPlaced = 0;
-        string[] rows = layerData.InnerText.Trim().Split('\n');
-        for (int y = 0; y < rows.Length; y++) {
-            string[] tiles = rows[y].Trim(new char[] {',','\n',' '}).Split(',');
-            for (int x = 0; x < tiles.Length; x++) {
-                int tile = 0;
-                int.TryParse(tiles[x], out tile);
-                tile -= 1;
+                int i = tileIndex % columns;
+                int j = (tileSetRows - 1) - tileIndex / columns;
+                float left = tileSet.Margin + i * (tileSet.TileWidth + tileSet.Spacing);
+                float right = left + tileSet.TileWidth;
+                float bottom = tileSet.Margin + j * (tileSet.TileHeight + tileSet.Spacing);
+                float top = bottom + tileSet.TileHeight;
 
-                if (tile >= 0) {
-                    Vector3 pos = new Vector3(x * offset.x, y * offset.y, 0);
-                    verts.AddRange(new Vector3[] {
-                        pos,
-                        pos + Vector3.up * offset.y,
-                        pos + (Vector3)offset,
-                        pos + Vector3.right * offset.x
-                    });
+                left /= (float)textureWidth;
+                right /= (float)textureWidth;
+                bottom /= (float)textureHeight;
+                top /= (float)textureHeight;
 
-                    norms.AddRange(new Vector3[] {
-                        Vector3.forward,
-                        Vector3.forward,
-                        Vector3.forward,
-                        Vector3.forward
-                    });
+                Vector2[] uvArray = new Vector2[] {
+                    new Vector2(left, bottom),
+                    new Vector2(left, top),
+                    new Vector2(right, top),
+                    new Vector2(right, bottom)
+                };
 
-                    int i = tile % tileSetColumns;
-                    int j = (tileSetRows - 1) - tile / tileSetColumns;
-                    float left = margin + i * (tileWidth + spacing);
-                    float right = left + tileWidth;
-                    float bottom = margin + j * (tileHeight + spacing);
-                    float top = bottom + tileHeight;
-
-                    left /= (float)textureWidth;
-                    right /= (float)textureWidth;
-                    bottom /= (float)textureHeight;
-                    top /= (float)textureHeight;
-
-                    Vector2[] uvArray = new Vector2[] {
-                        new Vector2(left, bottom),
-                        new Vector2(left, top),
+                if (offset.x < 0) {
+                    uvArray = new Vector2[] {
+                        new Vector2(right, bottom),
                         new Vector2(right, top),
-                        new Vector2(right, bottom)
+                        new Vector2(left, top),
+                        new Vector2(left, bottom)
                     };
-
-                    if (offset.x < 0) {
-                        uvArray = new Vector2[] {
-                            new Vector2(right, bottom),
-                            new Vector2(right, top),
-                            new Vector2(left, top),
-                            new Vector2(left, bottom)
-                        };
-                    }
-
-                    if (offset.y < 0) {
-                        uvArray = new Vector2[]{uvArray[1], uvArray[0], uvArray[3], uvArray[2]};
-                    }
-
-                    uvs.AddRange(uvArray);
-
-                    colors.AddRange(new Color[] {
-                        Color.white,
-                        Color.white,
-                        Color.white,
-                        Color.white
-                    });
-
-                    tris.AddRange(new int[] {
-                        tilesPlaced * 4, tilesPlaced * 4 + 1, tilesPlaced * 4 + 2,
-                        tilesPlaced * 4, tilesPlaced * 4 + 2, tilesPlaced * 4 + 3
-                    });
-                    tilesPlaced++;
                 }
+
+                if (offset.y < 0) {
+                    uvArray = new Vector2[]{uvArray[1], uvArray[0], uvArray[3], uvArray[2]};
+                }
+
+                uvs.AddRange(uvArray);
+
+                colors.AddRange(new Color[] {
+                    Color.white,
+                    Color.white,
+                    Color.white,
+                    Color.white
+                });
+
+                tris.AddRange(new int[] {
+                    tilesPlaced * 4, tilesPlaced * 4 + 1, tilesPlaced * 4 + 2,
+                    tilesPlaced * 4, tilesPlaced * 4 + 2, tilesPlaced * 4 + 3
+                });
+                tilesPlaced++;
             }
+
+            Mesh mesh = new Mesh();
+            mesh.name = layerData.Name + "_" + submesh;
+            mesh.vertices = verts.ToArray();
+            mesh.normals = norms.ToArray();
+            mesh.uv = uvs.ToArray();
+            mesh.colors = colors.ToArray();
+            mesh.triangles = tris.ToArray();
+            mesh.RecalculateBounds();
+
+            MeshFilter meshFilter = meshObject.AddComponent<MeshFilter>();
+            meshFilter.mesh = mesh;
+
+            MeshRenderer meshRenderer = meshObject.AddComponent<MeshRenderer>();
+            meshRenderer.sharedMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            //set material property block?
         }
-
-        mesh.vertices = verts.ToArray();
-        mesh.normals = norms.ToArray();
-        mesh.uv = uvs.ToArray();
-        mesh.colors = colors.ToArray();
-        mesh.triangles = tris.ToArray();
-        mesh.RecalculateBounds();
-
-        meshFilter.mesh = mesh;
 
         return layer;
     }
