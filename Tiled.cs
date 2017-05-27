@@ -1,13 +1,15 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Xml.Serialization;
 using System.IO;
+using System.IO.Compression;
 using UnityEngine;
 
 namespace Tiled {
 
 [XmlRoot("map")]
-public class Map {
+public class TileMap {
 	[XmlAttribute("version")] public string version = "1.0";
 	[XmlAttribute("orientation")] public string orientation = "orthogonal";
 	[XmlAttribute("renderorder")] public string renderOrder = "right-down";
@@ -23,21 +25,21 @@ public class Map {
 	[XmlElement("tileset", typeof(TileSet))] public TileSet[] tileSets;
 	[XmlElement("layer", typeof(Layer))] public Layer[] layers;
 
-	public static void Blah () {
-		Map map = Map.LoadTMX(Path.Combine(Application.dataPath, "read.tmx"));
+	public static void SanityCheck () {
+		TileMap map = TileMap.LoadTMX(Path.Combine(Application.dataPath, "read.tmx"));
 		map.SaveTMX(Path.Combine(Application.dataPath, "write.tmx"));
 	}
 
-	public static Map LoadTMX (string path) {
-		XmlSerializer deserializer = new XmlSerializer(typeof(Map));
+	public static TileMap LoadTMX (string path) {
+		XmlSerializer deserializer = new XmlSerializer(typeof(TileMap));
 		TextReader textReader = new StreamReader(path);
-		Map map = (Map)deserializer.Deserialize(textReader);
+		TileMap map = (TileMap)deserializer.Deserialize(textReader);
 		textReader.Close();
 		return map;
 	}
 
 	public void SaveTMX (string path) {
-		XmlSerializer serializer = new XmlSerializer(typeof(Map));
+		XmlSerializer serializer = new XmlSerializer(typeof(TileMap));
 		TextWriter textWriter = new StreamWriter(path);
 		serializer.Serialize(textWriter, this);
 		textWriter.Close();
@@ -55,18 +57,11 @@ public class TileSet {
 	[XmlAttribute("tilecount")] public int tileCount = 0;
 	[XmlAttribute("columns")] public int columns = 0;
 
-	public Image image;
-	public TileOffset tileoffset;
-	public Terrain[] terrainTypes;
+	[XmlElement("image", typeof(Image))] public Image image;
+	[XmlElement("tileoffset", typeof(TileOffset))] public TileOffset tileoffset;
+	[XmlElement("terraintypes", typeof(Terrain))] public Terrain[] terrainTypes;
 	[XmlElement("properties", typeof(Property))] public Property[] properties;
 	[XmlElement("tile", typeof(Tile))] public Tile[] tiles;
-	
-	public void SaveTMS (string path) {
-		XmlSerializer serializer = new XmlSerializer(typeof(TileSet));
-		TextWriter textWriter = new StreamWriter(path);
-		serializer.Serialize(textWriter, this);
-		textWriter.Close();
-	}
 }
 
 public class TileOffset {
@@ -87,7 +82,7 @@ public class Image {
 public class Data {
 	[XmlAttribute("encoding")] public string encoding = "csv";
 	[XmlAttribute("compression")] public string compression = "gzip";
-	[XmlText] public string data = "";
+	[XmlText] public string contents = "";
 }
 
 public class Terrain {
@@ -127,7 +122,48 @@ public class Layer {
 	[XmlAttribute("height")] public int height = 0;
 
 	[XmlElement("property", typeof(Property))] public Property[] properties;
-	[XmlElement("data", typeof(Data))] public Data data;
+	[XmlElement("data", typeof(Data))] public Data tileData;
+
+	private int[] _tileIDs;
+	public int[] tileIDs {
+		get {
+			if (_tileIDs == null || _tileIDs.Length != width * height) {
+				_tileIDs = new int[width * height];
+
+				if (tileData.encoding == "csv") {
+	            	string[] tiles = tileData.contents.Split(',');
+	                for (int i = 0; i < tiles.Length; i++) {
+	                    _tileIDs[i] = int.Parse(tiles[i].Trim());
+	                }
+	            }
+				else if (tileData.encoding == "base64") {
+	                // adapted from TiledSharp - https://github.com/marshallward/TiledSharp
+	                byte[] bytes = Convert.FromBase64String(tileData.contents);
+		            Stream stream = new MemoryStream(bytes, false);
+
+		            if (tileData.compression == "gzip") {
+		                stream = new GZipStream(stream, CompressionMode.Decompress);
+		            }
+		            else if (tileData.compression == "zlib") {
+		                stream = new DeflateStream(stream, CompressionMode.Decompress);
+		            }
+	                
+	                using (BinaryReader binaryReader = new BinaryReader(stream)){
+	                    for (int j = 0; j < height; j++) {
+	                        for (int i = 0; i < width; i++) {
+	                            _tileIDs[i + j * width] = (int)binaryReader.ReadUInt32();
+	                        }
+	                    }
+	                }
+	            }
+			}
+			return _tileIDs;
+		}
+	}
+
+	public int GetTileID (int x, int y) {
+		return tileIDs[x + y * width];
+	}
 }
 
 public class ObjectGroup {

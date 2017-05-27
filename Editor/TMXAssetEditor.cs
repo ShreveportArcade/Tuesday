@@ -9,9 +9,10 @@ using TiledSharp;
 [CustomEditor(typeof(DefaultAsset))]
 class TMXAssetEditor : Editor {
 
-    [MenuItem("Help/BLAH")]
-    private static void BLAH () {
-        Tiled.Map.Blah();
+    //TODO: DELETE ME
+    [MenuItem("Help/Tile Map Sanity Check")]
+    private static void SanityCheck () {
+        Tiled.TileMap.SanityCheck();
     }
 
     private static bool showTileSets = true;
