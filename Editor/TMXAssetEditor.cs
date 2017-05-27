@@ -9,6 +9,11 @@ using TiledSharp;
 [CustomEditor(typeof(DefaultAsset))]
 class TMXAssetEditor : Editor {
 
+    [MenuItem("Help/BLAH")]
+    private static void BLAH () {
+        Tiled.Map.Blah();
+    }
+
     private static bool showTileSets = true;
 
     public string path {
