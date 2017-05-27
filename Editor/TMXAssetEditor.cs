@@ -9,6 +9,8 @@ using TiledSharp;
 [CustomEditor(typeof(DefaultAsset))]
 class TMXAssetEditor : Editor {
 
+    private static bool showTileSets = true;
+
     public string path {
         get { return AssetDatabase.GetAssetPath(target); }
     }
@@ -33,44 +35,131 @@ class TMXAssetEditor : Editor {
         }
     }
 
-    private Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
+    private static Dictionary<string, bool> tileSetFoldoutStates = new Dictionary<string, bool>();
+    private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
     private Texture2D GetTileSetTexture (TmxTileset tileSet) {
+        Texture2D tex = null;
         if (tileSetTextures.ContainsKey(tileSet.Image.Source)) {
-            return tileSetTextures[tileSet.Image.Source];
+            tex = tileSetTextures[tileSet.Image.Source];
         }
         else {
             string texturePath = Path.GetFullPath(tileSet.Image.Source);
             texturePath = texturePath.Replace(Application.dataPath, "Assets");
-            Texture2D tex = AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D)) as Texture2D;
+            tex = AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D)) as Texture2D;
             tileSetTextures[tileSet.Image.Source] = tex;
-            return tex;
         }
+
+        if (tex == null) {
+            // texture doesn't exist at path
+        }
+
+        return tex;
+    }
+
+    private Texture2D TileSetTextureField (TmxTileset tileSet) {
+        EditorGUILayout.BeginHorizontal();
+
+        string path = tileSet.Image.Source;
+        bool show = !tileSetFoldoutStates.ContainsKey(path) || tileSetFoldoutStates[path];
+        tileSetFoldoutStates[path] = EditorGUILayout.Foldout(show, "");
+        
+        Texture2D currentTexture = GetTileSetTexture(tileSet);
+        Texture2D newTexture = EditorGUILayout.ObjectField(currentTexture, typeof(Texture2D), false) as Texture2D;
+        if (currentTexture != newTexture) {
+            // can't assign to tileSet.Image.Source
+        }
+
+        EditorGUILayout.EndHorizontal();   
+
+        return newTexture;
+    }
+
+    private TmxTileset selectedTileSet;
+    private int selectedTileIndex;
+    private Rect GetTileUVs (TmxTileset tileSet, int tileIndex) {
+        int columns = tileSet.Columns == null ? 1 : tileSet.Columns.Value;
+        int tileCount = tileSet.TileCount == null ? 1 : tileSet.TileCount.Value;
+        int textureWidth = tileSet.TileWidth * columns + tileSet.Spacing * (columns - 1) + 2 * tileSet.Margin;
+        int tileSetRows = tileCount / columns;
+        int textureHeight = tileSet.TileHeight * tileSetRows + tileSet.Spacing * (tileSetRows - 1) + 2 * tileSet.Margin;
+
+        int i = tileIndex % columns;
+        int j = (tileSetRows - 1) - tileIndex / columns;
+        
+        float x = tileSet.Margin + i * (tileSet.TileWidth + tileSet.Spacing);
+        float y = tileSet.Margin + j * (tileSet.TileHeight + tileSet.Spacing);
+        float width = tileSet.TileWidth;
+        float height = tileSet.TileHeight;
+
+        x /= (float)textureWidth;
+        y /= (float)textureHeight;
+        width /= (float)textureWidth;
+        height /= (float)textureHeight;
+
+        return new Rect(x, y, width, height);
+    }
+
+    private int GetTileIndex (TmxTileset tileSet, Rect rect, Vector2 pos) {
+        int columns = tileSet.Columns == null ? 1 : tileSet.Columns.Value;
+        int tileCount = tileSet.TileCount == null ? 1 : tileSet.TileCount.Value;
+        int rows = tileCount / columns;
+
+        pos -= rect.min;
+        pos.x /= rect.width;
+        pos.y /= rect.height;
+        return Mathf.FloorToInt(pos.y * rows) * columns + Mathf.FloorToInt(pos.x * columns);
     }
 
 	public override void OnInspectorGUI() {
-        if (isValid) TMXInspectorGUI();
-        else base.OnInspectorGUI();
-    }
- 
-    private void TMXInspectorGUI () {  
+        if (!isValid) {
+            base.OnInspectorGUI();
+            return;
+        }
+
+        GUI.enabled = true;
         EditorGUILayout.LabelField("Version: " + tmxMap.Version);
         EditorGUILayout.LabelField("Width: " + tmxMap.Width);
         EditorGUILayout.LabelField("Height: " + tmxMap.Height);
         EditorGUILayout.LabelField("TileWidth: " + tmxMap.TileWidth);
         EditorGUILayout.LabelField("TileHeight: " + tmxMap.TileHeight);
 
-        EditorGUILayout.LabelField("TileSets:");
-        foreach (TmxTileset tileSet in tmxMap.Tilesets){
-            EditorGUILayout.LabelField(tileSet.Name);
-            Texture2D tex = GetTileSetTexture(tileSet);
-            if (tex == null) continue; // TODO: Fix GetTileSetTexture missing textures
-            Rect r = GUILayoutUtility.GetRect(tex.width, tex.height);
-            EditorGUI.DrawPreviewTexture(r, tex, mat);
-            foreach (int tileIndex in tileSet.Tiles.Keys) {
-                TmxTilesetTile tile = tileSet.Tiles[tileIndex];
+        EditorGUIUtility.hierarchyMode = true;
+        showTileSets = EditorGUILayout.Foldout(showTileSets, "Tile Sets:");
+        EditorGUIUtility.hierarchyMode = false;
+        if (showTileSets) {
+            foreach (TmxTileset tileSet in tmxMap.Tilesets){
+                Texture2D tex = TileSetTextureField(tileSet); 
+
+                if (tileSetFoldoutStates[tileSet.Image.Source] && tex != null) {
+                    Rect r = GUILayoutUtility.GetRect(tex.width, tex.height);
+                    r.width = r.height * (float)tex.width / (float)tex.height;
+                    r.width -= 20;
+                    EditorGUI.DrawPreviewTexture(r, tex, mat);
+
+                    if (Event.current.type == EventType.MouseDown && r.Contains(Event.current.mousePosition)) {
+                        selectedTileSet = tileSet;
+                        selectedTileIndex = GetTileIndex(tileSet, r, Event.current.mousePosition);
+                    }
+                }
 
             }
         }
+    }
+
+    public override bool HasPreviewGUI() {
+        return selectedTileSet != null;
+    }
+
+    public override void OnPreviewGUI(Rect r, GUIStyle background) {
+        if (!isValid) {
+            base.OnPreviewGUI(r, background);
+            return;
+        }
+
+        if (Event.current.type != EventType.Repaint) return;
+
+        Texture2D tex = GetTileSetTexture(tmxMap.Tilesets[0]);
+        GUI.DrawTextureWithTexCoords(r, tex, GetTileUVs(selectedTileSet, selectedTileIndex), true);
     }
 
     void OnEnable () {
