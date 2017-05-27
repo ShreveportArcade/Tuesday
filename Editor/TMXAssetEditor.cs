@@ -1,5 +1,6 @@
 using UnityEditor;
 using UnityEngine;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Xml;
@@ -8,12 +9,6 @@ using Tiled;
 [InitializeOnLoad]
 [CustomEditor(typeof(DefaultAsset))]
 class TMXAssetEditor : Editor {
-
-    //TODO: DELETE ME
-    [MenuItem("Help/Tile Map Sanity Check")]
-    private static void SanityCheck () {
-        Tiled.TileMap.SanityCheck();
-    }
 
     private static bool showTileSets = true;
 
@@ -25,11 +20,15 @@ class TMXAssetEditor : Editor {
         get { return Path.GetExtension(path) == ".tmx"; }
     } 
 
-    private TileMap _tileMap;
+    private static Dictionary<string, bool> tileMapChanges = new Dictionary<string, bool>();
+    private static Dictionary<string, TileMap> tileMaps = new Dictionary<string, TileMap>();
     public TileMap tileMap {
         get {
-            if (_tileMap == null) _tileMap = TileMap.LoadTMX(path);
-            return _tileMap;
+            if (!tileMaps.ContainsKey(path)) {
+                tileMaps[path] = TileMap.LoadTMX(path);
+                tileMapChanges[path] = false;
+            } 
+            return tileMaps[path];
         }
     }
 
@@ -41,7 +40,7 @@ class TMXAssetEditor : Editor {
         }
     }
 
-    private static Dictionary<string, bool> tileSetFoldoutStates = new Dictionary<string, bool>();
+    private static Dictionary<int, bool> tileSetFoldoutStates = new Dictionary<int, bool>();
     private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
     private Texture2D GetTileSetTexture (TileSet tileSet) {
         Texture2D tex = null;
@@ -49,36 +48,82 @@ class TMXAssetEditor : Editor {
             tex = tileSetTextures[tileSet.image.source];
         }
         else {
-            string texturePath = Path.Combine(Path.GetDirectoryName(path), tileSet.image.source);
-            texturePath = Path.GetFullPath(texturePath);
-            texturePath = texturePath.Replace(Application.dataPath, "Assets");
+            string texturePath = tileSet.image.source;
+            if (texturePath.StartsWith("..")) {
+                texturePath = Path.Combine(Path.GetDirectoryName(path), texturePath);
+                texturePath = Path.GetFullPath(texturePath);
+                texturePath = texturePath.Replace(Application.dataPath, "Assets");
+            }
             tex = AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D)) as Texture2D;
             tileSetTextures[tileSet.image.source] = tex;
-        }
-
-        if (tex == null) {
-            // texture doesn't exist at path
         }
 
         return tex;
     }
 
-    private Texture2D TileSetTextureField (TileSet tileSet) {
+    private void TileSetField (TileSet tileSet) {
         EditorGUILayout.BeginHorizontal();
 
-        string path = tileSet.image.source;
-        bool show = !tileSetFoldoutStates.ContainsKey(path) || tileSetFoldoutStates[path];
-        tileSetFoldoutStates[path] = EditorGUILayout.Foldout(show, "");
-        
-        Texture2D currentTexture = GetTileSetTexture(tileSet);
-        Texture2D newTexture = EditorGUILayout.ObjectField(currentTexture, typeof(Texture2D), false) as Texture2D;
-        if (currentTexture != newTexture) {
-            tileSet.image.source = AssetDatabase.GetAssetPath(newTexture);
+        int id = tileSet.firstGID;
+        bool show = !tileSetFoldoutStates.ContainsKey(id) || tileSetFoldoutStates[id];
+        tileSetFoldoutStates[id] = EditorGUILayout.Foldout(show, "");
+
+        if (EditorGUILayout.DropdownButton(new GUIContent(""), FocusType.Passive)) {
+            GenericMenu menu = new GenericMenu();
+            int index = tileMap.GetIndexOfTileSet(tileSet);
+            if (index > 0) {
+                menu.AddItem(new GUIContent("Move Up"), false, () => {
+
+                });
+            }
+            if (index < (tileMap.tileSets.Length - 1)) {
+                menu.AddItem(new GUIContent("Move Down"), false, () => {
+
+                });
+            }
+            menu.AddSeparator("");
+            menu.AddItem(new GUIContent("Delete"), false, () => {
+
+            });
+            menu.ShowAsContext();
+            Event.current.Use();
         }
+
+        tileSet.name = EditorGUILayout.TextField("", tileSet.name);
 
         EditorGUILayout.EndHorizontal();   
 
-        return newTexture;
+        if (tileSetFoldoutStates[tileSet.firstGID]) {
+            tileSet.firstGID = EditorGUILayout.IntField("First Tile ID", tileSet.firstGID);
+            tileSet.tileWidth = EditorGUILayout.IntField("Width", tileSet.tileWidth);
+            tileSet.tileHeight = EditorGUILayout.IntField("Height", tileSet.tileHeight);
+            tileSet.spacing = EditorGUILayout.IntField("Spacing", tileSet.spacing);
+            tileSet.margin = EditorGUILayout.IntField("Margin", tileSet.margin);
+            tileSet.rows = EditorGUILayout.IntField("Rows", tileSet.rows);
+            tileSet.columns = EditorGUILayout.IntField("Columns", tileSet.columns);
+
+            Texture2D currentTexture = GetTileSetTexture(tileSet);
+            Texture2D tex = EditorGUILayout.ObjectField(currentTexture, typeof(Texture2D), false) as Texture2D;
+            if (currentTexture != tex) {
+                Uri textureURI = new Uri("/" + AssetDatabase.GetAssetPath(tex));
+                Uri tmxFileURI = new Uri("/" + Path.GetDirectoryName(path));
+                tileSet.image.source = "../" + tmxFileURI.MakeRelativeUri(textureURI);
+            }
+
+            if (tex != null) {
+                Rect r = GUILayoutUtility.GetRect(tex.width, tex.height);
+                r.width = r.height * (float)tex.width / (float)tex.height;
+                r.width -= 20;
+                EditorGUI.DrawPreviewTexture(r, tex, mat);
+
+                if (Event.current != null && 
+                    Event.current.type == EventType.MouseDown && 
+                    r.Contains(Event.current.mousePosition)) {
+                    selectedTileSet = tileSet;
+                    selectedTileIndex = GetTileIndex(tileSet, r, Event.current.mousePosition);
+                }
+            }
+        }
     }
 
     private TileSet selectedTileSet;
@@ -99,7 +144,6 @@ class TMXAssetEditor : Editor {
         }
 
         GUI.enabled = true;
-        Event e = Event.current;
 
         EditorGUILayout.LabelField("Version: " + tileMap.version);
         EditorGUILayout.LabelField("Width: " + tileMap.width);
@@ -112,21 +156,33 @@ class TMXAssetEditor : Editor {
         EditorGUIUtility.hierarchyMode = false;
         if (showTileSets) {
             foreach (TileSet tileSet in tileMap.tileSets){
-                Texture2D tex = TileSetTextureField(tileSet); 
-
-                if (tileSetFoldoutStates[tileSet.image.source] && tex != null) {
-                    Rect r = GUILayoutUtility.GetRect(tex.width, tex.height);
-                    r.width = r.height * (float)tex.width / (float)tex.height;
-                    r.width -= 20;
-                    EditorGUI.DrawPreviewTexture(r, tex, mat);
-
-                    if (e != null && e.type == EventType.MouseDown && r.Contains(e.mousePosition)) {
-                        selectedTileSet = tileSet;
-                        selectedTileIndex = GetTileIndex(tileSet, r, e.mousePosition);
-                    }
-                }
-
+                TileSetField(tileSet); 
             }
+        }
+
+        if (GUI.changed) {
+            tileMapChanges[path] = true;
+        }
+
+        if (tileMapChanges[path]) {
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Revert")) {
+                tileMaps[path] = TileMap.LoadTMX(path);
+                tileMapChanges[path] = false;
+            }
+            if (GUILayout.Button("Save")) {
+                tileMaps[path].SaveTMX(
+                    EditorUtility.SaveFilePanel(
+                        "Save as TMX",
+                        Path.GetDirectoryName(path),
+                        Path.GetFileNameWithoutExtension(path),
+                        Path.GetExtension(path).TrimStart(new char[]{'.'})
+                    )
+                );
+                AssetDatabase.ImportAsset(path);
+                tileMapChanges[path] = false;
+            }
+            EditorGUILayout.EndHorizontal();
         }
     }
 
@@ -234,6 +290,8 @@ class TMXAssetEditor : Editor {
             for (int tileIndex = submesh * 16250; tileIndex < Mathf.Min((submesh+1) * 16250, layerData.tileIDs.Length); tileIndex++) {        
                 int tileID = layerData.tileIDs[tileIndex];
                 TileSet tileSet = tileMap.GetTileSetByTileID(tileID);
+                if (tileSet == null) continue;
+                
                 float[] uvRect = tileSet.GetTileUVs(tileID);
                 if (uvRect == null) continue;
 

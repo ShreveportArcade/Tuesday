@@ -25,11 +25,6 @@ public class TileMap {
 	[XmlElement("tileset", typeof(TileSet))] public TileSet[] tileSets;
 	[XmlElement("layer", typeof(Layer))] public Layer[] layers;
 
-	public static void SanityCheck () {
-		TileMap map = TileMap.LoadTMX(Path.Combine(Application.dataPath, "read.tmx"));
-		map.SaveTMX(Path.Combine(Application.dataPath, "write.tmx"));
-	}
-
 	public static TileMap LoadTMX (string path) {
 		XmlSerializer deserializer = new XmlSerializer(typeof(TileMap));
 		TextReader textReader = new StreamReader(path);
@@ -43,6 +38,13 @@ public class TileMap {
 		TextWriter textWriter = new StreamWriter(path);
 		serializer.Serialize(textWriter, this);
 		textWriter.Close();
+	}
+
+	public int GetIndexOfTileSet (TileSet tileSet) {
+		for (int i = 0; i < tileSets.Length; i++) {
+			if (tileSets[i] == tileSet) return i;
+		}
+		return -1;
 	}
 
 	public TileSet GetTileSetByTileID (int tileID) {
@@ -78,7 +80,10 @@ public class TileSet {
 	[XmlAttribute("margin")] public int margin = 0;
 	[XmlAttribute("tilecount")] public int tileCount = 0;
 	[XmlAttribute("columns")] public int columns = 0;
-	public int rows { get { return tileCount / columns; } }
+	public int rows { 
+		get { return tileCount / columns; } 
+		set { tileCount = value * columns; }
+	}
 
 	[XmlElement("image", typeof(Image))] public Image image;
 	[XmlElement("tileoffset", typeof(TileOffset))] public TileOffset tileoffset;
