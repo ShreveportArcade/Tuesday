@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Xml.Serialization;
 using System.IO;
 using System.IO.Compression;
-using UnityEngine;
+using UnityEngine; //TODO: remove me
 
 namespace Tiled {
 
@@ -44,6 +44,28 @@ public class TileMap {
 		serializer.Serialize(textWriter, this);
 		textWriter.Close();
 	}
+
+	public TileSet GetTileSetByTileID (int tileID) {
+		foreach (TileSet tileSet in tileSets) {
+			if (tileID >= tileSet.firstGID && 
+				tileID < tileSet.firstGID + tileSet.tileCount) {
+				return tileSet;
+			}
+		}
+		return null;
+	}
+
+	public Tile GetTile (Layer layer, int x, int y) {
+		int tileID = layer.GetTileID(x, y);
+		TileSet tileSet = GetTileSetByTileID(tileID);
+		return tileSet.tiles[tileID - tileSet.firstGID];
+	}
+
+	public Tile GetTile (Layer layer, int index) {
+		int tileID = layer.tileIDs[index];
+		TileSet tileSet = GetTileSetByTileID(tileID);
+		return tileSet.tiles[tileID - tileSet.firstGID];
+	}
 }
 
 public class TileSet {
@@ -56,60 +78,32 @@ public class TileSet {
 	[XmlAttribute("margin")] public int margin = 0;
 	[XmlAttribute("tilecount")] public int tileCount = 0;
 	[XmlAttribute("columns")] public int columns = 0;
+	public int rows { get { return tileCount / columns; } }
 
 	[XmlElement("image", typeof(Image))] public Image image;
 	[XmlElement("tileoffset", typeof(TileOffset))] public TileOffset tileoffset;
 	[XmlElement("terraintypes", typeof(Terrain))] public Terrain[] terrainTypes;
 	[XmlElement("properties", typeof(Property))] public Property[] properties;
 	[XmlElement("tile", typeof(Tile))] public Tile[] tiles;
-}
 
-public class TileOffset {
-	[XmlAttribute("x")] public int x = 0; 
-	[XmlAttribute("y")] public int y = 0;
-}
+	public float[] GetTileUVs (int tileGID) {
+		if (tileGID < firstGID || tileGID >= firstGID + tileCount) return null;
+		int tileIndex = tileGID - firstGID;
+        int i = tileIndex % columns;
+        int j = (rows - 1) - tileIndex / columns;
+        
+        float x = (margin + i * (tileWidth + spacing));
+        float y = (margin + j * (tileHeight + spacing));
+        float width = tileWidth;
+        float height = tileHeight;
 
-public class Image {
-	[XmlAttribute("format")] public string format = "";
-	[XmlAttribute("source")] public string source = "";
-	[XmlAttribute("trans")] public string trans = "";
-	[XmlAttribute("width")] public int width = 0;
-	[XmlAttribute("height")] public int height = 0;
+		x /= (float)image.width;
+		y /= (float)image.height;
+		width /= (float)image.width;
+		height /= (float)image.height;
 
-	[XmlElement("data", typeof(Data))] public Data data;
-}
-
-public class Data {
-	[XmlAttribute("encoding")] public string encoding = "csv";
-	[XmlAttribute("compression")] public string compression = "gzip";
-	[XmlText] public string contents = "";
-}
-
-public class Terrain {
-	[XmlAttribute("name")] public string name = "";
-	[XmlAttribute("tile")] public int tile = 0;
-}
-
-public class Property {
-	[XmlAttribute("name")] public string name = "";
-	[XmlAttribute("type")] public string type = "";
-	[XmlAttribute("value")] public string val = "";
-}
-
-public class Tile {
-	[XmlAttribute("id")] public int id = 0;
-	[XmlAttribute("terrain")] public string terrain = "0,0,0,0";
-	[XmlAttribute("probability")] public float probability = 1;
-
-	[XmlElement("properties", typeof(Property))] public Property[] properties;
-	[XmlElement("animation", typeof(Frame))] public Frame[] animation;
-	[XmlElement("image", typeof(Image))] public Image image;
-	[XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup objectGroup;
-}
-
-public class Frame {
-	[XmlAttribute("tileid")] public int tileID = 0;
-	[XmlAttribute("duration")] public float duration = 0;
+        return new float[] {x, y, width, height};
+    }
 }
 
 public class Layer {
@@ -164,6 +158,61 @@ public class Layer {
 	public int GetTileID (int x, int y) {
 		return tileIDs[x + y * width];
 	}
+
+	public int[] GetTileLocation (int index) {
+		int[] loc = new int[2];
+		loc[0] = index % width;
+		loc[1] = index / height;
+		return loc;
+	}
+}
+
+public class TileOffset {
+	[XmlAttribute("x")] public int x = 0; 
+	[XmlAttribute("y")] public int y = 0;
+}
+
+public class Image {
+	[XmlAttribute("format")] public string format = "";
+	[XmlAttribute("source")] public string source = "";
+	[XmlAttribute("trans")] public string trans = "";
+	[XmlAttribute("width")] public int width = 0;
+	[XmlAttribute("height")] public int height = 0;
+
+	[XmlElement("data", typeof(Data))] public Data data;
+}
+
+public class Data {
+	[XmlAttribute("encoding")] public string encoding = "csv";
+	[XmlAttribute("compression")] public string compression = "gzip";
+	[XmlText] public string contents = "";
+}
+
+public class Terrain {
+	[XmlAttribute("name")] public string name = "";
+	[XmlAttribute("tile")] public int tile = 0;
+}
+
+public class Property {
+	[XmlAttribute("name")] public string name = "";
+	[XmlAttribute("type")] public string type = "";
+	[XmlAttribute("value")] public string val = "";
+}
+
+public class Tile {
+	[XmlAttribute("id")] public int id = 0;
+	[XmlAttribute("terrain")] public string terrain = "0,0,0,0";
+	[XmlAttribute("probability")] public float probability = 1;
+
+	[XmlElement("properties", typeof(Property))] public Property[] properties;
+	[XmlElement("animation", typeof(Frame))] public Frame[] animation;
+	[XmlElement("image", typeof(Image))] public Image image;
+	[XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup objectGroup;
+}
+
+public class Frame {
+	[XmlAttribute("tileid")] public int tileID = 0;
+	[XmlAttribute("duration")] public float duration = 0;
 }
 
 public class ObjectGroup {
