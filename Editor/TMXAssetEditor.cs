@@ -20,13 +20,11 @@ class TMXAssetEditor : Editor {
         get { return Path.GetExtension(path) == ".tmx"; }
     } 
 
-    private static Dictionary<string, bool> tileMapChanges = new Dictionary<string, bool>();
     private static Dictionary<string, TileMap> tileMaps = new Dictionary<string, TileMap>();
     public TileMap tileMap {
         get {
             if (!tileMaps.ContainsKey(path)) {
                 tileMaps[path] = TileMap.LoadTMX(path);
-                tileMapChanges[path] = false;
             } 
             return tileMaps[path];
         }
@@ -42,7 +40,7 @@ class TMXAssetEditor : Editor {
 
     private static Dictionary<int, bool> tileSetFoldoutStates = new Dictionary<int, bool>();
     private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
-    private Texture2D GetTileSetTexture (TileSet tileSet) {
+    private static Texture2D GetTileSetTexture (TileSet tileSet, string path) {
         Texture2D tex = null;
         if (tileSetTextures.ContainsKey(tileSet.image.source)) {
             tex = tileSetTextures[tileSet.image.source];
@@ -83,7 +81,12 @@ class TMXAssetEditor : Editor {
             }
             menu.AddSeparator("");
             menu.AddItem(new GUIContent("Delete"), false, () => {
-
+                TileSet[] newTileSets = new TileSet[tileMap.tileSets.Length - 1];
+                for (int i = 0; i < newTileSets.Length; i++) {
+                    if (i < index) newTileSets[i] = tileMap.tileSets[i];
+                    else if (i > index) newTileSets[i] = tileMap.tileSets[i+1];
+                }
+                tileMap.tileSets = newTileSets;
             });
             menu.ShowAsContext();
             Event.current.Use();
@@ -102,7 +105,7 @@ class TMXAssetEditor : Editor {
             tileSet.rows = EditorGUILayout.IntField("Rows", tileSet.rows);
             tileSet.columns = EditorGUILayout.IntField("Columns", tileSet.columns);
 
-            Texture2D currentTexture = GetTileSetTexture(tileSet);
+            Texture2D currentTexture = GetTileSetTexture(tileSet, path);
             Texture2D tex = EditorGUILayout.ObjectField(currentTexture, typeof(Texture2D), false) as Texture2D;
             if (currentTexture != tex) {
                 Uri textureURI = new Uri("/" + AssetDatabase.GetAssetPath(tex));
@@ -146,10 +149,10 @@ class TMXAssetEditor : Editor {
         GUI.enabled = true;
 
         EditorGUILayout.LabelField("Version: " + tileMap.version);
-        EditorGUILayout.LabelField("Width: " + tileMap.width);
-        EditorGUILayout.LabelField("Height: " + tileMap.height);
-        EditorGUILayout.LabelField("TileWidth: " + tileMap.tileWidth);
-        EditorGUILayout.LabelField("TileHeight: " + tileMap.tileHeight);
+        tileMap.width = EditorGUILayout.IntField("Width: ", tileMap.width);
+        tileMap.height = EditorGUILayout.IntField("Height: ", tileMap.height);
+        tileMap.tileWidth = EditorGUILayout.IntField("TileWidth: ", tileMap.tileWidth);
+        tileMap.tileHeight = EditorGUILayout.IntField("TileHeight: ", tileMap.tileHeight);
 
         EditorGUIUtility.hierarchyMode = true;
         showTileSets = EditorGUILayout.Foldout(showTileSets, "Tile Sets:");
@@ -160,30 +163,26 @@ class TMXAssetEditor : Editor {
             }
         }
 
-        if (GUI.changed) {
-            tileMapChanges[path] = true;
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Revert")) {
+            tileMaps[path] = TileMap.LoadTMX(path);
         }
-
-        if (tileMapChanges[path]) {
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Revert")) {
-                tileMaps[path] = TileMap.LoadTMX(path);
-                tileMapChanges[path] = false;
-            }
-            if (GUILayout.Button("Save")) {
-                tileMaps[path].SaveTMX(
-                    EditorUtility.SaveFilePanel(
-                        "Save as TMX",
-                        Path.GetDirectoryName(path),
-                        Path.GetFileNameWithoutExtension(path),
-                        Path.GetExtension(path).TrimStart(new char[]{'.'})
-                    )
-                );
-                AssetDatabase.ImportAsset(path);
-                tileMapChanges[path] = false;
-            }
-            EditorGUILayout.EndHorizontal();
+        if (GUILayout.Button("Save")) {
+            tileMaps[path].SaveTMX(path);
+            AssetDatabase.ImportAsset(path);
         }
+        if (GUILayout.Button("Save As")) {
+            tileMaps[path].SaveTMX(
+                EditorUtility.SaveFilePanel(
+                    "Save as TMX",
+                    Path.GetDirectoryName(path),
+                    Path.GetFileNameWithoutExtension(path),
+                    Path.GetExtension(path).TrimStart(new char[]{'.'})
+                )
+            );
+            AssetDatabase.ImportAsset(path);
+        }
+        EditorGUILayout.EndHorizontal();
     }
 
     public override bool HasPreviewGUI() {
@@ -198,9 +197,17 @@ class TMXAssetEditor : Editor {
 
         if (Event.current.type != EventType.Repaint) return;
 
-        Texture2D tex = GetTileSetTexture(tileMap.tileSets[0]);
+        Texture2D tex = GetTileSetTexture(tileMap.tileSets[0], path);
         float[] uvArray = selectedTileSet.GetTileUVs(selectedTileIndex);
         Rect uvRect = new Rect(uvArray[0], uvArray[1], uvArray[2], uvArray[3]);
+        if (r.height > r.width) {
+            r.height = r.width;
+            r.x += (r.height - r.width) * 0.5f;
+        }
+        else if (r.width > r.height) {
+            r.width = r.height;
+            r.y += (r.width - r.height) * 0.5f;
+        }
         GUI.DrawTextureWithTexCoords(r, tex, uvRect, true);
     }
 
@@ -261,14 +268,14 @@ class TMXAssetEditor : Editor {
         Undo.RegisterCreatedObjectUndo (root, "Created '" + name + "' from TMX file.");
 
         for (int i = 0; i < tileMap.layers.Length; i++) {
-            GameObject layer = CreateTileLayer(tileMap, i, offset);
+            GameObject layer = CreateTileLayer(tileMap, i, offset, tmxFilePath);
             if (layer != null) layer.transform.SetParent(root.transform);
         }
 
         return root;
     }
 
-    public static GameObject CreateTileLayer (TileMap tileMap, int layerIndex, Vector2 offset) {
+    public static GameObject CreateTileLayer (TileMap tileMap, int layerIndex, Vector2 offset, string tmxFilePath) {
         Layer layerData = tileMap.layers[layerIndex];
         GameObject layer = new GameObject(layerData.name);
         
@@ -367,7 +374,10 @@ class TMXAssetEditor : Editor {
 
             MeshRenderer meshRenderer = meshObject.AddComponent<MeshRenderer>();
             meshRenderer.sharedMaterial = mat;
-            //set material property block?
+            MaterialPropertyBlock propBlock = new MaterialPropertyBlock ();
+ 
+            propBlock.SetTexture("_MainTex", GetTileSetTexture(tileMap.tileSets[0], tmxFilePath));
+            meshRenderer.SetPropertyBlock (propBlock);
         }
 
         return layer;

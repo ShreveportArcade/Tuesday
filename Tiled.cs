@@ -167,7 +167,7 @@ public class Layer {
 	public int[] GetTileLocation (int index) {
 		int[] loc = new int[2];
 		loc[0] = index % width;
-		loc[1] = index / height;
+		loc[1] = index / width;
 		return loc;
 	}
 }
