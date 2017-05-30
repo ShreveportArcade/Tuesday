@@ -1,144 +1,60 @@
 using UnityEditor;
 using UnityEngine;
-using System;
 using System.Collections.Generic;
+using System;
 using System.IO;
-using System.Xml;
-using Tiled;
 
+namespace Tiled {
 [InitializeOnLoad]
 [CustomEditor(typeof(DefaultAsset))]
 class TMXAssetEditor : Editor {
 
-    private static bool showTileSets = true;
+    private AssetImporter importer;  
+    private int _pixelsPerUnit = -1;  
+    private int pixelsPerUnit {
+        get {
+            if (_pixelsPerUnit < 0) {
+                if (importer == null) importer = AssetImporter.GetAtPath(path);
+                string userData = importer.userData;
+                if (string.IsNullOrEmpty(userData)) _pixelsPerUnit = tmxFile.tileWidth;
+                else _pixelsPerUnit = Int32.Parse(userData);
+            }
+            return _pixelsPerUnit;
+        }
+        set {
+            if (_pixelsPerUnit != value) {
+                _pixelsPerUnit = value;
+                if (importer == null) importer = AssetImporter.GetAtPath(path);
+                importer.userData = "" + _pixelsPerUnit;
+            }
+        }
+    }
 
-    public string path {
+    private string path {
         get { return AssetDatabase.GetAssetPath(target); }
     }
 
-    public bool isValid {
+    private bool isValid {
         get { return Path.GetExtension(path) == ".tmx"; }
     } 
 
-    private static Dictionary<string, TileMap> tileMaps = new Dictionary<string, TileMap>();
-    public TileMap tileMap {
+    private static Dictionary<string, TMXFile> tmxFiles = new Dictionary<string, TMXFile>();
+    private TMXFile tmxFile {
         get {
-            if (!tileMaps.ContainsKey(path)) {
-                tileMaps[path] = TileMap.LoadTMX(path);
+            if (!tmxFiles.ContainsKey(path)) {
+                tmxFiles[path] = TMXFile.Load(path);
             } 
-            return tileMaps[path];
+            return tmxFiles[path];
         }
     }
 
     private static Material _mat;
-    public static Material mat {
+    private static Material mat {
         get {
             if (_mat == null) _mat = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
             return _mat;
         }
-    }
-
-    private static Dictionary<int, bool> tileSetFoldoutStates = new Dictionary<int, bool>();
-    private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
-    private static Texture2D GetTileSetTexture (TileSet tileSet, string path) {
-        Texture2D tex = null;
-        if (tileSetTextures.ContainsKey(tileSet.image.source)) {
-            tex = tileSetTextures[tileSet.image.source];
-        }
-        else {
-            string texturePath = tileSet.image.source;
-            if (texturePath.StartsWith("..")) {
-                texturePath = Path.Combine(Path.GetDirectoryName(path), texturePath);
-                texturePath = Path.GetFullPath(texturePath);
-                texturePath = texturePath.Replace(Application.dataPath, "Assets");
-            }
-            tex = AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D)) as Texture2D;
-            tileSetTextures[tileSet.image.source] = tex;
-        }
-
-        return tex;
-    }
-
-    private void TileSetField (TileSet tileSet) {
-        EditorGUILayout.BeginHorizontal();
-
-        int id = tileSet.firstGID;
-        bool show = !tileSetFoldoutStates.ContainsKey(id) || tileSetFoldoutStates[id];
-        tileSetFoldoutStates[id] = EditorGUILayout.Foldout(show, "");
-
-        if (EditorGUILayout.DropdownButton(new GUIContent(""), FocusType.Passive)) {
-            GenericMenu menu = new GenericMenu();
-            int index = tileMap.GetIndexOfTileSet(tileSet);
-            if (index > 0) {
-                menu.AddItem(new GUIContent("Move Up"), false, () => {
-
-                });
-            }
-            if (index < (tileMap.tileSets.Length - 1)) {
-                menu.AddItem(new GUIContent("Move Down"), false, () => {
-
-                });
-            }
-            menu.AddSeparator("");
-            menu.AddItem(new GUIContent("Delete"), false, () => {
-                TileSet[] newTileSets = new TileSet[tileMap.tileSets.Length - 1];
-                for (int i = 0; i < newTileSets.Length; i++) {
-                    if (i < index) newTileSets[i] = tileMap.tileSets[i];
-                    else if (i > index) newTileSets[i] = tileMap.tileSets[i+1];
-                }
-                tileMap.tileSets = newTileSets;
-            });
-            menu.ShowAsContext();
-            Event.current.Use();
-        }
-
-        tileSet.name = EditorGUILayout.TextField("", tileSet.name);
-
-        EditorGUILayout.EndHorizontal();   
-
-        if (tileSetFoldoutStates[tileSet.firstGID]) {
-            tileSet.firstGID = EditorGUILayout.IntField("First Tile ID", tileSet.firstGID);
-            tileSet.tileWidth = EditorGUILayout.IntField("Width", tileSet.tileWidth);
-            tileSet.tileHeight = EditorGUILayout.IntField("Height", tileSet.tileHeight);
-            tileSet.spacing = EditorGUILayout.IntField("Spacing", tileSet.spacing);
-            tileSet.margin = EditorGUILayout.IntField("Margin", tileSet.margin);
-            tileSet.rows = EditorGUILayout.IntField("Rows", tileSet.rows);
-            tileSet.columns = EditorGUILayout.IntField("Columns", tileSet.columns);
-
-            Texture2D currentTexture = GetTileSetTexture(tileSet, path);
-            Texture2D tex = EditorGUILayout.ObjectField(currentTexture, typeof(Texture2D), false) as Texture2D;
-            if (currentTexture != tex) {
-                Uri textureURI = new Uri("/" + AssetDatabase.GetAssetPath(tex));
-                Uri tmxFileURI = new Uri("/" + Path.GetDirectoryName(path));
-                tileSet.image.source = "../" + tmxFileURI.MakeRelativeUri(textureURI);
-            }
-
-            if (tex != null) {
-                Rect r = GUILayoutUtility.GetRect(tex.width, tex.height);
-                r.width = r.height * (float)tex.width / (float)tex.height;
-                r.width -= 20;
-                EditorGUI.DrawPreviewTexture(r, tex, mat);
-
-                if (Event.current != null && 
-                    Event.current.type == EventType.MouseDown && 
-                    r.Contains(Event.current.mousePosition)) {
-                    selectedTileSet = tileSet;
-                    selectedTileIndex = GetTileIndex(tileSet, r, Event.current.mousePosition);
-                }
-            }
-        }
-    }
-
-    private TileSet selectedTileSet;
-    private int selectedTileIndex;
-    private int GetTileIndex (TileSet tileSet, Rect rect, Vector2 pos) {
-        pos -= rect.min;
-        pos.x /= rect.width;
-        pos.y /= rect.height;
-        int i = tileSet.firstGID;
-        i += Mathf.FloorToInt(pos.y * tileSet.rows) * tileSet.columns + Mathf.FloorToInt(pos.x * tileSet.columns);
-        return i;
-    }
+    }    
 
 	public override void OnInspectorGUI() {
         if (!isValid) {
@@ -148,31 +64,23 @@ class TMXAssetEditor : Editor {
 
         GUI.enabled = true;
 
-        EditorGUILayout.LabelField("Version: " + tileMap.version);
-        tileMap.width = EditorGUILayout.IntField("Width: ", tileMap.width);
-        tileMap.height = EditorGUILayout.IntField("Height: ", tileMap.height);
-        tileMap.tileWidth = EditorGUILayout.IntField("TileWidth: ", tileMap.tileWidth);
-        tileMap.tileHeight = EditorGUILayout.IntField("TileHeight: ", tileMap.tileHeight);
+        pixelsPerUnit = EditorGUILayout.IntField("Pixels / Unit: ", pixelsPerUnit);
+        tmxFile.width = EditorGUILayout.IntField("Map Width: ", tmxFile.width);
+        tmxFile.height = EditorGUILayout.IntField("Map Height: ", tmxFile.height);
+        tmxFile.tileWidth = EditorGUILayout.IntField("Tile Width: ", tmxFile.tileWidth);
+        tmxFile.tileHeight = EditorGUILayout.IntField("Tile Height: ", tmxFile.tileHeight);
 
-        EditorGUIUtility.hierarchyMode = true;
-        showTileSets = EditorGUILayout.Foldout(showTileSets, "Tile Sets:");
-        EditorGUIUtility.hierarchyMode = false;
-        if (showTileSets) {
-            foreach (TileSet tileSet in tileMap.tileSets){
-                TileSetField(tileSet); 
-            }
-        }
-
+        EditorGUILayout.Space();
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Revert")) {
-            tileMaps[path] = TileMap.LoadTMX(path);
+            tmxFiles[path] = TMXFile.Load(path);
         }
         if (GUILayout.Button("Save")) {
-            tileMaps[path].SaveTMX(path);
+            tmxFiles[path].Save(path);
             AssetDatabase.ImportAsset(path);
         }
         if (GUILayout.Button("Save As")) {
-            tileMaps[path].SaveTMX(
+            tmxFiles[path].Save(
                 EditorUtility.SaveFilePanel(
                     "Save as TMX",
                     Path.GetDirectoryName(path),
@@ -183,32 +91,6 @@ class TMXAssetEditor : Editor {
             AssetDatabase.ImportAsset(path);
         }
         EditorGUILayout.EndHorizontal();
-    }
-
-    public override bool HasPreviewGUI() {
-        return selectedTileSet != null;
-    }
-
-    public override void OnPreviewGUI(Rect r, GUIStyle background) {
-        if (!isValid) {
-            base.OnPreviewGUI(r, background);
-            return;
-        }
-
-        if (Event.current.type != EventType.Repaint) return;
-
-        Texture2D tex = GetTileSetTexture(tileMap.tileSets[0], path);
-        float[] uvArray = selectedTileSet.GetTileUVs(selectedTileIndex);
-        Rect uvRect = new Rect(uvArray[0], uvArray[1], uvArray[2], uvArray[3]);
-        if (r.height > r.width) {
-            r.height = r.width;
-            r.x += (r.height - r.width) * 0.5f;
-        }
-        else if (r.width > r.height) {
-            r.width = r.height;
-            r.y += (r.width - r.height) * 0.5f;
-        }
-        GUI.DrawTextureWithTexCoords(r, tex, uvRect, true);
     }
 
     void OnEnable () {
@@ -239,10 +121,30 @@ class TMXAssetEditor : Editor {
                 foreach (UnityEngine.Object o in DragAndDrop.objectReferences) {
                     string path = AssetDatabase.GetAssetPath(o);
                     if (Path.GetExtension(path) == ".tmx") {
-                        CreateTileMap(path);
-                        // GameObject map = CreateTileMap(path);
+                        float pixelsPerUnit = -1;
+                        AssetImporter importer = AssetImporter.GetAtPath(path);
+                        if (!string.IsNullOrEmpty(importer.userData)) {
+                            pixelsPerUnit = float.Parse(importer.userData);
+                        }
+
+                        string name = Path.GetFileNameWithoutExtension(path);
+                        GameObject map = new GameObject(name);
+                        TileMap tileMap = map.AddComponent<TileMap>();
+                        tileMap.Setup(path, pixelsPerUnit);
+                        TMXFile tmxFile = tileMap.tmxFile;
+                        foreach (MeshRenderer meshRenderer in map.GetComponentsInChildren<MeshRenderer>()) {
+                            meshRenderer.sharedMaterial = mat;
+                            MaterialPropertyBlock propBlock = new MaterialPropertyBlock ();
+                 
+                            propBlock.SetTexture("_MainTex", TileMapEditor.GetTileSetTexture(tmxFile.tileSets[0], path));
+                            meshRenderer.SetPropertyBlock (propBlock);
+                        }
+
+                        Undo.RegisterCreatedObjectUndo (map, "Created '" + name + "' from TMX file.");
+
                         // place map at mouse position in scene view
                         // place at origin relative to object dropped on in Hierarchy
+
                         foundTMX = true;
                     }
                 }
@@ -253,133 +155,5 @@ class TMXAssetEditor : Editor {
             }
         }
     }
-
-    private static GameObject CreateTileMap (string tmxFilePath) {
-        TileMap tileMap = TileMap.LoadTMX(tmxFilePath);
-
-        string[] xyDirections = tileMap.renderOrder.Split('-');
-        Vector2 offset = new Vector2(
-            (xyDirections[0] == "right") ? tileMap.tileWidth : -tileMap.tileWidth,
-            (xyDirections[1] == "up") ? tileMap.tileHeight : -tileMap.tileHeight            
-        );
-
-        string name = Path.GetFileNameWithoutExtension(tmxFilePath);
-        GameObject root = new GameObject(name);
-        Undo.RegisterCreatedObjectUndo (root, "Created '" + name + "' from TMX file.");
-
-        for (int i = 0; i < tileMap.layers.Length; i++) {
-            GameObject layer = CreateTileLayer(tileMap, i, offset, tmxFilePath);
-            if (layer != null) layer.transform.SetParent(root.transform);
-        }
-
-        return root;
-    }
-
-    public static GameObject CreateTileLayer (TileMap tileMap, int layerIndex, Vector2 offset, string tmxFilePath) {
-        Layer layerData = tileMap.layers[layerIndex];
-        GameObject layer = new GameObject(layerData.name);
-        
-        int submeshCount = 1 + layerData.tileIDs.Length * 4 / 65000;
-        for (int submesh = 0; submesh < submeshCount; submesh++) {
-            GameObject meshObject = layer;
-            if (submeshCount > 1) {
-                meshObject = new GameObject(layerData.name + "_submesh" + submesh);
-                meshObject.transform.SetParent(layer.transform);
-            }
-
-            List<Vector3> verts = new List<Vector3>();
-            List<Vector3> norms = new List<Vector3>();
-            List<Vector2> uvs = new List<Vector2>();
-            List<Color> colors = new List<Color>();
-            List<int> tris = new List<int>();
-
-            int tilesPlaced = 0;
-            for (int tileIndex = submesh * 16250; tileIndex < Mathf.Min((submesh+1) * 16250, layerData.tileIDs.Length); tileIndex++) {        
-                int tileID = layerData.tileIDs[tileIndex];
-                TileSet tileSet = tileMap.GetTileSetByTileID(tileID);
-                if (tileSet == null) continue;
-                
-                float[] uvRect = tileSet.GetTileUVs(tileID);
-                if (uvRect == null) continue;
-
-                int[] tileLocation = layerData.GetTileLocation(tileIndex);
-                Vector3 pos = new Vector3(tileLocation[0] * offset.x, tileLocation[1] * offset.y, 0);
-                verts.AddRange(new Vector3[] {
-                    pos,
-                    pos + Vector3.up * offset.y,
-                    pos + (Vector3)offset,
-                    pos + Vector3.right * offset.x
-                });
-
-                norms.AddRange(new Vector3[] {
-                    Vector3.forward,
-                    Vector3.forward,
-                    Vector3.forward,
-                    Vector3.forward
-                });
-
-                float left = uvRect[0];
-                float right = uvRect[0] + uvRect[2];
-                float bottom = uvRect[1];
-                float top = uvRect[1] + uvRect[3];
-
-                Vector2[] uvArray = new Vector2[] {
-                    new Vector2(left, bottom),
-                    new Vector2(left, top),
-                    new Vector2(right, top),
-                    new Vector2(right, bottom)
-                };
-
-                if (offset.x < 0) {
-                    uvArray = new Vector2[] {
-                        new Vector2(right, bottom),
-                        new Vector2(right, top),
-                        new Vector2(left, top),
-                        new Vector2(left, bottom)
-                    };
-                }
-
-                if (offset.y < 0) {
-                    uvArray = new Vector2[]{uvArray[1], uvArray[0], uvArray[3], uvArray[2]};
-                }
-
-                uvs.AddRange(uvArray);
-
-                colors.AddRange(new Color[] {
-                    Color.white,
-                    Color.white,
-                    Color.white,
-                    Color.white
-                });
-
-                tris.AddRange(new int[] {
-                    tilesPlaced * 4, tilesPlaced * 4 + 1, tilesPlaced * 4 + 2,
-                    tilesPlaced * 4, tilesPlaced * 4 + 2, tilesPlaced * 4 + 3
-                });
-                tilesPlaced++;
-            }
-
-            Mesh mesh = new Mesh();
-            mesh.name = layerData.name;
-            if (submeshCount > 1) mesh.name += "_submesh" + submesh;
-            mesh.vertices = verts.ToArray();
-            mesh.normals = norms.ToArray();
-            mesh.uv = uvs.ToArray();
-            mesh.colors = colors.ToArray();
-            mesh.triangles = tris.ToArray();
-            mesh.RecalculateBounds();
-
-            MeshFilter meshFilter = meshObject.AddComponent<MeshFilter>();
-            meshFilter.mesh = mesh;
-
-            MeshRenderer meshRenderer = meshObject.AddComponent<MeshRenderer>();
-            meshRenderer.sharedMaterial = mat;
-            MaterialPropertyBlock propBlock = new MaterialPropertyBlock ();
- 
-            propBlock.SetTexture("_MainTex", GetTileSetTexture(tileMap.tileSets[0], tmxFilePath));
-            meshRenderer.SetPropertyBlock (propBlock);
-        }
-
-        return layer;
-    }
+}
 }
