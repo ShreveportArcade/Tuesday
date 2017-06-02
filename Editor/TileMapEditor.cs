@@ -48,14 +48,21 @@ public class TileMapEditor : Editor {
                 texturePath = texturePath.Replace(Application.dataPath, "Assets");
             }
             tex = AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D)) as Texture2D;
-            tileSetTextures[tileSet.image.source] = tex;
+        }
+
+        if (tex == null) {
+        	tex = EditorGUIUtility.FindTexture(Path.GetFileNameWithoutExtension(path));
+        }
+
+        if (tex != null) {
+        	tileSetTextures[tileSet.image.source] = tex;
         }
 
         return tex;
     }
 
-	private TileSet selectedTileSet;
-    private int selectedTileIndex;
+	private static TileSet selectedTileSet;
+    private static int selectedTileIndex;
     private int GetTileIndex (TileSet tileSet, Rect rect, Vector2 pos) {
         pos -= rect.min;
         pos.x /= rect.width;
@@ -129,18 +136,9 @@ public class TileMapEditor : Editor {
                 r.x = (Screen.width - r.width) * 0.5f;
                 EditorGUI.DrawPreviewTexture(r, tex, mat);
 
-                // FIXME: Mouse events throw exception here
-                /*
-                ArgumentException: GUILayout: Mismatched LayoutGroup.MouseDown
-                UnityEngine.GUILayoutUtility.BeginLayoutGroup (UnityEngine.GUIStyle style, UnityEngine.GUILayoutOption[] options, System.Type layoutType) (at /Users/builduser/buildslave/unity/build/Runtime/IMGUI/Managed/GUILayoutUtility.cs:301)
-                UnityEditor.EditorGUILayout.BeginHorizontal (UnityEngine.GUIContent content, UnityEngine.GUIStyle style, UnityEngine.GUILayoutOption[] options) (at /Users/builduser/buildslave/unity/build/Editor/Mono/EditorGUI.cs:7234)
-                UnityEditor.EditorGUILayout.BeginHorizontal (UnityEngine.GUILayoutOption[] options) (at /Users/builduser/buildslave/unity/build/Editor/Mono/EditorGUI.cs:7214)
-                UnityEditor.LabelGUI.OnLabelGUI (UnityEngine.Object[] assets) (at /Users/builduser/buildslave/unity/build/Editor/Mono/Inspector/LabelGUI.cs:171)
-                UnityEditor.InspectorWindow.DrawPreviewAndLabels () (at /Users/builduser/buildslave/unity/build/Editor/Mono/Inspector/InspectorWin
-                */
-                if (Event.current != null && 
-                    Event.current.type == EventType.MouseDown && 
-                    r.Contains(Event.current.mousePosition)) {
+                if (Event.current.isMouse && 
+                	Event.current.button == 0 && 
+                	r.Contains(Event.current.mousePosition)) {
                     selectedTileSet = tileSet;
                     selectedTileIndex = GetTileIndex(tileSet, r, Event.current.mousePosition);
                 }
@@ -167,14 +165,15 @@ public class TileMapEditor : Editor {
         }
     }
 
-	public override void OnInspectorGUI() {
-		
+    private static int editState = 0;
+    public override void OnInspectorGUI() {		
 		base.OnInspectorGUI();
 
     	EditorGUIUtility.hierarchyMode = true;
         showTileSets = EditorGUILayout.Foldout(showTileSets, "Tile Sets:");
         EditorGUIUtility.hierarchyMode = false;
         if (showTileSets) {
+	    	editState = GUILayout.Toolbar(editState, new string[] {"Move", "Paint", "Erase", "Select"});
             foreach (TileSet tileSet in tmxFile.tileSets){
                 TileSetField(tileSet); 
             }
@@ -184,6 +183,7 @@ public class TileMapEditor : Editor {
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Revert")) {
             tmxFile = TMXFile.Load(path);
+			tileMap.Revert();
         }
         if (GUILayout.Button("Save")) {
             tmxFile.Save(path);
@@ -207,11 +207,16 @@ public class TileMapEditor : Editor {
         return selectedTileSet != null;
     }
 
+    public override GUIContent GetPreviewTitle() {
+    	return new GUIContent(selectedTileSet.name + " - Tile: " + selectedTileIndex);
+    }
+
     public override void OnPreviewGUI(Rect r, GUIStyle background) {
         if (Event.current.type != EventType.Repaint) return;
 
         Texture2D tex = GetTileSetTexture(tmxFile.tileSets[0], path);
         TileRect uvTileRect = selectedTileSet.GetTileUVs(selectedTileIndex);
+        if (uvTileRect == null) return;
         Rect uvRect = new Rect(uvTileRect.x, uvTileRect.y, uvTileRect.width, uvTileRect.height);
         if (r.height > r.width) {
             r.height = r.width;
@@ -225,19 +230,98 @@ public class TileMapEditor : Editor {
         GUI.DrawTextureWithTexCoords(r, tex, uvRect, true);
     }
 
+    Vector3 selectionStart;
+    Vector3 selectionEnd;
+    int[] selectedTileIndices = null;
     void OnSceneGUI () {
-    	if (selectedTileSet == null) return;
+    	if (editState == 0) return;
 
-    	Camera cam = SceneView.lastActiveSceneView.camera;
-    	if (cam != null && Event.current != null && Event.current.type == EventType.MouseDown) {
-	        Ray ray = cam.ScreenPointToRay(Event.current.mousePosition);
-	        float dist = 0;
-	        Plane plane = new Plane(Vector3.back, tileMap.transform.position);
-	        if (plane.Raycast(ray, out dist)) {
-	        	Vector3 p = ray.GetPoint(dist);
-	        	tileMap.SetTile(selectedTileIndex, 0, p);
-	        }
+    	int controlId = GUIUtility.GetControlID(FocusType.Passive);
+
+    	Event e = Event.current;
+    	if (e == null) return;
+
+    	if (e.type == EventType.MouseDown) {
+    		selectedTileIndices = null;
+    		if (editState == 3) selectionStart = Event.current.mousePosition;
+    		else DrawTile();
+    	}
+    	else if (e.type == EventType.MouseUp && editState == 3) {
+			selectionEnd = Event.current.mousePosition;
+			SelectTiles();
+    	}
+    	else if (e.type == EventType.MouseDrag) {
+    		if (editState != 3) DrawTile();	    
+
+    		Handles.DrawSolidRectangleWithOutline(new Vector3[] {
+    				new Vector3(selectionStart.x, selectionEnd.y, 0),
+    				selectionStart,
+    				selectionEnd,
+					new Vector3(selectionEnd.x, selectionStart.y, 0)
+				},
+				new Color(1,1,1,0.1f),
+				new Color(1,1,1,0.5f)
+			);      
 	    }
+
+    	GUIUtility.hotControl = controlId;
+    }
+
+    void DrawTile () {
+    	int tileIndex = selectedTileIndex;
+    	if (selectedTileSet == null) { 
+    		selectedTileSet = tmxFile.tileSets[0];
+    		tileIndex = selectedTileSet.firstGID;
+    	}
+
+    	if (editState == 2) {
+    		tileIndex = selectedTileSet.firstGID - 1;
+    	}
+
+    	Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+        float dist = 0;
+        Plane plane = new Plane(Vector3.forward, tileMap.transform.position);
+        if (plane.Raycast(ray, out dist)) {
+        	Vector3 p = ray.GetPoint(dist);
+        	if (tileMap.SetTile(tileIndex, 0, p - tileMap.transform.position)) {
+		        Event.current.Use();
+	        }
+        }
+    }
+
+    void SelectTiles () {
+		Ray startRay = HandleUtility.GUIPointToWorldRay(selectionStart);
+		Ray endRay = HandleUtility.GUIPointToWorldRay(selectionEnd);
+        float startDist = 0;
+        float endDist = 0;
+        Plane plane = new Plane(Vector3.forward, tileMap.transform.position);
+        if (plane.Raycast(startRay, out startDist) && plane.Raycast(endRay, out endDist)) {
+        	Vector3 startPos = startRay.GetPoint(startDist) - tileMap.transform.position;
+        	Vector3 endPos = endRay.GetPoint(endDist) - tileMap.transform.position;
+
+			int startX = Mathf.Clamp(Mathf.FloorToInt(startPos.x / tileMap.offset.x), 0, tmxFile.width);
+			int startY = Mathf.Clamp(Mathf.FloorToInt(startPos.y / tileMap.offset.y), 0, tmxFile.height);
+        
+			int endX = Mathf.Clamp(Mathf.FloorToInt(endPos.x / tileMap.offset.x), 0, tmxFile.width);
+			int endY = Mathf.Clamp(Mathf.FloorToInt(endPos.y / tileMap.offset.y), 0, tmxFile.height);
+        
+        	int width = Mathf.Abs(endX - startX);
+        	int height = Mathf.Abs(endY - startY);
+        	int a = Mathf.Min(startX, endX);
+        	int b = Mathf.Min(startY, endY);
+			selectedTileIndices = new int[width * height];
+			int i = 0;
+			for (int x = a; x < a + width; x++) {
+				for (int y = b; y < b + width; y++) {
+					selectedTileIndices[i] = x + y * tmxFile.width;
+				}
+			}
+        }
+
+        if (selectedTileIndices != null) {
+        	Debug.Log(selectedTileIndices.Length);
+	        Event.current.Use();
+        }
     }
 }
 }

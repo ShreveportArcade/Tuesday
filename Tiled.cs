@@ -135,7 +135,9 @@ public class Layer {
 	private int[] _tileIDs;
 	public int[] tileIDs {
 		get {
-			if (_tileIDs == null || _tileIDs.Length != width * height) {
+			if (_tileIDs == null || 
+				_tileIDs.Length != width * height) {
+
 				_tileIDs = new int[width * height];
 
 				if (tileData.encoding == "csv") {
@@ -171,7 +173,18 @@ public class Layer {
 	}
 
 	public void SetTileID (int id, int x, int y) {
-		tileIDs[x + y * width] = id;
+		int index = x + y * width;
+		tileIDs[index] = id;
+
+		if (tileData.encoding == "csv") {
+        	string[] tileStrings = tileData.contents.Split(',');
+            string tileString = tileStrings[index];
+
+            if (tileString.StartsWith("\n")) tileStrings[index] = "\n" + id.ToString();
+            else tileStrings[index] = id.ToString();
+            
+            tileData.contents = string.Join(",", tileStrings);
+        }
 	}
 
 	public int GetTileID (int x, int y) {

@@ -93,12 +93,7 @@ class TMXAssetEditor : Editor {
         EditorGUILayout.EndHorizontal();
     }
 
-    void OnEnable () {
-        EditorApplication.hierarchyWindowItemOnGUI += HierarchyGUICallback;
-        SceneView.onSceneGUIDelegate += SceneGUICallback;
-    }
-
-    void OnDisable () {
+    static TMXAssetEditor () {
         EditorApplication.hierarchyWindowItemOnGUI += HierarchyGUICallback;
         SceneView.onSceneGUIDelegate += SceneGUICallback;
     }
