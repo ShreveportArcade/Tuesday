@@ -24,16 +24,16 @@ public class TileMap : MonoBehaviour {
         }
     }
 
-    private PolyTree[][] _layerPolyTrees;
-    private PolyTree[][] layerPolyTrees {
+    private List<List<IntPoint>>[][] _layerPaths;
+    private List<List<IntPoint>>[][] layerPaths {
         get {
-            if (_layerPolyTrees == null) {
-                _layerPolyTrees = new PolyTree[layers.Length][];
+            if (_layerPaths == null) {
+                _layerPaths = new List<List<IntPoint>>[layers.Length][];
                 for (int layerIndex = 0; layerIndex < layers.Length; layerIndex++) {
-                    _layerPolyTrees[layerIndex] = new PolyTree[meshesPerLayer];
+                    _layerPaths[layerIndex] = new List<List<IntPoint>>[meshesPerLayer];
                 }
             }
-            return _layerPolyTrees;
+            return _layerPaths;
         }
     }
 
@@ -91,6 +91,7 @@ public class TileMap : MonoBehaviour {
             for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
                 UpdateMesh(layerIndex, submeshIndex);
             }
+            UpdatePolygonColliders(layerIndex);
         }
     }
 
@@ -115,7 +116,7 @@ public class TileMap : MonoBehaviour {
         List<Color> colors = new List<Color>();
         List<int> tris = new List<int>();
 
-        Clipper clipper = new Clipper();
+        List<List<IntPoint>> paths = new List<List<IntPoint>>();
 
         int tilesPlaced = 0;
         for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileIDs.Length); tileIndex++) {        
@@ -137,8 +138,7 @@ public class TileMap : MonoBehaviour {
             };
             verts.AddRange(quad);
 
-            List<IntPoint> path = new List<IntPoint>(System.Array.ConvertAll(quad, (p) => Vector2ToIntPoint((Vector2)p)));
-            clipper.AddPath(path, PolyType.ptSubject, true);
+            paths.Add(new List<IntPoint>(System.Array.ConvertAll(quad, (p) => Vector2ToIntPoint((Vector2)p))));
 
             norms.AddRange(new Vector3[] {
                 Vector3.forward,
@@ -199,27 +199,24 @@ public class TileMap : MonoBehaviour {
         mesh.RecalculateBounds();
 
         layerMeshFilters[layerIndex][submeshIndex].sharedMesh = mesh;
-
-        PolyTree tree = new PolyTree();
-        clipper.Execute(ClipType.ctUnion, tree);
-        layerPolyTrees[layerIndex][submeshIndex] = tree;
+        layerPaths[layerIndex][submeshIndex] = paths;
     }
 
-    void UpdatePolygonColliders (int layerIndex) {
+    public void UpdatePolygonColliders (int layerIndex) {
         Clipper clipper = new Clipper();
         for (int submeshIndex = 0; submeshIndex < layers.Length; submeshIndex++) {
-            PolyTree branch = layerPolyTrees[layerIndex][submeshIndex];
-            clipper.AddPaths(Clipper.ClosedPathsFromPolyTree(branch), PolyType.ptSubject, true);
+            List<List<IntPoint>> paths = layerPaths[layerIndex][submeshIndex];
+            clipper.AddPaths(paths, PolyType.ptSubject, true);
         }
         
         PolyTree tree = new PolyTree();
         clipper.Execute(ClipType.ctUnion, tree);
-        List<List<IntPoint>> paths = Clipper.ClosedPathsFromPolyTree(tree);
+        List<List<IntPoint>> resultPaths = Clipper.ClosedPathsFromPolyTree(tree);
 
         PolygonCollider2D poly = layers[layerIndex].GetComponent<PolygonCollider2D>();
-        poly.pathCount = paths.Count;
-        for (int i = 0; i < paths.Count; i++) {
-            Vector2[] path = System.Array.ConvertAll(paths[i].ToArray(), (p) => IntPointToVector2(p));
+        poly.pathCount = resultPaths.Count;
+        for (int i = 0; i < resultPaths.Count; i++) {
+            Vector2[] path = System.Array.ConvertAll(resultPaths[i].ToArray(), (p) => IntPointToVector2(p));
             poly.SetPath(i, path);
         }
     }

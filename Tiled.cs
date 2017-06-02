@@ -213,7 +213,7 @@ public class Image {
 [System.Serializable]
 public class Data {
 	[XmlAttribute("encoding")] public string encoding = "csv";
-	[XmlAttribute("compression")] public string compression = "gzip";
+	[XmlAttribute("compression")] public string compression = "";
 	[XmlText] public string contents = "";
 }
 
@@ -311,7 +311,7 @@ public class Elipse {
 
 [System.Serializable]
 public class Polygon {
-	[XmlAttribute("points")] public string points = "0,0 1,1 1,-1";
+	[XmlAttribute("points")] public string points = "";
 }
 
 [System.Serializable]

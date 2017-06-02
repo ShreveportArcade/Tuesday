@@ -143,7 +143,7 @@ public class TileMapEditor : Editor {
                     selectedTileIndex = GetTileIndex(tileSet, r, Event.current.mousePosition);
                 }
 
-                if (selectedTileSet != null && selectedTileSet == tileSet) {
+                if (selectedTileSet != null && selectedTileSet == tileSet && selectedTileIndex > 0) {
                     TileRect uvTileRect = selectedTileSet.GetTileUVs(selectedTileIndex);
                     float left = r.x + r.width * uvTileRect.left;
                     float right = r.x + r.width * uvTileRect.right;
@@ -246,9 +246,14 @@ public class TileMapEditor : Editor {
     		if (editState == 3) selectionStart = Event.current.mousePosition;
     		else DrawTile();
     	}
-    	else if (e.type == EventType.MouseUp && editState == 3) {
-			selectionEnd = Event.current.mousePosition;
-			SelectTiles();
+    	else if (e.type == EventType.MouseUp) {
+            if (editState == 3) {
+    			selectionEnd = Event.current.mousePosition;
+    			SelectTiles();
+            }
+            else {
+                tileMap.UpdatePolygonColliders(0);
+            }
     	}
     	else if (e.type == EventType.MouseDrag) {
     		if (editState != 3) DrawTile();	    
