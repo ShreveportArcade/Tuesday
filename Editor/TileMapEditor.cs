@@ -235,41 +235,53 @@ public class TileMapEditor : Editor {
     int[] selectedTileIndices = null;
     void OnSceneGUI () {
     	if (editState == 0) return;
-
-    	int controlId = GUIUtility.GetControlID(FocusType.Passive);
+        if (editState == 3) DrawSelection();
 
     	Event e = Event.current;
     	if (e == null) return;
 
+        int controlId = GUIUtility.GetControlID(FocusType.Passive);
+
     	if (e.type == EventType.MouseDown) {
     		selectedTileIndices = null;
-    		if (editState == 3) selectionStart = Event.current.mousePosition;
+    		if (editState == 3) selectionStart = MouseToWorldPoint();
     		else DrawTile();
     	}
-    	else if (e.type == EventType.MouseUp) {
-            if (editState == 3) {
-    			selectionEnd = Event.current.mousePosition;
-    			SelectTiles();
-            }
+        else if (e.type == EventType.MouseDrag) {
+            if (editState != 3) DrawTile(); 
             else {
-                tileMap.UpdatePolygonColliders(0);
+                selectionEnd = MouseToWorldPoint();
+                HandleUtility.Repaint();
             }
+        }
+    	else if (e.type == EventType.MouseUp) {
+            if (editState == 3) SelectTiles();
+            else tileMap.UpdatePolygonColliders(0);
     	}
-    	else if (e.type == EventType.MouseDrag) {
-    		if (editState != 3) DrawTile();	    
-
-    		Handles.DrawSolidRectangleWithOutline(new Vector3[] {
-    				new Vector3(selectionStart.x, selectionEnd.y, 0),
-    				selectionStart,
-    				selectionEnd,
-					new Vector3(selectionEnd.x, selectionStart.y, 0)
-				},
-				new Color(1,1,1,0.1f),
-				new Color(1,1,1,0.5f)
-			);      
-	    }
 
     	GUIUtility.hotControl = controlId;
+    }
+
+    Vector3 MouseToWorldPoint () {
+        Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+        float dist = 0;
+        Plane plane = new Plane(Vector3.forward, tileMap.transform.position);
+        if (plane.Raycast(ray, out dist)) {
+            return ray.GetPoint(dist) - tileMap.transform.position;
+        }
+        return Vector3.zero;
+    }
+
+    void DrawSelection () {
+        Handles.DrawSolidRectangleWithOutline(new Vector3[] {
+                selectionStart,
+                new Vector3(selectionStart.x, selectionEnd.y, 0),
+                selectionEnd,
+                new Vector3(selectionEnd.x, selectionStart.y, 0)
+            },
+            new Color(1,1,1,0.1f),
+            new Color(1,1,1,0.5f)
+        );  
     }
 
     void DrawTile () {
@@ -295,36 +307,29 @@ public class TileMapEditor : Editor {
     }
 
     void SelectTiles () {
-		Ray startRay = HandleUtility.GUIPointToWorldRay(selectionStart);
-		Ray endRay = HandleUtility.GUIPointToWorldRay(selectionEnd);
-        float startDist = 0;
-        float endDist = 0;
-        Plane plane = new Plane(Vector3.forward, tileMap.transform.position);
-        if (plane.Raycast(startRay, out startDist) && plane.Raycast(endRay, out endDist)) {
-        	Vector3 startPos = startRay.GetPoint(startDist) - tileMap.transform.position;
-        	Vector3 endPos = endRay.GetPoint(endDist) - tileMap.transform.position;
+        Vector3 startPos = selectionStart - tileMap.transform.position;
+        Vector3 endPos = selectionEnd - tileMap.transform.position;
 
-			int startX = Mathf.Clamp(Mathf.FloorToInt(startPos.x / tileMap.offset.x), 0, tmxFile.width);
-			int startY = Mathf.Clamp(Mathf.FloorToInt(startPos.y / tileMap.offset.y), 0, tmxFile.height);
-        
-			int endX = Mathf.Clamp(Mathf.FloorToInt(endPos.x / tileMap.offset.x), 0, tmxFile.width);
-			int endY = Mathf.Clamp(Mathf.FloorToInt(endPos.y / tileMap.offset.y), 0, tmxFile.height);
-        
-        	int width = Mathf.Abs(endX - startX);
-        	int height = Mathf.Abs(endY - startY);
-        	int a = Mathf.Min(startX, endX);
-        	int b = Mathf.Min(startY, endY);
-			selectedTileIndices = new int[width * height];
-			int i = 0;
-			for (int x = a; x < a + width; x++) {
-				for (int y = b; y < b + width; y++) {
-					selectedTileIndices[i] = x + y * tmxFile.width;
-				}
+		int startX = Mathf.Clamp(Mathf.FloorToInt(startPos.x / tileMap.offset.x), 0, tmxFile.width);
+		int startY = Mathf.Clamp(Mathf.FloorToInt(startPos.y / tileMap.offset.y), 0, tmxFile.height);
+    
+		int endX = Mathf.Clamp(Mathf.FloorToInt(endPos.x / tileMap.offset.x), 0, tmxFile.width);
+		int endY = Mathf.Clamp(Mathf.FloorToInt(endPos.y / tileMap.offset.y), 0, tmxFile.height);
+    
+    	int width = Mathf.Abs(endX - startX);
+    	int height = Mathf.Abs(endY - startY);
+    	int a = Mathf.Min(startX, endX);
+    	int b = Mathf.Min(startY, endY);
+		selectedTileIndices = new int[width * height];
+
+		int i = 0;
+		for (int x = a; x < a + width; x++) {
+			for (int y = b; y < b + width; y++) {
+				selectedTileIndices[i] = x + y * tmxFile.width;
 			}
-        }
+		}
 
         if (selectedTileIndices != null) {
-        	Debug.Log(selectedTileIndices.Length);
 	        Event.current.Use();
         }
     }
