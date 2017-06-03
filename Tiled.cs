@@ -16,19 +16,14 @@ public class TMXFile {
 	[XmlAttribute("height")] public int height = 0;
 	[XmlAttribute("tilewidth")] public int tileWidth = 0;
 	[XmlAttribute("tileheight")] public int tileHeight = 0;
-	[XmlAttribute("hexsidelength")] public int hexSideLength = 0;
-	[XmlAttribute("staggeraxis")] public string staggerAxis = "x";
-	[XmlAttribute("staggerindex")] public string staggerIndex = "even";
-	[XmlAttribute("backgroundcolor")] public string backgroundColor = "";
+	[XmlAttribute("hexsidelength")] public int? hexSideLength { get; set; }
+	[XmlAttribute("staggeraxis")] public string staggerAxis { get; set; }
+	[XmlAttribute("staggerindex")] public string staggerIndex { get; set; }
+	[XmlAttribute("backgroundcolor")] public string backgroundColor { get; set; }
 	[XmlAttribute("nextobjectid")] public int nextObjectID = 0;	
 	
 	[XmlElement("tileset", typeof(TileSet))] public TileSet[] tileSets;
 	[XmlElement("layer", typeof(Layer))] public Layer[] layers;
-
-    public bool ShouldSerializehexsidelength () { return orientation == "hexagonal"; }
-    public bool ShouldSerializestaggeraxis () { return orientation == "hexagonal" || orientation == "staggered"; }
-    public bool ShouldSerializestaggerindex () { return orientation == "hexagonal" || orientation == "staggered"; }
-    public bool ShouldSerializebackgroundColor () { return !string.IsNullOrEmpty(backgroundColor); }
 
 	public static TMXFile Load (string path) {
 		XmlSerializer deserializer = new XmlSerializer(typeof(TMXFile));
@@ -39,11 +34,13 @@ public class TMXFile {
 	}
 
 	public void Save (string path) {
-		XmlSerializer serializer = new XmlSerializer(typeof(TMXFile));
-		TextWriter textWriter = new StreamWriter(path);
-		serializer.Serialize(textWriter, this);
-		textWriter.Close();
-	}
+        XmlSerializer serializer = new XmlSerializer(typeof(TMXFile));
+        TextWriter textWriter = new StreamWriter(path);
+        XmlSerializerNamespaces nameSpaces = new XmlSerializerNamespaces();
+        nameSpaces.Add("","");
+        serializer.Serialize(textWriter, this, nameSpaces);
+        textWriter.Close();
+    }
 
 	public int GetIndexOfTileSet (TileSet tileSet) {
 		for (int i = 0; i < tileSets.Length; i++) {
@@ -83,7 +80,7 @@ public class TMXFile {
 [System.Serializable]
 public class TileSet {
 	[XmlAttribute("firstgid")] public int firstGID = 0;
-	[XmlAttribute("source")] public string source = "";
+	[XmlAttribute("source")] public string source { get; set; }
 	[XmlAttribute("name")] public string name = "";
 	[XmlAttribute("tilewidth")] public int tileWidth = 0;
 	[XmlAttribute("tileheight")] public int tileHeight = 0;
@@ -91,22 +88,17 @@ public class TileSet {
 	[XmlAttribute("margin")] public int margin = 0;
 	[XmlAttribute("tilecount")] public int tileCount = 0;
 	[XmlAttribute("columns")] public int columns = 0;
-	public int rows { 
+	
+    [XmlIgnore] public int rows { 
 		get { return tileCount / columns; } 
 		set { tileCount = value * columns; }
 	}
 
-	[XmlElement("image", typeof(Image))] public Image image;
-	[XmlElement("tileoffset", typeof(TilePoint))] public TilePoint tileOffset;
-	[XmlElement("terraintypes", typeof(Terrain))] public Terrain[] terrainTypes;
-	[XmlElement("properties", typeof(Property))] public Property[] properties;
-	[XmlElement("tile", typeof(Tile))] public Tile[] tiles;
-
-	public bool ShouldSerializesource () { return !string.IsNullOrEmpty(source); }
-	public bool ShouldSerializeimage () { return image != null; }
-	public bool ShouldSerializetileOffset () { return tileOffset != null; }
-	public bool ShouldSerializeterrainTypes () { return terrainTypes != null && terrainTypes.Length > 0; }
-	public bool ShouldSerializeproperties () { return properties != null && properties.Length > 0; }
+	[XmlElement("image", typeof(Image))] public Image image { get; set; }
+	[XmlElement("tileoffset", typeof(TilePoint))] public TilePoint tileOffset { get; set; }
+	[XmlElement("terraintypes", typeof(Terrain))] public Terrain[] terrainTypes { get; set; }
+	[XmlElement("properties", typeof(Property))] public Property[] properties { get; set; }
+	[XmlElement("tile", typeof(Tile))] public Tile[] tiles { get; set; }
 
 	public TileRect GetTileUVs (int tileGID) {
 		if (tileGID < firstGID || tileGID >= firstGID + tileCount) return null;
@@ -141,10 +133,7 @@ public class Layer {
 	[XmlAttribute("height")] public int height = 0;
 
 	[XmlElement("property", typeof(Property))] public Property[] properties;
-	[XmlElement("data", typeof(Data))] public Data tileData;
-
-    public bool ShouldSerializeproperties () { return properties != null && properties.Length > 0; }
-    public bool ShouldSerializetileData () { return tileData != null; }
+	[XmlElement("data", typeof(Data))] public Data tileData { get; set; }
     
 	private int[] _tileIDs;
 	public int[] tileIDs {
@@ -215,25 +204,20 @@ public class Layer {
 
 [System.Serializable]
 public class Image {
-	[XmlAttribute("format")] public string format = "";
-	[XmlAttribute("source")] public string source = "";
-	[XmlAttribute("trans")] public string trans = "";
+	[XmlAttribute("format")] public string format { get; set; }
+	[XmlAttribute("source")] public string source { get; set; }
+	[XmlAttribute("trans")] public string trans { get; set; }
 	[XmlAttribute("width")] public int width = 0;
 	[XmlAttribute("height")] public int height = 0;
 
-	[XmlElement("data", typeof(Data))] public Data data;
-
-    public bool ShouldSerializeformat () { return data != null; }
-    public bool ShouldSerializedata () { return data != null; }
+	[XmlElement("data", typeof(Data))] public Data data { get; set; }
 }
 
 [System.Serializable]
 public class Data {
 	[XmlAttribute("encoding")] public string encoding = "csv";
-	[XmlAttribute("compression")] public string compression = "";
+	[XmlAttribute("compression")] public string compression { get; set; }
 	[XmlText] public string contents = "";
-
-    public bool ShouldSerializecompression () { return encoding != "csv"; }
 }
 
 [System.Serializable]
@@ -271,20 +255,13 @@ public class Property {
 [System.Serializable]
 public class Tile {
 	[XmlAttribute("id")] public int id = 0;
-	[XmlAttribute("terrain")] public string terrain = "";
-	[XmlAttribute("probability")] public float probability = 1;
+	[XmlAttribute("terrain")] public string terrain { get; set; }
+	[XmlAttribute("probability")] public float probability { get; set; }
 
 	[XmlElement("properties", typeof(Property))] public Property[] properties;
 	[XmlElement("animation", typeof(Frame))] public Frame[] animation;
-	[XmlElement("image", typeof(Image))] public Image image;
-	[XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup objectGroup;
-
-    public bool ShouldSerializeterrain () { return !string.IsNullOrEmpty(terrain); }
-    public bool ShouldSerializeprobability () { return !string.IsNullOrEmpty(terrain); }
-    public bool ShouldSerializeproperties () { return properties != null && properties.Length > 0; }
-    public bool ShouldSerializeanimation () { return animation != null && animation.Length > 0; }
-    public bool ShouldSerializeimage () { return image != null; }
-    public bool ShouldSerializeobjectGroup () { return objectGroup != null; }
+	[XmlElement("image", typeof(Image))] public Image image { get; set; }
+	[XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup objectGroup { get; set; }
 }
 
 [System.Serializable]
@@ -296,7 +273,7 @@ public class Frame {
 [System.Serializable]
 public class ObjectGroup {
 	[XmlAttribute("name")] public string name = "";
-	[XmlAttribute("color")] public string color = "00000000";
+	[XmlAttribute("color")] public string color { get; set; }
 	[XmlAttribute("opacity")] public float opacity = 1;
 	[XmlAttribute("visible")] public int visible = 1;
 	[XmlAttribute("offsetx")] public int offsetX = 0;
@@ -305,36 +282,26 @@ public class ObjectGroup {
 
 	[XmlElement("property", typeof(Property))] public Property[] properties;
 	[XmlElement("object", typeof(TileObject))] public TileObject[] objects;
-
-    public bool ShouldSerializeproperties () { return properties != null && properties.Length > 0; }
-    public bool ShouldSerializeobjects () { return objects != null && objects.Length > 0; }
 }
 
 [System.Serializable]
 public class TileObject {
 	[XmlAttribute("id")] public int id = 0;
-	[XmlAttribute("name")] public string name = "";
-	[XmlAttribute("type")] public string type = "";
+	[XmlAttribute("name")] public string name { get; set; }
+	[XmlAttribute("type")] public string type { get; set; }
 	[XmlAttribute("x")] public int x = 0;
 	[XmlAttribute("y")] public int y = 0;
 	[XmlAttribute("width")] public int width = 0;
 	[XmlAttribute("height")] public int height = 0;
 	[XmlAttribute("rotation")] public float rotation = 0;
-	[XmlAttribute("gid")] public int gid = -1;
+	[XmlAttribute("gid")] public int? gid { get; set; }
 	[XmlAttribute("visible")] public int visible = 1;
 
 	[XmlElement("property", typeof(Property))] public Property[] properties;
-	[XmlElement("ellipse", typeof(Elipse))] public Elipse ellipse;
-	[XmlElement("polygon", typeof(Polygon))] public Polygon polygon;
-	[XmlElement("polyline", typeof(Polygon))] public Polygon polyline;
-	[XmlElement("image", typeof(Image))] public Image image;
-
-    public bool ShouldSerializegid () { return gid >= 0; }
-    public bool ShouldSerializeproperties () { return properties != null && properties.Length > 0; }
-    public bool ShouldSerializeellipse () { return ellipse != null; }
-    public bool ShouldSerializepolygon () { return polygon != null; }
-    public bool ShouldSerializepolyline () { return polyline != null; }
-    public bool ShouldSerializeimage () { return image != null; }
+	[XmlElement("ellipse", typeof(Elipse))] public Elipse ellipse { get; set; }
+	[XmlElement("polygon", typeof(Polygon))] public Polygon polygon { get; set; }
+	[XmlElement("polyline", typeof(Polygon))] public Polygon polyline { get; set; }
+	[XmlElement("image", typeof(Image))] public Image image { get; set; }
 }
 
 [System.Serializable]
@@ -359,9 +326,7 @@ public class ImageLayer {
 	[XmlAttribute("visible")] public int visible = 1;
 
 	[XmlElement("property", typeof(Property))] public Property[] properties;
-	[XmlElement("image", typeof(Image))] public Image image;
+	[XmlElement("image", typeof(Image))] public Image image { get; set; }
 
-    public bool ShouldSerializeproperties () { return properties != null && properties.Length > 0; }
-    public bool ShouldSerializeimage () { return image != null; }
 }
 }
