@@ -36,17 +36,17 @@ public class TileMapEditor : Editor {
 	private static Dictionary<int, bool> tileSetFoldoutStates = new Dictionary<int, bool>();
     private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
     public static Texture2D GetTileSetTexture (TileSet tileSet, string path) {
+        if (tileSet.image == null || tileSet.image.source == null) return null;
+
         Texture2D tex = null;
         if (tileSetTextures.ContainsKey(tileSet.image.source)) {
             tex = tileSetTextures[tileSet.image.source];
         }
         else {
             string texturePath = tileSet.image.source;
-            if (texturePath.StartsWith("..")) {
-                texturePath = Path.Combine(Path.GetDirectoryName(path), texturePath);
-                texturePath = Path.GetFullPath(texturePath);
-                texturePath = texturePath.Replace(Application.dataPath, "Assets");
-            }
+            texturePath = Path.Combine(Path.GetDirectoryName(path), texturePath);
+            texturePath = Path.GetFullPath(texturePath);
+            texturePath = texturePath.Replace(Application.dataPath, "Assets");
             tex = AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D)) as Texture2D;
         }
 

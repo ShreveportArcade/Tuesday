@@ -128,11 +128,7 @@ class TMXAssetEditor : Editor {
                         tileMap.Setup(path, pixelsPerUnit);
                         TMXFile tmxFile = tileMap.tmxFile;
                         foreach (MeshRenderer meshRenderer in map.GetComponentsInChildren<MeshRenderer>()) {
-                            meshRenderer.sharedMaterial = mat;
-                            MaterialPropertyBlock propBlock = new MaterialPropertyBlock ();
-                 
-                            propBlock.SetTexture("_MainTex", TileMapEditor.GetTileSetTexture(tmxFile.tileSets[0], path));
-                            meshRenderer.SetPropertyBlock (propBlock);
+                            meshRenderer.sharedMaterials = TileMapEditor.GetMaterials(path);
                         }
 
                         Undo.RegisterCreatedObjectUndo (map, "Created '" + name + "' from TMX file.");

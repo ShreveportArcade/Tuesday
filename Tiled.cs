@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Xml.Serialization;
 using System.IO;
 using System.IO.Compression;
+using UnityEngine;
 
 namespace Tiled {
 [XmlRoot("map")]
@@ -16,12 +17,12 @@ public class TMXFile {
 	[XmlAttribute("height")] public int height = 0;
 	[XmlAttribute("tilewidth")] public int tileWidth = 0;
 	[XmlAttribute("tileheight")] public int tileHeight = 0;
-	[XmlAttribute("hexsidelength")] public int? hexSideLength { get; set; }
-	[XmlAttribute("staggeraxis")] public string staggerAxis { get; set; }
-	[XmlAttribute("staggerindex")] public string staggerIndex { get; set; }
-	[XmlAttribute("backgroundcolor")] public string backgroundColor { get; set; }
+	[XmlAttribute("hexsidelength")] public int? hexSideLength;
+	[XmlAttribute("staggeraxis")] public string staggerAxis;
+	[XmlAttribute("staggerindex")] public string staggerIndex;
+	[XmlAttribute("backgroundcolor")] public string backgroundColor;
 	[XmlAttribute("nextobjectid")] public int nextObjectID = 0;	
-	
+
 	[XmlElement("tileset", typeof(TileSet))] public TileSet[] tileSets;
 	[XmlElement("layer", typeof(Layer))] public Layer[] layers;
 
@@ -30,6 +31,20 @@ public class TMXFile {
 		TextReader textReader = new StreamReader(path);
 		TMXFile map = (TMXFile)deserializer.Deserialize(textReader);
 		textReader.Close();
+
+		for (int i = 0; i < map.tileSets.Length; i++) {
+			TileSet tileSet = map.tileSets[i];
+			if (!string.IsNullOrEmpty(tileSet.source)) {
+				string tsxPath = tileSet.source;
+				tsxPath = Path.Combine(Path.GetDirectoryName(path), tsxPath);
+                tsxPath = Path.GetFullPath(tsxPath);
+				TileSet tsxFile = TileSet.Load(tsxPath);
+
+				tsxFile.firstGID = tileSet.firstGID;
+				tsxFile.isTSX = true;
+				map.tileSets[i] = tsxFile;
+			}
+		}
 		return map;
 	}
 
@@ -40,6 +55,16 @@ public class TMXFile {
         nameSpaces.Add("","");
         serializer.Serialize(textWriter, this, nameSpaces);
         textWriter.Close();
+
+        for (int i = 0; i < tileSets.Length; i++) {
+			TileSet tileSet = tileSets[i];
+			if (tileSet.isTSX) {
+				string tsxPath = tileSet.source;
+				tsxPath = Path.Combine(Path.GetDirectoryName(path), tsxPath);
+                tsxPath = Path.GetFullPath(tsxPath);
+				tileSet.Save(tsxPath);
+			}
+		}
     }
 
 	public int GetIndexOfTileSet (TileSet tileSet) {
@@ -77,29 +102,76 @@ public class TMXFile {
 	}
 }
 
+[XmlRoot("tileset")]
 [System.Serializable]
 public class TileSet {
-	[XmlAttribute("firstgid")] public int firstGID = 0;
-	[XmlAttribute("source")] public string source { get; set; }
+	[XmlIgnore] public bool isTSX = false;
+	[XmlAttribute("firstgid")] public int firstGID;
+	[XmlIgnore] public bool firstGIDSpecified { get { return !isTSX; } set {} }
+
+	[XmlAttribute("source")] public string source;
+	[XmlIgnore] public bool sourceSpecified { get { return !isTSX; } set {} }
+
 	[XmlAttribute("name")] public string name = "";
+	[XmlIgnore] public bool nameSpecified { get { return source == null; } set {} }
+
 	[XmlAttribute("tilewidth")] public int tileWidth = 0;
+	[XmlIgnore] public bool tileWidthSpecified { get { return source == null; } set {} }
+
 	[XmlAttribute("tileheight")] public int tileHeight = 0;
+	[XmlIgnore] public bool tileHeightSpecified { get { return source == null; } set {} }
+
 	[XmlAttribute("spacing")] public int spacing = 0;
+	[XmlIgnore] public bool spacingSpecified { get { return source == null; } set {} }
+
 	[XmlAttribute("margin")] public int margin = 0;
+	[XmlIgnore] public bool marginSpecified { get { return source == null; } set {} }
+
 	[XmlAttribute("tilecount")] public int tileCount = 0;
+	[XmlIgnore] public bool tileCountSpecified { get { return source == null; } set {} }
+
 	[XmlAttribute("columns")] public int columns = 0;
+	[XmlIgnore] public bool columnsSpecified { get { return source == null; } set {} }
 	
     [XmlIgnore] public int rows { 
-		get { return tileCount / columns; } 
+		get { return (columns > 0) ? tileCount / columns : 0; } 
 		set { tileCount = value * columns; }
 	}
 
-	[XmlElement("image", typeof(Image))] public Image image { get; set; }
-	[XmlElement("tileoffset", typeof(TilePoint))] public TilePoint tileOffset { get; set; }
-	[XmlElement("terraintypes", typeof(Terrain))] public Terrain[] terrainTypes { get; set; }
-	[XmlElement("properties", typeof(Property))] public Property[] properties { get; set; }
-	[XmlElement("tile", typeof(Tile))] public Tile[] tiles { get; set; }
+	[XmlElement("tileoffset", typeof(TilePoint))] public TilePoint tileOffset;
+	[XmlIgnore] public bool tileOffsetSpecified { get { return source == null; } set {} }
 
+	[XmlElement("image", typeof(Image))]  public Image image;
+	[XmlIgnore] public bool imageSpecified { get { return source == null; } set {} }
+
+	[XmlElement("tile", typeof(Tile))] public Tile[] tiles;
+	[XmlIgnore] public bool tilesSpecified { get { return source == null; } set {} }
+
+	[XmlElement("terraintypes", typeof(Terrain))] public Terrain[] terrainTypes;
+	[XmlIgnore] public bool terrainTypesSpecified { get { return source == null; } set {} }
+
+	[XmlElement("properties", typeof(Property))] public Property[] properties;
+	[XmlIgnore] public bool propertiesSpecified { get { return source == null; } set {} }
+
+	public static TileSet Load (string path) {
+		XmlSerializer deserializer = new XmlSerializer(typeof(TileSet));
+		TextReader textReader = new StreamReader(path);
+		TileSet map = (TileSet)deserializer.Deserialize(textReader);
+		textReader.Close();
+		return map;
+	}
+
+	public void Save (string path) {
+		string source = this.source;
+		this.source = null;
+        XmlSerializer serializer = new XmlSerializer(typeof(TMXFile));
+        TextWriter textWriter = new StreamWriter(path);
+        XmlSerializerNamespaces nameSpaces = new XmlSerializerNamespaces();
+        nameSpaces.Add("","");
+        serializer.Serialize(textWriter, this, nameSpaces);
+        textWriter.Close();
+        this.source = source;
+    }
 	public TileRect GetTileUVs (int tileGID) {
 		if (tileGID < firstGID || tileGID >= firstGID + tileCount) return null;
 
@@ -124,16 +196,16 @@ public class TileSet {
 
 [System.Serializable]
 public class Layer {
-	[XmlAttribute("name")] public string name = "";
-	[XmlAttribute("opacity")] public float opacity = 1;
-	[XmlAttribute("visible")] public int visible = 1;
-	[XmlAttribute("offsetx")] public int offsetX = 0;
-	[XmlAttribute("offsety")] public int offsetY = 0;
-	[XmlAttribute("width")] public int width = 0;
-	[XmlAttribute("height")] public int height = 0;
+	[XmlAttribute("name")] public string name;
+	[XmlAttribute("opacity")] public float? opacity;
+	[XmlAttribute("visible")] public int? visible;
+	[XmlAttribute("offsetx")] public int? offsetX;
+	[XmlAttribute("offsety")] public int? offsetY;
+	[XmlAttribute("width")] public int width;
+	[XmlAttribute("height")] public int height;
 
 	[XmlElement("property", typeof(Property))] public Property[] properties;
-	[XmlElement("data", typeof(Data))] public Data tileData { get; set; }
+	[XmlElement("data", typeof(Data))] public Data tileData;
     
 	private int[] _tileIDs;
 	public int[] tileIDs {
@@ -158,7 +230,11 @@ public class Layer {
 						stream = new GZipStream(stream, CompressionMode.Decompress);
 					}
 					else if (tileData.compression == "zlib") {
-						stream = new DeflateStream(stream, CompressionMode.Decompress);
+						int bodyLength = bytes.Length - 6;
+		                byte[] bodyData = new byte[bodyLength];
+		                Array.Copy (bytes, 2, bodyData, 0, bodyLength);
+		                stream = new MemoryStream (bodyData, false);
+		                stream = new DeflateStream(stream, CompressionMode.Decompress);
 					}
 					
 					using (BinaryReader binaryReader = new BinaryReader(stream)){
@@ -203,10 +279,22 @@ public class Layer {
 }
 
 [System.Serializable]
+public class Tile {
+	[XmlAttribute("id")] public int id = 0;
+	[XmlAttribute("terrain")] public string terrain;
+	[XmlAttribute("probability")] public float? probability;
+
+	[XmlElement("properties", typeof(Property))] public Property[] properties;
+	[XmlElement("animation", typeof(Frame))] public Frame[] animation;
+	[XmlElement("image", typeof(Image))] public Image image { get; set; }
+	[XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup objectGroup { get; set; }
+}
+
+[System.Serializable]
 public class Image {
-	[XmlAttribute("format")] public string format { get; set; }
-	[XmlAttribute("source")] public string source { get; set; }
-	[XmlAttribute("trans")] public string trans { get; set; }
+	[XmlAttribute("format")] public string format;
+	[XmlAttribute("source")] public string source;
+	[XmlAttribute("trans")] public string trans;
 	[XmlAttribute("width")] public int width = 0;
 	[XmlAttribute("height")] public int height = 0;
 
@@ -216,7 +304,7 @@ public class Image {
 [System.Serializable]
 public class Data {
 	[XmlAttribute("encoding")] public string encoding = "csv";
-	[XmlAttribute("compression")] public string compression { get; set; }
+	[XmlAttribute("compression")] public string compression;
 	[XmlText] public string contents = "";
 }
 
@@ -253,18 +341,6 @@ public class Property {
 }
 
 [System.Serializable]
-public class Tile {
-	[XmlAttribute("id")] public int id = 0;
-	[XmlAttribute("terrain")] public string terrain { get; set; }
-	[XmlAttribute("probability")] public float probability { get; set; }
-
-	[XmlElement("properties", typeof(Property))] public Property[] properties;
-	[XmlElement("animation", typeof(Frame))] public Frame[] animation;
-	[XmlElement("image", typeof(Image))] public Image image { get; set; }
-	[XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup objectGroup { get; set; }
-}
-
-[System.Serializable]
 public class Frame {
 	[XmlAttribute("tileid")] public int tileID = 0;
 	[XmlAttribute("duration")] public float duration = 0;
@@ -272,12 +348,12 @@ public class Frame {
 
 [System.Serializable]
 public class ObjectGroup {
-	[XmlAttribute("name")] public string name = "";
-	[XmlAttribute("color")] public string color { get; set; }
-	[XmlAttribute("opacity")] public float opacity = 1;
-	[XmlAttribute("visible")] public int visible = 1;
-	[XmlAttribute("offsetx")] public int offsetX = 0;
-	[XmlAttribute("offsety")] public int offsetY = 0;
+	[XmlAttribute("name")] public string name;
+	[XmlAttribute("color")] public string color;
+	[XmlAttribute("opacity")] public float? opacity;
+	[XmlAttribute("visible")] public int? visible;
+	[XmlAttribute("offsetx")] public int? offsetX;
+	[XmlAttribute("offsety")] public int? offsetY;
 	[XmlAttribute("draworder")] public string drawOrder = "topdown";
 
 	[XmlElement("property", typeof(Property))] public Property[] properties;
@@ -287,15 +363,15 @@ public class ObjectGroup {
 [System.Serializable]
 public class TileObject {
 	[XmlAttribute("id")] public int id = 0;
-	[XmlAttribute("name")] public string name { get; set; }
-	[XmlAttribute("type")] public string type { get; set; }
+	[XmlAttribute("name")] public string name;
+	[XmlAttribute("type")] public string type;
 	[XmlAttribute("x")] public int x = 0;
 	[XmlAttribute("y")] public int y = 0;
 	[XmlAttribute("width")] public int width = 0;
 	[XmlAttribute("height")] public int height = 0;
-	[XmlAttribute("rotation")] public float rotation = 0;
-	[XmlAttribute("gid")] public int? gid { get; set; }
-	[XmlAttribute("visible")] public int visible = 1;
+	[XmlAttribute("rotation")] public float? rotation;
+	[XmlAttribute("gid")] public int? gid;
+	[XmlAttribute("visible")] public int? visible;
 
 	[XmlElement("property", typeof(Property))] public Property[] properties;
 	[XmlElement("ellipse", typeof(Elipse))] public Elipse ellipse { get; set; }
@@ -326,7 +402,7 @@ public class ImageLayer {
 	[XmlAttribute("visible")] public int visible = 1;
 
 	[XmlElement("property", typeof(Property))] public Property[] properties;
-	[XmlElement("image", typeof(Image))] public Image image { get; set; }
+	[XmlElement("image", typeof(Image))] public Image image;
 
 }
 }

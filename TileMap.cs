@@ -8,6 +8,7 @@ public class TileMap : MonoBehaviour {
 
 	public string tmxFilePath;
 	public TMXFile tmxFile;
+    public Texture2D texture;
 
     [HideInInspector] public Vector2 offset;
     [HideInInspector] public GameObject[] layers;
@@ -21,6 +22,19 @@ public class TileMap : MonoBehaviour {
                 }
             }
             return _layerMeshFilters;
+        }
+    }
+
+    private PolygonCollider2D[][] _layerPolyColliders;
+    private PolygonCollider2D[][] layerPolyColliders {
+        get {
+            if (_layerPolyColliders == null) {
+                _layerPolyColliders = new PolygonCollider2D[layers.Length][];
+                for (int layerIndex = 0; layerIndex < layers.Length; layerIndex++) {
+                    _layerPolyColliders[layerIndex] = layers[layerIndex].GetComponentsInChildren<PolygonCollider2D>();
+                }
+            }
+            return _layerPolyColliders;
         }
     }
 
@@ -56,6 +70,7 @@ public class TileMap : MonoBehaviour {
 
         layers = new GameObject[tmxFile.layers.Length];
         _layerMeshFilters = new MeshFilter[tmxFile.layers.Length][];
+        _layerPolyColliders = new PolygonCollider2D[tmxFile.layers.Length][];
         for (int i = 0; i < tmxFile.layers.Length; i++) {
             CreateTileLayer(i);
         }
@@ -64,26 +79,28 @@ public class TileMap : MonoBehaviour {
     public void CreateTileLayer (int layerIndex) {
         Layer layerData = tmxFile.layers[layerIndex];
         GameObject layer = new GameObject(layerData.name);
-        layer.AddComponent<PolygonCollider2D>();
         layer.transform.SetParent(transform);
         layers[layerIndex] = layer;
 
         _layerMeshFilters[layerIndex] = new MeshFilter[meshesPerLayer];
+        _layerPolyColliders[layerIndex] = new PolygonCollider2D[meshesPerLayer];
         for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
             GameObject meshObject = layer;
             if (meshesPerLayer > 1) {
                 meshObject = new GameObject(layerData.name + "_submesh" + submeshIndex);
                 meshObject.transform.SetParent(layer.transform);
             }
+            meshObject.AddComponent<MeshRenderer>();
+
+            PolygonCollider2D polyCollider = meshObject.AddComponent<PolygonCollider2D>();
+            _layerPolyColliders[layerIndex][submeshIndex] = polyCollider;
 
             MeshFilter meshFilter = meshObject.AddComponent<MeshFilter>();
             _layerMeshFilters[layerIndex][submeshIndex] = meshFilter;
+
             UpdateMesh(layerIndex, submeshIndex);
-
-            meshObject.AddComponent<MeshRenderer>();
-        }
-
-        UpdatePolygonColliders(layerIndex);
+            UpdatePolygonCollider(layerIndex, submeshIndex);
+        }        
     }
 
     public void Revert () {
@@ -199,25 +216,44 @@ public class TileMap : MonoBehaviour {
         mesh.RecalculateBounds();
 
         layerMeshFilters[layerIndex][submeshIndex].sharedMesh = mesh;
+        paths = Clipper.SimplifyPolygons(paths);
+        paths = RemoveColinnear(paths);
+
         layerPaths[layerIndex][submeshIndex] = paths;
     }
 
-    public void UpdatePolygonColliders (int layerIndex) {
-        Clipper clipper = new Clipper();
-        for (int submeshIndex = 0; submeshIndex < layers.Length; submeshIndex++) {
-            List<List<IntPoint>> paths = layerPaths[layerIndex][submeshIndex];
-            clipper.AddPaths(paths, PolyType.ptSubject, true);
+    List<List<IntPoint>> RemoveColinnear (List<List<IntPoint>> paths) {
+        for (int i = 0; i < paths.Count; i++) {
+            List<IntPoint> path = paths[i];
+            List<IntPoint> newPath = new List<IntPoint>(path);
+            float ang = 0;
+            for (int j = 1; j < path.Count-1; j++) {
+                Vector2 a = new Vector2(path[j].X - path[j-1].X, path[j].Y - path[j-1].Y);
+                Vector2 b = new Vector2(path[j+1].X - path[j].X, path[j+1].Y - path[j].Y);
+                ang = Vector2.Angle(a, b);
+                if (Mathf.Abs(ang) < 5) {
+                    newPath.Remove(path[j]);
+                }
+            }
+            paths[i] = newPath;
         }
-        
-        PolyTree tree = new PolyTree();
-        clipper.Execute(ClipType.ctUnion, tree);
-        List<List<IntPoint>> resultPaths = Clipper.ClosedPathsFromPolyTree(tree);
 
-        PolygonCollider2D poly = layers[layerIndex].GetComponent<PolygonCollider2D>();
-        poly.pathCount = resultPaths.Count;
-        for (int i = 0; i < resultPaths.Count; i++) {
-            Vector2[] path = System.Array.ConvertAll(resultPaths[i].ToArray(), (p) => IntPointToVector2(p));
+        return paths;
+    }
+
+    public void UpdatePolygonCollider (int layerIndex, int submeshIndex) {
+        List<List<IntPoint>> paths = layerPaths[layerIndex][submeshIndex];
+        PolygonCollider2D poly = layerPolyColliders[layerIndex][submeshIndex];
+        poly.pathCount = paths.Count;
+        for (int i = 0; i < paths.Count; i++) {
+            Vector2[] path = System.Array.ConvertAll(paths[i].ToArray(), (p) => IntPointToVector2(p));
             poly.SetPath(i, path);
+        }
+    }
+
+    public void UpdatePolygonColliders (int layerIndex) {
+        for (int submeshIndex = 0; submeshIndex < layers.Length; submeshIndex++) {
+            UpdatePolygonCollider(layerIndex, submeshIndex);
         }
     }
 
