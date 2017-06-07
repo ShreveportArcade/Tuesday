@@ -35,6 +35,37 @@ public class TileMapEditor : Editor {
 
 	private static Dictionary<int, bool> tileSetFoldoutStates = new Dictionary<int, bool>();
     private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
+    private static Dictionary<string, Material> tileSetMaterials = new Dictionary<string, Material>();
+    public static Material[] GetMaterials (TMXFile tmxFile, string path) {
+        Material[] materials = new Material[tmxFile.tileSets.Length];
+        for (int i = 0; i < tmxFile.tileSets.Length; i++) {
+            TileSet tileSet = tmxFile.tileSets[i];
+            Material mat = null;
+            if (tileSetMaterials.ContainsKey(tileSet.image.source)) {
+                mat = tileSetMaterials[tileSet.image.source];
+            }
+            else {
+                string materialPath = Path.Combine(Path.GetDirectoryName(tileSet.image.source), "Materials");
+                materialPath = Path.Combine(materialPath, Path.GetFileNameWithoutExtension(tileSet.image.source) + ".mat");
+                materialPath = Path.Combine(Path.GetDirectoryName(path), materialPath);
+                materialPath = Path.GetFullPath(materialPath);
+                string materialDir = Path.GetDirectoryName(materialPath);                
+                Directory.CreateDirectory(materialDir);
+                materialPath = materialPath.Replace(Application.dataPath, "Assets");
+                mat = AssetDatabase.LoadAssetAtPath(materialPath, typeof(Material)) as Material;
+                if (mat == null) {
+                    mat = new Material(Shader.Find("Unlit/Transparent"));
+                    mat.mainTexture = GetTileSetTexture(tileSet, path);
+                    AssetDatabase.CreateAsset(mat, materialPath);
+                }
+            }
+            if (mat != null) tileSetMaterials[tileSet.image.source] = mat;
+            
+            materials[i] = mat;
+        }
+        return materials;
+    }
+
     public static Texture2D GetTileSetTexture (TileSet tileSet, string path) {
         if (tileSet.image == null || tileSet.image.source == null) return null;
 

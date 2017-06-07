@@ -46,15 +46,7 @@ class TMXAssetEditor : Editor {
             } 
             return tmxFiles[path];
         }
-    }
-
-    private static Material _mat;
-    private static Material mat {
-        get {
-            if (_mat == null) _mat = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
-            return _mat;
-        }
-    }    
+    }   
 
 	public override void OnInspectorGUI() {
         if (!isValid) {
@@ -65,10 +57,6 @@ class TMXAssetEditor : Editor {
         GUI.enabled = true;
 
         pixelsPerUnit = EditorGUILayout.IntField("Pixels / Unit: ", pixelsPerUnit);
-        tmxFile.width = EditorGUILayout.IntField("Map Width: ", tmxFile.width);
-        tmxFile.height = EditorGUILayout.IntField("Map Height: ", tmxFile.height);
-        tmxFile.tileWidth = EditorGUILayout.IntField("Tile Width: ", tmxFile.tileWidth);
-        tmxFile.tileHeight = EditorGUILayout.IntField("Tile Height: ", tmxFile.tileHeight);
 
         EditorGUILayout.Space();
         EditorGUILayout.BeginHorizontal();
@@ -114,22 +102,20 @@ class TMXAssetEditor : Editor {
             if (eventType == EventType.DragPerform) {
                 bool foundTMX = false;
                 foreach (UnityEngine.Object o in DragAndDrop.objectReferences) {
-                    string path = AssetDatabase.GetAssetPath(o);
-                    if (Path.GetExtension(path) == ".tmx") {
+                    string tmxFilePath = AssetDatabase.GetAssetPath(o);
+                    if (Path.GetExtension(tmxFilePath) == ".tmx") {
                         float pixelsPerUnit = -1;
-                        AssetImporter importer = AssetImporter.GetAtPath(path);
+                        AssetImporter importer = AssetImporter.GetAtPath(tmxFilePath);
                         if (!string.IsNullOrEmpty(importer.userData)) {
                             pixelsPerUnit = float.Parse(importer.userData);
                         }
 
-                        string name = Path.GetFileNameWithoutExtension(path);
+                        string name = Path.GetFileNameWithoutExtension(tmxFilePath);
                         GameObject map = new GameObject(name);
                         TileMap tileMap = map.AddComponent<TileMap>();
-                        tileMap.Setup(path, pixelsPerUnit);
-                        TMXFile tmxFile = tileMap.tmxFile;
-                        foreach (MeshRenderer meshRenderer in map.GetComponentsInChildren<MeshRenderer>()) {
-                            meshRenderer.sharedMaterials = TileMapEditor.GetMaterials(path);
-                        }
+                        TMXFile tmxFile = TMXFile.Load(tmxFilePath);
+                        tileMap.tileSetMaterials = TileMapEditor.GetMaterials(tmxFile, tmxFilePath);
+                        tileMap.Setup(tmxFile, tmxFilePath, pixelsPerUnit);
 
                         Undo.RegisterCreatedObjectUndo (map, "Created '" + name + "' from TMX file.");
 

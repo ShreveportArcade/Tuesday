@@ -240,6 +240,7 @@ public class Layer {
 					using (BinaryReader binaryReader = new BinaryReader(stream)){
 						for (int j = 0; j < height; j++) {
 							for (int i = 0; i < width; i++) {
+								// FIXME: EndOfStreamException: Failed to read past end of stream.
 								_tileIDs[i + j * width] = (int)binaryReader.ReadUInt32();
 							}
 						}

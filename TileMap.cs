@@ -8,33 +8,21 @@ public class TileMap : MonoBehaviour {
 
 	public string tmxFilePath;
 	public TMXFile tmxFile;
-    public Texture2D texture;
 
     [HideInInspector] public Vector2 offset;
     [HideInInspector] public GameObject[] layers;
-    private MeshFilter[][] _layerMeshFilters;
-    private MeshFilter[][] layerMeshFilters {
-        get {
-            if (_layerMeshFilters == null) {
-                _layerMeshFilters = new MeshFilter[layers.Length][];
-                for (int layerIndex = 0; layerIndex < layers.Length; layerIndex++) {
-                    _layerMeshFilters[layerIndex] = layers[layerIndex].GetComponentsInChildren<MeshFilter>();
-                }
-            }
-            return _layerMeshFilters;
-        }
-    }
+    [HideInInspector] public Material[] tileSetMaterials;
 
-    private PolygonCollider2D[][] _layerPolyColliders;
-    private PolygonCollider2D[][] layerPolyColliders {
+    private GameObject[][] _layerSubmeshObjects;
+    private GameObject[][] layerSubmeshObjects {
         get {
-            if (_layerPolyColliders == null) {
-                _layerPolyColliders = new PolygonCollider2D[layers.Length][];
+            if (_layerSubmeshObjects == null) {
+                _layerSubmeshObjects = new GameObject[layers.Length][];
                 for (int layerIndex = 0; layerIndex < layers.Length; layerIndex++) {
-                    _layerPolyColliders[layerIndex] = layers[layerIndex].GetComponentsInChildren<PolygonCollider2D>();
+                    _layerSubmeshObjects[layerIndex] = layers[layerIndex].GetComponentsInChildren<GameObject>();
                 }
             }
-            return _layerPolyColliders;
+            return _layerSubmeshObjects;
         }
     }
 
@@ -55,9 +43,9 @@ public class TileMap : MonoBehaviour {
         get { return 1 + tmxFile.width * tmxFile.height / 16250; }
     }
 
-	public void Setup (string tmxFilePath, float pixelsPerUnit = -1) {
+	public void Setup (TMXFile tmxFile, string tmxFilePath, float pixelsPerUnit = -1) {
 		this.tmxFilePath = tmxFilePath;
-        this.tmxFile = TMXFile.Load(tmxFilePath);
+        this.tmxFile = tmxFile;
 
         if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileWidth;
 
@@ -69,8 +57,7 @@ public class TileMap : MonoBehaviour {
         offset *= 1f / pixelsPerUnit;
 
         layers = new GameObject[tmxFile.layers.Length];
-        _layerMeshFilters = new MeshFilter[tmxFile.layers.Length][];
-        _layerPolyColliders = new PolygonCollider2D[tmxFile.layers.Length][];
+        _layerSubmeshObjects = new GameObject[tmxFile.layers.Length][];
         for (int i = 0; i < tmxFile.layers.Length; i++) {
             CreateTileLayer(i);
         }
@@ -82,8 +69,7 @@ public class TileMap : MonoBehaviour {
         layer.transform.SetParent(transform);
         layers[layerIndex] = layer;
 
-        _layerMeshFilters[layerIndex] = new MeshFilter[meshesPerLayer];
-        _layerPolyColliders[layerIndex] = new PolygonCollider2D[meshesPerLayer];
+        _layerSubmeshObjects[layerIndex] = new GameObject[meshesPerLayer];
         for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
             GameObject meshObject = layer;
             if (meshesPerLayer > 1) {
@@ -91,12 +77,10 @@ public class TileMap : MonoBehaviour {
                 meshObject.transform.SetParent(layer.transform);
             }
             meshObject.AddComponent<MeshRenderer>();
+            meshObject.AddComponent<MeshFilter>();
+            meshObject.AddComponent<PolygonCollider2D>();
 
-            PolygonCollider2D polyCollider = meshObject.AddComponent<PolygonCollider2D>();
-            _layerPolyColliders[layerIndex][submeshIndex] = polyCollider;
-
-            MeshFilter meshFilter = meshObject.AddComponent<MeshFilter>();
-            _layerMeshFilters[layerIndex][submeshIndex] = meshFilter;
+            _layerSubmeshObjects[layerIndex][submeshIndex] = meshObject;
 
             UpdateMesh(layerIndex, submeshIndex);
             UpdatePolygonCollider(layerIndex, submeshIndex);
@@ -131,9 +115,37 @@ public class TileMap : MonoBehaviour {
         List<Vector3> norms = new List<Vector3>();
         List<Vector2> uvs = new List<Vector2>();
         List<Color> colors = new List<Color>();
-        List<int> tris = new List<int>();
+        
+        List<int>[] matTris = new List<int>[tmxFile.tileSets.Length];
+        Dictionary<int, int> firstGIDToIndex = new Dictionary<int, int>();
+        for (int i = 0; i < tmxFile.tileSets.Length; i++) {
+            matTris[i] = new List<int>();
+            firstGIDToIndex[tmxFile.tileSets[i].firstGID] = i;
+        }
 
         List<List<IntPoint>> paths = new List<List<IntPoint>>();
+        Dictionary<int, Vector3[]> idToPhysics = new Dictionary<int, Vector3[]>();
+        foreach (TileSet tileSet in tmxFile.tileSets) {
+            if (tileSet.tiles == null) {
+                Debug.Log("Missing tiles for: " + tileSet.name);
+                continue;
+            }
+            foreach (Tile tile in tileSet.tiles) {
+                if (tile.objectGroup != null && tile.objectGroup.objects != null && tile.objectGroup.objects.Length > 0) {
+                    TileObject tileObject = tile.objectGroup.objects[0];
+                    float x = offset.x * (float)tileObject.x / (float)tileSet.tileWidth;
+                    float y = offset.y * (float)tileObject.y / (float)tileSet.tileHeight;
+                    float width = offset.x * (float)tileObject.width / (float)tileSet.tileWidth;
+                    float height = offset.y * (float)tileObject.height / (float)tileSet.tileHeight;
+                    idToPhysics[tile.id + tileSet.firstGID] = new Vector3[] {
+                        new Vector3(x, y, 0),
+                        new Vector3(x, y + height, 0),
+                        new Vector3(x + width, y + height, 0),
+                        new Vector3(x + width, y, 0)
+                    };
+                }
+            }
+        }
 
         int tilesPlaced = 0;
         for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileIDs.Length); tileIndex++) {        
@@ -147,15 +159,18 @@ public class TileMap : MonoBehaviour {
 
             int[] tileLocation = layerData.GetTileLocation(tileIndex);
             Vector3 pos = new Vector3(tileLocation[0] * offset.x, tileLocation[1] * offset.y, 0);
-            Vector3[] quad = new Vector3[] {
+            verts.AddRange(new Vector3[] {
                 pos,
                 pos + Vector3.up * offset.y,
                 pos + (Vector3)offset,
                 pos + Vector3.right * offset.x
-            };
-            verts.AddRange(quad);
+            });
 
-            paths.Add(new List<IntPoint>(System.Array.ConvertAll(quad, (p) => Vector2ToIntPoint((Vector2)p))));
+            if (idToPhysics.ContainsKey(tileID)) {
+                Vector3[] phys = idToPhysics[tileID];
+                IntPoint[] path = System.Array.ConvertAll(phys, (p) => Vector2ToIntPoint((Vector2)(p + pos)));
+                paths.Add(new List<IntPoint>(path));
+            }
 
             norms.AddRange(new Vector3[] {
                 Vector3.forward,
@@ -198,24 +213,45 @@ public class TileMap : MonoBehaviour {
                 Color.white
             });
 
-            tris.AddRange(new int[] {
-                tilesPlaced * 4, tilesPlaced * 4 + 1, tilesPlaced * 4 + 2,
-                tilesPlaced * 4, tilesPlaced * 4 + 2, tilesPlaced * 4 + 3
+            matTris[firstGIDToIndex[tileSet.firstGID]].AddRange(new int[] {
+                tilesPlaced * 4, tilesPlaced * 4 + 2, tilesPlaced * 4 + 1,
+                tilesPlaced * 4, tilesPlaced * 4 + 3, tilesPlaced * 4 + 2
             });
             tilesPlaced++;
         }
 
+        GameObject obj = layerSubmeshObjects[layerIndex][submeshIndex];
+        
         Mesh mesh = new Mesh();
+        
         mesh.name = layerData.name;
         if (meshesPerLayer > 1) mesh.name += "_submesh" + submeshIndex;
-        mesh.vertices = verts.ToArray();
-        mesh.normals = norms.ToArray();
-        mesh.uv = uvs.ToArray();
-        mesh.colors = colors.ToArray();
-        mesh.triangles = tris.ToArray();
+        
+        mesh.SetVertices(verts);
+        mesh.SetNormals(norms);
+        mesh.SetUVs(0, uvs);
+        mesh.SetColors(colors);
+        
+        List<Material> mats = new List<Material>();
+        List<List<int>> triLists = new List<List<int>>();       
+        for (int i = 0; i < tmxFile.tileSets.Length; i++) {
+            List<int> tris = matTris[i];
+            if (tris != null && tris.Count > 0) {
+                mats.Add(tileSetMaterials[i]);
+                triLists.Add(tris);
+            }
+        }
+        obj.GetComponent<MeshRenderer>().sharedMaterials = mats.ToArray();
+
+        mesh.subMeshCount = mats.Count;
+        for (int i = 0; i < mesh.subMeshCount; i++) {
+            mesh.SetTriangles(triLists[i], i);
+        }
+
         mesh.RecalculateBounds();
 
-        layerMeshFilters[layerIndex][submeshIndex].sharedMesh = mesh;
+        obj.GetComponent<MeshFilter>().sharedMesh = mesh;
+
         paths = Clipper.SimplifyPolygons(paths);
         paths = RemoveColinnear(paths);
 
@@ -243,7 +279,7 @@ public class TileMap : MonoBehaviour {
 
     public void UpdatePolygonCollider (int layerIndex, int submeshIndex) {
         List<List<IntPoint>> paths = layerPaths[layerIndex][submeshIndex];
-        PolygonCollider2D poly = layerPolyColliders[layerIndex][submeshIndex];
+        PolygonCollider2D poly = layerSubmeshObjects[layerIndex][submeshIndex].GetComponent<PolygonCollider2D>();
         poly.pathCount = paths.Count;
         for (int i = 0; i < paths.Count; i++) {
             Vector2[] path = System.Array.ConvertAll(paths[i].ToArray(), (p) => IntPointToVector2(p));
