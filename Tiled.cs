@@ -44,6 +44,11 @@ public class TMXFile {
 				tsxFile.isTSX = true;
 				map.tileSets[i] = tsxFile;
 			}
+
+			if (tileSet.columns == 0 || tileSet.tileCount == 0) {
+				tileSet.columns = (tileSet.image.width - 2 * tileSet.margin + tileSet.spacing) / (tileSet.tileWidth + tileSet.spacing);
+				tileSet.rows = (tileSet.image.height - 2 * tileSet.margin + tileSet.spacing) / (tileSet.tileHeight + tileSet.spacing);
+			}
 		}
 		return map;
 	}
@@ -81,6 +86,7 @@ public class TMXFile {
 				return tileSet;
 			}
 		}
+		if (tileSets.Length > 0) return tileSets[0];
 		return null;
 	}
 
@@ -156,9 +162,10 @@ public class TileSet {
 	public static TileSet Load (string path) {
 		XmlSerializer deserializer = new XmlSerializer(typeof(TileSet));
 		TextReader textReader = new StreamReader(path);
-		TileSet map = (TileSet)deserializer.Deserialize(textReader);
+		TileSet tileSet = (TileSet)deserializer.Deserialize(textReader);
 		textReader.Close();
-		return map;
+		
+		return tileSet;
 	}
 
 	public void Save (string path) {
@@ -172,8 +179,8 @@ public class TileSet {
         textWriter.Close();
         this.source = source;
     }
-	public TileRect GetTileUVs (int tileGID) {
-		if (tileGID < firstGID || tileGID >= firstGID + tileCount) return null;
+	public TileRect GetTileUVs (int tileGID, float inset = 0) {
+		if (tileGID < firstGID) return null;
 
 		TileRect uvs = new TileRect();
 		int tileIndex = tileGID - firstGID;
@@ -189,6 +196,11 @@ public class TileSet {
 		uvs.y /= (float)image.height;
 		uvs.width /= (float)image.width;
 		uvs.height /= (float)image.height;
+
+		uvs.x += inset;
+		uvs.y += inset;
+		uvs.width -= inset * 2;
+		uvs.height -= inset * 2;
 
 		return uvs;
 	}
@@ -210,8 +222,7 @@ public class Layer {
 	private int[] _tileIDs;
 	public int[] tileIDs {
 		get {
-			if (_tileIDs == null || 
-				_tileIDs.Length != width * height) {
+			if (_tileIDs == null || _tileIDs.Length != width * height) {
 
 				_tileIDs = new int[width * height];
 
@@ -222,7 +233,6 @@ public class Layer {
 					}
 				}
 				else if (tileData.encoding == "base64") {
-					// > adapted from TiledSharp - https://github.com/marshallward/TiledSharp
 					byte[] bytes = Convert.FromBase64String(tileData.contents);
 					Stream stream = new MemoryStream(bytes, false);
 
@@ -230,22 +240,17 @@ public class Layer {
 						stream = new GZipStream(stream, CompressionMode.Decompress);
 					}
 					else if (tileData.compression == "zlib") {
-						int bodyLength = bytes.Length - 6;
-		                byte[] bodyData = new byte[bodyLength];
-		                Array.Copy (bytes, 2, bodyData, 0, bodyLength);
-		                stream = new MemoryStream (bodyData, false);
+						stream = new MemoryStream(bytes, 2, bytes.Length-2, false);
 		                stream = new DeflateStream(stream, CompressionMode.Decompress);
 					}
 					
 					using (BinaryReader binaryReader = new BinaryReader(stream)){
 						for (int j = 0; j < height; j++) {
 							for (int i = 0; i < width; i++) {
-								// FIXME: EndOfStreamException: Failed to read past end of stream.
 								_tileIDs[i + j * width] = (int)binaryReader.ReadUInt32();
 							}
 						}
 					}
-					// <
 				}
 			}
 			return _tileIDs;
@@ -264,6 +269,9 @@ public class Layer {
 			else tileStrings[index] = id.ToString();
 			
 			tileData.contents = string.Join(",", tileStrings);
+		}
+		else if (tileData.encoding == "base64") {
+			// TODO: encode as base64
 		}
 	}
 

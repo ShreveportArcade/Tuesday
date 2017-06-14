@@ -9,7 +9,8 @@ public class TileMap : MonoBehaviour {
 	public string tmxFilePath;
 	public TMXFile tmxFile;
 
-    [HideInInspector] public Vector2 offset;
+    [Range(0, 0.01f)]public float uvInset = 0;
+    [HideInInspector] public Vector4 offset;
     [HideInInspector] public GameObject[] layers;
     [HideInInspector] public Material[] tileSetMaterials;
 
@@ -19,7 +20,8 @@ public class TileMap : MonoBehaviour {
             if (_layerSubmeshObjects == null) {
                 _layerSubmeshObjects = new GameObject[layers.Length][];
                 for (int layerIndex = 0; layerIndex < layers.Length; layerIndex++) {
-                    _layerSubmeshObjects[layerIndex] = layers[layerIndex].GetComponentsInChildren<GameObject>();
+                    MeshRenderer[] renderers = layers[layerIndex].GetComponentsInChildren<MeshRenderer>();
+                    _layerSubmeshObjects[layerIndex] = System.Array.ConvertAll(renderers, (r) => r.gameObject);
                 }
             }
             return _layerSubmeshObjects;
@@ -50,10 +52,18 @@ public class TileMap : MonoBehaviour {
         if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileWidth;
 
         string[] xyDirections = tmxFile.renderOrder.Split('-');
-        offset = new Vector2(
+        offset = new Vector4(
             (xyDirections[0] == "right") ? tmxFile.tileWidth : -tmxFile.tileWidth,
-            (xyDirections[1] == "up") ? tmxFile.tileHeight : -tmxFile.tileHeight            
+            (xyDirections[1] == "up") ? tmxFile.tileHeight : -tmxFile.tileHeight,
+            (xyDirections[0] == "right") ? tmxFile.tileWidth : -tmxFile.tileWidth,
+            (xyDirections[1] == "up") ? tmxFile.tileHeight : -tmxFile.tileHeight
         );
+
+        if (tmxFile.orientation == "hexagonal" && tmxFile.hexSideLength != null) {
+            if (tmxFile.staggerAxis == "x") offset.z = Mathf.Sign(offset.z) * tmxFile.hexSideLength.Value;
+            else offset.w = Mathf.Sign(offset.w) * tmxFile.hexSideLength.Value;            
+        }
+
         offset *= 1f / pixelsPerUnit;
 
         layers = new GameObject[tmxFile.layers.Length];
@@ -126,10 +136,7 @@ public class TileMap : MonoBehaviour {
         List<List<IntPoint>> paths = new List<List<IntPoint>>();
         Dictionary<int, Vector3[]> idToPhysics = new Dictionary<int, Vector3[]>();
         foreach (TileSet tileSet in tmxFile.tileSets) {
-            if (tileSet.tiles == null) {
-                Debug.Log("Missing tiles for: " + tileSet.name);
-                continue;
-            }
+            if (tileSet.tiles == null) continue;
             foreach (Tile tile in tileSet.tiles) {
                 if (tile.objectGroup != null && tile.objectGroup.objects != null && tile.objectGroup.objects.Length > 0) {
                     TileObject tileObject = tile.objectGroup.objects[0];
@@ -148,22 +155,39 @@ public class TileMap : MonoBehaviour {
         }
 
         int tilesPlaced = 0;
+        bool isHexMap = tmxFile.orientation == "hexagonal";
+        bool staggerX = tmxFile.staggerAxis == "x";
+        int staggerIndex = (tmxFile.staggerAxis == "even") ? 0 : 1;
+        
         for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileIDs.Length); tileIndex++) {        
 
             int tileID = layerData.tileIDs[tileIndex];
             TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
             if (tileSet == null) continue;
             
-            TileRect uvRect = tileSet.GetTileUVs(tileID);
+            TileRect uvRect = tileSet.GetTileUVs(tileID, uvInset);
             if (uvRect == null) continue;
 
             int[] tileLocation = layerData.GetTileLocation(tileIndex);
             Vector3 pos = new Vector3(tileLocation[0] * offset.x, tileLocation[1] * offset.y, 0);
+            if (isHexMap) {
+                if (staggerX) {
+                    pos.y = tileLocation[1] * offset.w;
+                    if (tileLocation[0] % 2 == staggerIndex) pos.y += offset.w * 0.5f;
+                }
+                else {
+                    pos.x = tileLocation[0] * offset.z;
+                    if (tileLocation[1] % 2 == staggerIndex) pos.x += offset.z * 0.5f;
+                }
+            }
+
+            float widthMult = (float)tileSet.tileWidth / (float)tmxFile.tileWidth;
+            float heightMult = (float)(tileSet.tileHeight + 10) / (float)tmxFile.tileHeight;
             verts.AddRange(new Vector3[] {
                 pos,
-                pos + Vector3.up * offset.y,
-                pos + (Vector3)offset,
-                pos + Vector3.right * offset.x
+                pos + Vector3.up * offset.y * heightMult,
+                pos + new Vector3(offset.x * widthMult, offset.y * heightMult, 0),
+                pos + Vector3.right * offset.x * widthMult
             });
 
             if (idToPhysics.ContainsKey(tileID)) {
