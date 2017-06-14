@@ -61,7 +61,7 @@ public class TileMap : MonoBehaviour {
 
         if (tmxFile.orientation == "hexagonal" && tmxFile.hexSideLength != null) {
             if (tmxFile.staggerAxis == "x") offset.z = Mathf.Sign(offset.z) * tmxFile.hexSideLength.Value;
-            else offset.w = Mathf.Sign(offset.w) * tmxFile.hexSideLength.Value;            
+            else offset.w = Mathf.Sign(offset.w) * (tmxFile.tileHeight - tmxFile.hexSideLength.Value * 0.5f);            
         }
 
         offset *= 1f / pixelsPerUnit;
@@ -172,17 +172,17 @@ public class TileMap : MonoBehaviour {
             Vector3 pos = new Vector3(tileLocation[0] * offset.x, tileLocation[1] * offset.y, 0);
             if (isHexMap) {
                 if (staggerX) {
-                    pos.y = tileLocation[1] * offset.w;
+                    pos.x = tileLocation[0] * offset.z;
                     if (tileLocation[0] % 2 == staggerIndex) pos.y += offset.w * 0.5f;
                 }
                 else {
-                    pos.x = tileLocation[0] * offset.z;
+                    pos.y = tileLocation[1] * offset.w;
                     if (tileLocation[1] % 2 == staggerIndex) pos.x += offset.z * 0.5f;
                 }
             }
 
             float widthMult = (float)tileSet.tileWidth / (float)tmxFile.tileWidth;
-            float heightMult = (float)(tileSet.tileHeight + 10) / (float)tmxFile.tileHeight;
+            float heightMult = (float)tileSet.tileHeight / (float)tmxFile.tileHeight;
             verts.AddRange(new Vector3[] {
                 pos,
                 pos + Vector3.up * offset.y * heightMult,
@@ -346,18 +346,21 @@ public class TileMap : MonoBehaviour {
         if (tmxFile == null) return;
 
         Gizmos.color = new Color(1,1,1,0.1f);
-        for (int x = 1; x < tmxFile.width; x++) {
-            Gizmos.DrawLine(
-                new Vector3(x * offset.x, 0, 0),
-                new Vector3(x * offset.x, tmxFile.height * offset.y, 0)
-            );
-        }
 
-        for (int y = 1; y < tmxFile.height; y++) {
-             Gizmos.DrawLine(
-                new Vector3(0, y * offset.y, 0),
-                new Vector3(tmxFile.width * offset.x, y * offset.y, 0)
-            );   
+        if (tmxFile.orientation == "orthogonal") {
+            for (int x = 1; x < tmxFile.width; x++) {
+                Gizmos.DrawLine(
+                    new Vector3(x * offset.x, 0, 0),
+                    new Vector3(x * offset.x, tmxFile.height * offset.y, 0)
+                );
+            }
+
+            for (int y = 1; y < tmxFile.height; y++) {
+                Gizmos.DrawLine(
+                    new Vector3(0, y * offset.y, 0),
+                    new Vector3(tmxFile.width * offset.x, y * offset.y, 0)
+                );   
+            }
         }
     }
 }
