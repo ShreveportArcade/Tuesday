@@ -60,7 +60,7 @@ public class TileMap : MonoBehaviour {
         );
 
         if (tmxFile.orientation == "hexagonal" && tmxFile.hexSideLength != null) {
-            if (tmxFile.staggerAxis == "x") offset.z = Mathf.Sign(offset.z) * tmxFile.hexSideLength.Value;
+            if (tmxFile.staggerAxis == "x") offset.z = Mathf.Sign(offset.z) * (tmxFile.tileWidth - tmxFile.hexSideLength.Value * 0.5f);
             else offset.w = Mathf.Sign(offset.w) * (tmxFile.tileHeight - tmxFile.hexSideLength.Value * 0.5f);            
         }
 
