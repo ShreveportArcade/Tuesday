@@ -45,7 +45,7 @@ public class TMXFile {
 				map.tileSets[i] = tsxFile;
 			}
 
-			if (tileSet.columns == 0 || tileSet.tileCount == 0) {
+			if ((tileSet.columns == 0 || tileSet.tileCount == 0) && tileSet.image != null) {
 				tileSet.columns = (tileSet.image.width - 2 * tileSet.margin + tileSet.spacing) / (tileSet.tileWidth + tileSet.spacing);
 				tileSet.rows = (tileSet.image.height - 2 * tileSet.margin + tileSet.spacing) / (tileSet.tileHeight + tileSet.spacing);
 			}
@@ -218,18 +218,25 @@ public class Layer {
 
 	[XmlElement("property", typeof(Property))] public Property[] properties;
 	[XmlElement("data", typeof(Data))] public Data tileData;
-    
+	
+	const uint FlippedHorizontallyFlag = 0x80000000;
+	const uint FlippedVerticallyFlag = 0x40000000;
+	const uint FlippedAntiDiagonallyFlag = 0x20000000;
+	const uint RotatedHexagonal120Flag = 0x10000000;
+
+	private uint[] flaggedTileIDs;
 	private int[] _tileIDs;
 	public int[] tileIDs {
 		get {
 			if (_tileIDs == null || _tileIDs.Length != width * height) {
 
 				_tileIDs = new int[width * height];
+				flaggedTileIDs = new uint[width * height];
 
 				if (tileData.encoding == "csv") {
 					string[] tiles = tileData.contents.Split(',');
 					for (int i = 0; i < tiles.Length; i++) {
-						_tileIDs[i] = int.Parse(tiles[i].Trim());
+						flaggedTileIDs[i] = uint.Parse(tiles[i].Trim());
 					}
 				}
 				else if (tileData.encoding == "base64") {
@@ -247,11 +254,18 @@ public class Layer {
 					using (BinaryReader binaryReader = new BinaryReader(stream)){
 						for (int j = 0; j < height; j++) {
 							for (int i = 0; i < width; i++) {
-								_tileIDs[i + j * width] = (int)binaryReader.ReadUInt32();
+								flaggedTileIDs[i + j * width] = binaryReader.ReadUInt32();
 							}
 						}
 					}
 				}
+
+				for (int i = 0; i < _tileIDs.Length; i++) {
+					uint id = flaggedTileIDs[i];
+					id &= ~(FlippedHorizontallyFlag | FlippedVerticallyFlag | FlippedAntiDiagonallyFlag | RotatedHexagonal120Flag);
+					_tileIDs[i] = (int)id;
+				}
+
 			}
 			return _tileIDs;
 		}
@@ -277,6 +291,22 @@ public class Layer {
 
 	public int GetTileID (int x, int y) {
 		return tileIDs[x + y * width];
+	}
+
+	public bool FlippedHorizontally (int index) {
+		return (flaggedTileIDs[index] & FlippedHorizontallyFlag) == FlippedHorizontallyFlag;
+	}
+
+	public bool FlippedVertically (int index) {
+		return (flaggedTileIDs[index] & FlippedVerticallyFlag) == FlippedVerticallyFlag;
+	}
+
+	public bool FlippedAntiDiagonally (int index) {
+		return (flaggedTileIDs[index] & FlippedAntiDiagonallyFlag) == FlippedAntiDiagonallyFlag;
+	}
+
+	public bool RotatedHexagonal120 (int index) {
+		return (flaggedTileIDs[index] & RotatedHexagonal120Flag) == RotatedHexagonal120Flag;
 	}
 
 	public int[] GetTileLocation (int index) {

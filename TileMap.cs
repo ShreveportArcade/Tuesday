@@ -158,7 +158,6 @@ public class TileMap : MonoBehaviour {
         bool isHexMap = tmxFile.orientation == "hexagonal";
         bool staggerX = tmxFile.staggerAxis == "x";
         int staggerIndex = (tmxFile.staggerAxis == "even") ? 0 : 1;
-        
         for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileIDs.Length); tileIndex++) {        
 
             int tileID = layerData.tileIDs[tileIndex];
@@ -167,6 +166,11 @@ public class TileMap : MonoBehaviour {
             
             TileRect uvRect = tileSet.GetTileUVs(tileID, uvInset);
             if (uvRect == null) continue;
+
+            bool flipX = layerData.FlippedHorizontally(tileIndex);
+            bool flipY = layerData.FlippedVertically(tileIndex);
+            bool flipAntiDiag = layerData.FlippedAntiDiagonally(tileIndex);
+            bool rotated120 = layerData.RotatedHexagonal120(tileIndex);
 
             int[] tileLocation = layerData.GetTileLocation(tileIndex);
             Vector3 pos = new Vector3(tileLocation[0] * offset.x, tileLocation[1] * offset.y, 0);
@@ -183,12 +187,23 @@ public class TileMap : MonoBehaviour {
 
             float widthMult = (float)tileSet.tileWidth / (float)tmxFile.tileWidth;
             float heightMult = (float)tileSet.tileHeight / (float)tmxFile.tileHeight;
-            verts.AddRange(new Vector3[] {
+            Vector3[] v = new Vector3[] {
                 pos,
                 pos + Vector3.up * offset.y * heightMult,
                 pos + new Vector3(offset.x * widthMult, offset.y * heightMult, 0),
                 pos + Vector3.right * offset.x * widthMult
-            });
+            };
+
+            if (rotated120 || (flipAntiDiag && isHexMap)) {
+                float angle = rotated120 ? 120 : 0;
+                angle += flipAntiDiag ? 60 : 0;
+                Vector3 center = (v[0] + v[2]) * 0.5f;
+                for (int i = 0; i < 4; i++) {
+                    v[i] = Quaternion.Euler(0,0,-angle) * (v[i] - center) + center;
+                }
+            }
+
+            verts.AddRange(v);
 
             if (idToPhysics.ContainsKey(tileID)) {
                 Vector3[] phys = idToPhysics[tileID];
@@ -215,7 +230,7 @@ public class TileMap : MonoBehaviour {
                 new Vector2(right, bottom)
             };
 
-            if (offset.x < 0) {
+            if (offset.x < 0 != flipX) {
                 uvArray = new Vector2[] {
                     new Vector2(right, bottom),
                     new Vector2(right, top),
@@ -224,7 +239,7 @@ public class TileMap : MonoBehaviour {
                 };
             }
 
-            if (offset.y < 0) {
+            if (offset.y < 0 != flipY) {
                 uvArray = new Vector2[]{uvArray[1], uvArray[0], uvArray[3], uvArray[2]};
             }
 
