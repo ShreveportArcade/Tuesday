@@ -6,10 +6,15 @@ using ClipperLib;
 namespace Tiled {
 public class TileMap : MonoBehaviour {
 
+    #if UNITY_EDITOR
+    public bool showGrid = false;
+    public Color gridColor = new Color(1,1,1,0.1f);
+    #endif
+    [Range(0, 0.01f)]public float uvInset = 0;
+
 	public string tmxFilePath;
 	public TMXFile tmxFile;
 
-    [Range(0, 0.01f)]public float uvInset = 0;
     [HideInInspector] public Vector4 offset;
     [HideInInspector] public GameObject[] layers;
     [HideInInspector] public Material[] tileSetMaterials;
@@ -61,7 +66,11 @@ public class TileMap : MonoBehaviour {
 
         if (tmxFile.orientation == "hexagonal" && tmxFile.hexSideLength != null) {
             if (tmxFile.staggerAxis == "x") offset.z = Mathf.Sign(offset.z) * (tmxFile.tileWidth - tmxFile.hexSideLength.Value * 0.5f);
-            else offset.w = Mathf.Sign(offset.w) * (tmxFile.tileHeight - tmxFile.hexSideLength.Value * 0.5f);            
+            else offset.w = Mathf.Sign(offset.w) * (tmxFile.tileHeight - tmxFile.hexSideLength.Value * 0.5f);
+        }
+        else if (tmxFile.orientation == "staggered") {
+            if (tmxFile.staggerAxis == "x") offset.z -= offset.x * 0.5f;
+            else offset.w -= offset.y *0.5f;
         }
 
         offset *= 1f / pixelsPerUnit;
@@ -154,15 +163,30 @@ public class TileMap : MonoBehaviour {
             }
         }
 
-        int tilesPlaced = 0;
         bool isHexMap = tmxFile.orientation == "hexagonal";
+        bool isIsoMap = tmxFile.orientation == "isometric";
+        bool isStagMap = tmxFile.orientation == "staggered";
+
         bool staggerX = tmxFile.staggerAxis == "x";
         int staggerIndex = (tmxFile.staggerAxis == "even") ? 0 : 1;
+
+        int tilesPlaced = 0;        
         for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileIDs.Length); tileIndex++) {        
 
             int tileID = layerData.tileIDs[tileIndex];
             TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
             if (tileSet == null) continue;
+
+            if (tileSet.columns == 0 || tileSet.rows == 0) {
+                if (tileSet.image.width == 0 || tileSet.image.height == 0) {
+                    int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
+                    Texture2D tex = tileSetMaterials[tileSetIndex].mainTexture as Texture2D;
+                    tileSet.image.width = tex.width;
+                    tileSet.image.height = tex.height;
+                }
+                tileSet.columns = (tileSet.image.width - 2 * tileSet.margin) / (tileSet.tileWidth + tileSet.spacing);
+                tileSet.rows = (tileSet.image.width - 2 * tileSet.margin) / (tileSet.tileWidth + tileSet.spacing);
+            }
             
             TileRect uvRect = tileSet.GetTileUVs(tileID, uvInset);
             if (uvRect == null) continue;
@@ -174,7 +198,7 @@ public class TileMap : MonoBehaviour {
 
             int[] tileLocation = layerData.GetTileLocation(tileIndex);
             Vector3 pos = new Vector3(tileLocation[0] * offset.x, tileLocation[1] * offset.y, 0);
-            if (isHexMap) {
+            if (isHexMap || isStagMap) {
                 if (staggerX) {
                     pos.x = tileLocation[0] * offset.z;
                     if (tileLocation[0] % 2 == staggerIndex) pos.y += offset.w * 0.5f;
@@ -183,6 +207,10 @@ public class TileMap : MonoBehaviour {
                     pos.y = tileLocation[1] * offset.w;
                     if (tileLocation[1] % 2 == staggerIndex) pos.x += offset.z * 0.5f;
                 }
+            }
+            else if (isIsoMap) {
+                pos.x = (tileLocation[0] * offset.x  / 2) - (tileLocation[1] * offset.x  / 2);
+                pos.y = (tileLocation[1] * offset.y / 2) + (tileLocation[0] * offset.y / 2);
             }
 
             float widthMult = (float)tileSet.tileWidth / (float)tmxFile.tileWidth;
@@ -241,6 +269,12 @@ public class TileMap : MonoBehaviour {
 
             if (offset.y < 0 != flipY) {
                 uvArray = new Vector2[]{uvArray[1], uvArray[0], uvArray[3], uvArray[2]};
+            }
+
+            if (flipAntiDiag && !isHexMap) {
+                Vector2 tmp = uvArray[0];
+                uvArray[0] = uvArray[2];
+                uvArray[2] = tmp;
             }
 
             uvs.AddRange(uvArray);
@@ -357,11 +391,12 @@ public class TileMap : MonoBehaviour {
         return true;
     }
 
+    #if UNITY_EDITOR
     public void OnDrawGizmos () {
-        if (tmxFile == null) return;
+        if (!showGrid || tmxFile == null) return;
 
-        Gizmos.color = new Color(1,1,1,0.1f);
-
+        Gizmos.color = gridColor;
+        Gizmos.matrix = transform.localToWorldMatrix;
         if (tmxFile.orientation == "orthogonal") {
             for (int x = 1; x < tmxFile.width; x++) {
                 Gizmos.DrawLine(
@@ -378,5 +413,6 @@ public class TileMap : MonoBehaviour {
             }
         }
     }
+    #endif
 }
 }

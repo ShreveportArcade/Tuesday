@@ -42,13 +42,14 @@ public class TMXFile {
 
 				tsxFile.firstGID = tileSet.firstGID;
 				tsxFile.isTSX = true;
-				map.tileSets[i] = tsxFile;
+				tileSet = tsxFile;
 			}
 
 			if ((tileSet.columns == 0 || tileSet.tileCount == 0) && tileSet.image != null) {
 				tileSet.columns = (tileSet.image.width - 2 * tileSet.margin + tileSet.spacing) / (tileSet.tileWidth + tileSet.spacing);
 				tileSet.rows = (tileSet.image.height - 2 * tileSet.margin + tileSet.spacing) / (tileSet.tileHeight + tileSet.spacing);
 			}
+			map.tileSets[i] = tileSet;
 		}
 		return map;
 	}
@@ -179,6 +180,7 @@ public class TileSet {
         textWriter.Close();
         this.source = source;
     }
+	
 	public TileRect GetTileUVs (int tileGID, float inset = 0) {
 		if (tileGID < firstGID) return null;
 
@@ -236,7 +238,9 @@ public class Layer {
 				if (tileData.encoding == "csv") {
 					string[] tiles = tileData.contents.Split(',');
 					for (int i = 0; i < tiles.Length; i++) {
-						flaggedTileIDs[i] = uint.Parse(tiles[i].Trim());
+						string id = tiles[i].Trim();
+						if (string.IsNullOrEmpty(id)) flaggedTileIDs[i] = 0;
+						else flaggedTileIDs[i] = uint.Parse(id);
 					}
 				}
 				else if (tileData.encoding == "base64") {
