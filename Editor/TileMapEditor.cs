@@ -121,6 +121,7 @@ public class TileMapEditor : Editor {
         return i;
     }
 
+    Rect tileRect;
     private void TileSetField (TileSet tileSet) {
         int id = tileSet.firstGID;
         Rect r = GUILayoutUtility.GetRect(Screen.width, EditorGUIUtility.singleLineHeight);
@@ -185,29 +186,24 @@ public class TileMapEditor : Editor {
                 r.x = (Screen.width - r.width) * 0.5f;
                 EditorGUI.DrawPreviewTexture(r, tex, mat);
 
-                if (Event.current.isMouse && 
-                	Event.current.button == 0 && 
-                	r.Contains(Event.current.mousePosition)) {
-                    selectedTileSet = tileSet;
-                    selectedTileIndex = GetTileIndex(tileSet, r, Event.current.mousePosition);
-                }
-
                 if (selectedTileSet != null && selectedTileSet == tileSet && selectedTileIndex > 0) {
                     TileRect uvTileRect = selectedTileSet.GetTileUVs(selectedTileIndex);
-                    float left = r.x + r.width * uvTileRect.left;
-                    float right = r.x + r.width * uvTileRect.right;
-                    float bottom = r.y + r.height * (1 - uvTileRect.bottom);
-                    float top = r.y + r.height * (1 - uvTileRect.top);
+                    tileRect = r;
+                    tileRect.x += uvTileRect.x * r.width;
+                    tileRect.y += (1 - (uvTileRect.y + uvTileRect.height)) * r.height;
+                    tileRect.width *= uvTileRect.width;
+                    tileRect.height *= uvTileRect.height;
+                }
 
-                    Vector3 center = new Vector3(
-                        (left + right) * 0.5f,
-                        (bottom + top) * 0.5f,
-                        0);
-                    Vector3 size = new Vector3(
-                        (right - left),
-                        (top - bottom),
-                        0);
-                    Handles.DrawWireCube(center, size);
+                Handles.DrawSolidRectangleWithOutline(tileRect, Color.clear, Color.white);
+                HandleUtility.Repaint();
+
+                if (Event.current.type == EventType.MouseDown && 
+                    Event.current.button == 0 && 
+                    r.Contains(Event.current.mousePosition)) {
+                    selectedTileSet = tileSet;
+                    selectedTileIndex = GetTileIndex(tileSet, r, Event.current.mousePosition);
+                    Event.current.Use();
                 }
             }
             EditorGUILayout.Space();
