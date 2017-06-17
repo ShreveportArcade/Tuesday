@@ -334,10 +334,10 @@ public class Layer {
 		return (tileFlags[index] & RotatedHexagonal120Flag) == RotatedHexagonal120Flag;
 	}
 
-	public int[] GetTileLocation (int index) {
-		int[] loc = new int[2];
-		loc[0] = index % width;
-		loc[1] = index / width;
+	public TilePoint GetTileLocation (int index) {
+		TilePoint loc = new TilePoint();
+		loc.x = index % width;
+		loc.y = index / width;
 		return loc;
 	}
 }
@@ -350,8 +350,13 @@ public class Tile {
 
 	[XmlElement("properties", typeof(Property))] public Property[] properties;
 	[XmlElement("animation", typeof(Frame))] public Frame[] animation;
-	[XmlElement("image", typeof(Image))] public Image image { get; set; }
-	[XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup objectGroup { get; set; }
+	[XmlElement("image", typeof(Image))] public Image image;
+	[XmlIgnore] public bool imageSpecified { get { return image != null && !string.IsNullOrEmpty(image.source); } set {} }
+	[XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup objectGroup;
+	[XmlIgnore] public bool objectGroupSpecified { 
+		get { return objectGroup != null && objectGroup.objects != null && objectGroup.objects.Length > 0; } 
+		set {} 
+	}
 }
 
 [System.Serializable]
@@ -362,7 +367,7 @@ public class Image {
 	[XmlAttribute("width")] public int width = 0;
 	[XmlAttribute("height")] public int height = 0;
 
-	[XmlElement("data", typeof(Data))] public Data data { get; set; }
+	[XmlElement("data", typeof(Data))] public Data data;
 }
 
 [System.Serializable]
@@ -438,14 +443,19 @@ public class TileObject {
 	[XmlAttribute("visible")] public int? visible;
 
 	[XmlElement("property", typeof(Property))] public Property[] properties;
-	[XmlElement("ellipse", typeof(Elipse))] public Elipse ellipse { get; set; }
-	[XmlElement("polygon", typeof(Polygon))] public Polygon polygon { get; set; }
-	[XmlElement("polyline", typeof(Polygon))] public Polygon polyline { get; set; }
-	[XmlElement("image", typeof(Image))] public Image image { get; set; }
+	[XmlIgnore] public bool propertiesSpecified {get { return properties != null && properties.Length > 0; } set {} }
+	[XmlElement("ellipse", typeof(Ellipse))] public Ellipse ellipse;
+	[XmlIgnore] public bool ellipseSpecified {get { return ellipse != null && ellipse.width > 0 && ellipse.height > 0; } set {} }
+	[XmlElement("polygon", typeof(Polygon))] public Polygon polygon;
+	[XmlIgnore] public bool polygonSpecified {get { return polygon != null && !string.IsNullOrEmpty(polygon.points); } set {} }
+	[XmlElement("polyline", typeof(Polygon))] public Polygon polyline;
+	[XmlIgnore] public bool polylineSpecified {get { return polyline != null && !string.IsNullOrEmpty(polyline.points); } set {} }
+	[XmlElement("image", typeof(Image))] public Image image;
+	[XmlIgnore] public bool imageSpecified {get { return image != null && !string.IsNullOrEmpty(image.source); } set {} }
 }
 
 [System.Serializable]
-public class Elipse {
+public class Ellipse {
 	[XmlAttribute("x")] public int x = 0;
 	[XmlAttribute("y")] public int y = 0;
 	[XmlAttribute("width")] public int width  = 0;
@@ -455,6 +465,21 @@ public class Elipse {
 [System.Serializable]
 public class Polygon {
 	[XmlAttribute("points")] public string points = "";
+	[XmlIgnore] public TilePoint[] path {
+		get {
+			string[] pts = points.Split(' ');
+			TilePoint[] _path = new TilePoint[pts.Length];
+			for (int i = 0; i < pts.Length; i++) {
+				TilePoint point = new TilePoint();
+				string[] pt = pts[i].Trim().Split(',');
+				point.x = int.Parse(pt[0]);
+				point.y = int.Parse(pt[1]);
+				_path[i] = point;
+			}
+			return _path;
+		}
+	}
+
 }
 
 [System.Serializable]

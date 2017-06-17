@@ -215,21 +215,21 @@ public class TileMap : MonoBehaviour {
             bool flipAntiDiag = layerData.FlippedAntiDiagonally(tileIndex);
             bool rotated120 = layerData.RotatedHexagonal120(tileIndex);
 
-            int[] tileLocation = layerData.GetTileLocation(tileIndex);
-            Vector3 pos = new Vector3(tileLocation[0] * offset.x, tileLocation[1] * offset.y, 0);
+            TilePoint tileLocation = layerData.GetTileLocation(tileIndex);
+            Vector3 pos = new Vector3(tileLocation.x * offset.x, tileLocation.y * offset.y, 0);
             if (isHexMap || isStagMap) {
                 if (staggerX) {
-                    pos.x = tileLocation[0] * offset.z;
-                    if (tileLocation[0] % 2 == staggerIndex) pos.y += offset.w * 0.5f;
+                    pos.x = tileLocation.x * offset.z;
+                    if (tileLocation.x % 2 == staggerIndex) pos.y += offset.w * 0.5f;
                 }
                 else {
-                    pos.y = tileLocation[1] * offset.w;
-                    if (tileLocation[1] % 2 == staggerIndex) pos.x += offset.z * 0.5f;
+                    pos.y = tileLocation.y * offset.w;
+                    if (tileLocation.y % 2 == staggerIndex) pos.x += offset.z * 0.5f;
                 }
             }
             else if (isIsoMap) {
-                pos.x = (tileLocation[0] * offset.x  / 2) - (tileLocation[1] * offset.x  / 2);
-                pos.y = (tileLocation[1] * offset.y / 2) + (tileLocation[0] * offset.y / 2);
+                pos.x = (tileLocation.x * offset.x  / 2) - (tileLocation.y * offset.x  / 2);
+                pos.y = (tileLocation.y * offset.y / 2) + (tileLocation.x * offset.y / 2);
             }
 
             float widthMult = (float)tileSet.tileWidth / (float)tmxFile.tileWidth;
@@ -344,7 +344,7 @@ public class TileMap : MonoBehaviour {
 
         obj.GetComponent<MeshFilter>().sharedMesh = mesh;
 
-        paths = Clipper.SimplifyPolygons(paths);
+        paths = Clipper.SimplifyPolygons(paths, PolyFillType.pftPositive);
         paths = RemoveColinnear(paths);
 
         layerPaths[layerIndex][submeshIndex] = paths;

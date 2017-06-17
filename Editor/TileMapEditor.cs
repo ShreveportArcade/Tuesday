@@ -140,7 +140,7 @@ public class TileMapEditor : Editor {
     Rect tileRect;
     private void TileSetField (TileSet tileSet) {
         int id = tileSet.firstGID;
-        Rect r = GUILayoutUtility.GetRect(Screen.width, EditorGUIUtility.singleLineHeight);
+        Rect r = GUILayoutUtility.GetRect(Screen.width - 40, EditorGUIUtility.singleLineHeight);
         float w = r.width;
         r.width = 20;
         bool show = !tileSetFoldoutStates.ContainsKey(id) || tileSetFoldoutStates[id];
@@ -190,8 +190,14 @@ public class TileMapEditor : Editor {
             }
 
             if (tex != null) {
-                r = GUILayoutUtility.GetRect(Screen.width, tex.height);
-                r.width = r.height * (float)tex.width / (float)tex.height - 20;
+                float x = Screen.width - 40;
+                float y = tex.height * x / (float)tex.width;
+                if (x > tex.width) {
+                    x = tex.width;
+                    y = tex.height;
+                }
+                r = GUILayoutUtility.GetRect(x, y);
+                r.width = r.height * (float)tex.width / (float)tex.height;
                 r.height = r.width * (float)tex.height / (float)tex.width;
                 r.x = (Screen.width - r.width) * 0.5f;
                 EditorGUI.DrawPreviewTexture(r, tex, mat);
