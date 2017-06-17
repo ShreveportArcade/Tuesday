@@ -33,6 +33,7 @@ public class TileMap : MonoBehaviour {
 	public string tmxFilePath;
 	public TMXFile tmxFile;
 
+    [HideInInspector] public float pixelsPerUnit = -1;
     [HideInInspector] public Vector4 offset;
     [HideInInspector] public GameObject[] layers;
     [HideInInspector] public Material[] tileSetMaterials;
@@ -71,7 +72,11 @@ public class TileMap : MonoBehaviour {
 	public void Setup (TMXFile tmxFile, string tmxFilePath, float pixelsPerUnit = -1) {
 		this.tmxFilePath = tmxFilePath;
         this.tmxFile = tmxFile;
+        this.pixelsPerUnit = pixelsPerUnit;
+        Setup();
+    }
 
+    public void Setup () {
         if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileWidth;
 
         string[] xyDirections = tmxFile.renderOrder.Split('-');
@@ -124,7 +129,7 @@ public class TileMap : MonoBehaviour {
         }        
     }
 
-    public void Revert () {
+    public void ReloadMap () {
         for (int layerIndex = 0; layerIndex < tmxFile.layers.Length; layerIndex++) {
             for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
                 UpdateMesh(layerIndex, submeshIndex);

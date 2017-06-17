@@ -43,6 +43,17 @@ public class TileMapEditor : Editor {
     	set { tileMap.tmxFilePath = value; }
     }
 
+    void OnEnable () {
+        Undo.undoRedoPerformed += UndoRedo;
+    }
+    void OnDisable () {
+        Undo.undoRedoPerformed -= UndoRedo;
+    }
+
+    void UndoRedo () {
+        tileMap.ReloadMap();
+    }
+
     private static Material _mat;
     private static Material mat {
         get {
@@ -58,6 +69,8 @@ public class TileMapEditor : Editor {
         Material[] materials = new Material[tmxFile.tileSets.Length];
         for (int i = 0; i < tmxFile.tileSets.Length; i++) {
             TileSet tileSet = tmxFile.tileSets[i];
+            if (tileSet == null || tileSet.image == null || string.IsNullOrEmpty(tileSet.image.source)) continue;
+
             Material mat = null;
             if (tileSetMaterials.ContainsKey(tileSet.image.source)) {
                 mat = tileSetMaterials[tileSet.image.source];
@@ -163,14 +176,6 @@ public class TileMapEditor : Editor {
         }
 
         if (tileSetFoldoutStates[tileSet.firstGID]) {
-            tileSet.firstGID = EditorGUILayout.IntField("First Tile ID", tileSet.firstGID);
-            tileSet.tileWidth = EditorGUILayout.IntField("Width", tileSet.tileWidth);
-            tileSet.tileHeight = EditorGUILayout.IntField("Height", tileSet.tileHeight);
-            tileSet.spacing = EditorGUILayout.IntField("Spacing", tileSet.spacing);
-            tileSet.margin = EditorGUILayout.IntField("Margin", tileSet.margin);
-            tileSet.rows = EditorGUILayout.IntField("Rows", tileSet.rows);
-            tileSet.columns = EditorGUILayout.IntField("Columns", tileSet.columns);
-
             Texture2D currentTexture = GetTileSetTexture(tileSet, path);
             Texture2D tex = EditorGUILayout.ObjectField(currentTexture, typeof(Texture2D), false) as Texture2D;
             if (currentTexture != tex) {
@@ -211,7 +216,7 @@ public class TileMapEditor : Editor {
     }
 
     private static int editState = 0;
-    public override void OnInspectorGUI() {		
+    public override void OnInspectorGUI() {	
 		base.OnInspectorGUI();
 
     	EditorGUIUtility.hierarchyMode = true;
@@ -228,7 +233,7 @@ public class TileMapEditor : Editor {
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Revert")) {
             tmxFile = TMXFile.Load(path);
-			tileMap.Revert();
+			tileMap.ReloadMap();
         }
         if (GUILayout.Button("Save")) {
             tmxFile.Save(path);
@@ -280,14 +285,14 @@ public class TileMapEditor : Editor {
     int[] selectedTileIndices = null;
     void OnSceneGUI () {
     	if (editState == 0) return;
-        if (editState == 3) DrawSelection();
+        else if (editState == 3) DrawSelection();
+        else Undo.RecordObject(target, "Draw/Erase Tiles");
 
     	Event e = Event.current;
     	if (e == null) return;
 
-        int controlId = GUIUtility.GetControlID(FocusType.Passive);
-
     	if (e.type == EventType.MouseDown) {
+            GUIUtility.hotControl = GUIUtility.GetControlID(FocusType.Passive);
     		selectedTileIndices = null;
     		if (editState == 3) selectionStart = MouseToWorldPoint();
     		else DrawTile();
@@ -302,9 +307,11 @@ public class TileMapEditor : Editor {
     	else if (e.type == EventType.MouseUp) {
             if (editState == 3) SelectTiles();
             else tileMap.UpdatePolygonColliders(0);
+            GUIUtility.hotControl = 0;
+            Undo.FlushUndoRecordObjects();
     	}
 
-    	GUIUtility.hotControl = controlId;
+    	
     }
 
     Vector3 MouseToWorldPoint () {
@@ -347,6 +354,7 @@ public class TileMapEditor : Editor {
         	Vector3 p = ray.GetPoint(dist);
         	if (tileMap.SetTile(tileIndex, 0, p - tileMap.transform.position)) {
 		        Event.current.Use();
+                EditorUtility.SetDirty(target);
 	        }
         }
     }

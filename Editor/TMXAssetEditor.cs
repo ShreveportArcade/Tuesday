@@ -109,10 +109,10 @@ class TMXAssetEditor : Editor {
     }
 
     private static void SceneGUICallback (SceneView sceneView) {
-        DragAndDropTMXFile();
+        DragAndDropTMXFile(true);
     }
 
-    private static void DragAndDropTMXFile () {
+    private static void DragAndDropTMXFile (bool isSceneView = false) {
         EventType eventType = Event.current.type;
         if (eventType == EventType.DragUpdated || eventType == EventType.DragPerform) {
             DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
@@ -135,11 +135,20 @@ class TMXAssetEditor : Editor {
                         tileMap.tileSetMaterials = TileMapEditor.GetMaterials(tmxFile, tmxFilePath);
                         tileMap.Setup(tmxFile, tmxFilePath, pixelsPerUnit);
 
+                        if (isSceneView) {
+                            Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+                            float dist = 0;
+                            Plane plane = new Plane(Vector3.forward, tileMap.transform.position);
+                            if (plane.Raycast(ray, out dist)) {
+                                map.transform.position = ray.GetPoint(dist);
+                                Event.current.Use();
+                            }
+                        }
+                        else {
+                            // place at origin relative to object dropped on in Hierarchy
+                        }
+
                         Undo.RegisterCreatedObjectUndo (map, "Created '" + name + "' from TMX file.");
-
-                        // place map at mouse position in scene view
-                        // place at origin relative to object dropped on in Hierarchy
-
                         foundTMX = true;
                     }
                 }

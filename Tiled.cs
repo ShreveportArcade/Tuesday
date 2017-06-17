@@ -138,25 +138,25 @@ public class TileSet {
 	[XmlIgnore] public bool sourceSpecified { get { return !isTSX; } set {} }
 
 	[XmlAttribute("name")] public string name = "";
-	[XmlIgnore] public bool nameSpecified { get { return source == null; } set {} }
+	[XmlIgnore] public bool nameSpecified { get { return string.IsNullOrEmpty(source); } set {} }
 
 	[XmlAttribute("tilewidth")] public int tileWidth = 0;
-	[XmlIgnore] public bool tileWidthSpecified { get { return source == null; } set {} }
+	[XmlIgnore] public bool tileWidthSpecified { get { return string.IsNullOrEmpty(source); } set {} }
 
 	[XmlAttribute("tileheight")] public int tileHeight = 0;
-	[XmlIgnore] public bool tileHeightSpecified { get { return source == null; } set {} }
+	[XmlIgnore] public bool tileHeightSpecified { get { return string.IsNullOrEmpty(source); } set {} }
 
 	[XmlAttribute("spacing")] public int spacing = 0;
-	[XmlIgnore] public bool spacingSpecified { get { return source == null; } set {} }
+	[XmlIgnore] public bool spacingSpecified { get { return string.IsNullOrEmpty(source); } set {} }
 
 	[XmlAttribute("margin")] public int margin = 0;
-	[XmlIgnore] public bool marginSpecified { get { return source == null; } set {} }
+	[XmlIgnore] public bool marginSpecified { get { return string.IsNullOrEmpty(source); } set {} }
 
 	[XmlAttribute("tilecount")] public int tileCount = 0;
-	[XmlIgnore] public bool tileCountSpecified { get { return source == null; } set {} }
+	[XmlIgnore] public bool tileCountSpecified { get { return string.IsNullOrEmpty(source); } set {} }
 
 	[XmlAttribute("columns")] public int columns = 0;
-	[XmlIgnore] public bool columnsSpecified { get { return source == null; } set {} }
+	[XmlIgnore] public bool columnsSpecified { get { return string.IsNullOrEmpty(source); } set {} }
 	
     [XmlIgnore] public int rows { 
 		get { return (columns > 0) ? tileCount / columns : 0; } 
@@ -164,19 +164,19 @@ public class TileSet {
 	}
 
 	[XmlElement("tileoffset", typeof(TilePoint))] public TilePoint tileOffset;
-	[XmlIgnore] public bool tileOffsetSpecified { get { return source == null; } set {} }
+	[XmlIgnore] public bool tileOffsetSpecified { get { return string.IsNullOrEmpty(source); } set {} }
 
 	[XmlElement("image", typeof(Image))]  public Image image;
-	[XmlIgnore] public bool imageSpecified { get { return source == null; } set {} }
+	[XmlIgnore] public bool imageSpecified { get { return string.IsNullOrEmpty(source); } set {} }
 
 	[XmlElement("tile", typeof(Tile))] public Tile[] tiles;
-	[XmlIgnore] public bool tilesSpecified { get { return source == null; } set {} }
+	[XmlIgnore] public bool tilesSpecified { get { return string.IsNullOrEmpty(source); } set {} }
 
 	[XmlElement("terraintypes", typeof(Terrain))] public Terrain[] terrainTypes;
-	[XmlIgnore] public bool terrainTypesSpecified { get { return source == null; } set {} }
+	[XmlIgnore] public bool terrainTypesSpecified { get { return string.IsNullOrEmpty(source); } set {} }
 
 	[XmlElement("properties", typeof(Property))] public Property[] properties;
-	[XmlIgnore] public bool propertiesSpecified { get { return source == null; } set {} }
+	[XmlIgnore] public bool propertiesSpecified { get { return string.IsNullOrEmpty(source); } set {} }
 
 	public static TileSet Load (string path) {
 		XmlSerializer deserializer = new XmlSerializer(typeof(TileSet));
@@ -244,21 +244,19 @@ public class Layer {
 	const uint FlippedAntiDiagonallyFlag = 0x20000000;
 	const uint RotatedHexagonal120Flag = 0x10000000;
 
-	private uint[] flaggedTileIDs;
-	private int[] _tileIDs;
+	[XmlIgnore] public uint[] tileFlags;
+	[XmlIgnore] public int[] _tileIDs;
 	public int[] tileIDs {
 		get {
-			if (_tileIDs == null || _tileIDs.Length != width * height) {
-
-				_tileIDs = new int[width * height];
-				flaggedTileIDs = new uint[width * height];
+			if (tileFlags == null || tileFlags.Length != width * height) {
+				tileFlags = new uint[width * height];
 
 				if (tileData.encoding == "csv") {
 					string[] tiles = tileData.contents.Split(',');
 					for (int i = 0; i < tiles.Length; i++) {
 						string id = tiles[i].Trim();
-						if (string.IsNullOrEmpty(id)) flaggedTileIDs[i] = 0;
-						else flaggedTileIDs[i] = uint.Parse(id);
+						if (string.IsNullOrEmpty(id)) tileFlags[i] = 0;
+						else tileFlags[i] = uint.Parse(id);
 					}
 				}
 				else if (tileData.encoding == "base64") {
@@ -276,19 +274,22 @@ public class Layer {
 					using (BinaryReader binaryReader = new BinaryReader(stream)){
 						for (int j = 0; j < height; j++) {
 							for (int i = 0; i < width; i++) {
-								flaggedTileIDs[i + j * width] = binaryReader.ReadUInt32();
+								tileFlags[i + j * width] = binaryReader.ReadUInt32();
 							}
 						}
 					}
 				}
+			}
 
+			if (_tileIDs == null || _tileIDs.Length != width * height) {
+				_tileIDs = new int[width * height];
 				for (int i = 0; i < _tileIDs.Length; i++) {
-					uint id = flaggedTileIDs[i];
+					uint id = tileFlags[i];
 					id &= ~(FlippedHorizontallyFlag | FlippedVerticallyFlag | FlippedAntiDiagonallyFlag | RotatedHexagonal120Flag);
 					_tileIDs[i] = (int)id;
 				}
-
 			}
+
 			return _tileIDs;
 		}
 	}
@@ -305,6 +306,8 @@ public class Layer {
 			else tileStrings[index] = id.ToString();
 			
 			tileData.contents = string.Join(",", tileStrings);
+
+			//TODO: handle flags
 		}
 		else if (tileData.encoding == "base64") {
 			// TODO: encode as base64
@@ -316,19 +319,19 @@ public class Layer {
 	}
 
 	public bool FlippedHorizontally (int index) {
-		return (flaggedTileIDs[index] & FlippedHorizontallyFlag) == FlippedHorizontallyFlag;
+		return (tileFlags[index] & FlippedHorizontallyFlag) == FlippedHorizontallyFlag;
 	}
 
 	public bool FlippedVertically (int index) {
-		return (flaggedTileIDs[index] & FlippedVerticallyFlag) == FlippedVerticallyFlag;
+		return (tileFlags[index] & FlippedVerticallyFlag) == FlippedVerticallyFlag;
 	}
 
 	public bool FlippedAntiDiagonally (int index) {
-		return (flaggedTileIDs[index] & FlippedAntiDiagonallyFlag) == FlippedAntiDiagonallyFlag;
+		return (tileFlags[index] & FlippedAntiDiagonallyFlag) == FlippedAntiDiagonallyFlag;
 	}
 
 	public bool RotatedHexagonal120 (int index) {
-		return (flaggedTileIDs[index] & RotatedHexagonal120Flag) == RotatedHexagonal120Flag;
+		return (tileFlags[index] & RotatedHexagonal120Flag) == RotatedHexagonal120Flag;
 	}
 
 	public int[] GetTileLocation (int index) {
