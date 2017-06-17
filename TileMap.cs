@@ -135,14 +135,14 @@ public class TileMap : MonoBehaviour {
     }
 
     private IntPoint Vector2ToIntPoint (Vector2 p) {
-        int x = (int)(p.x * 100);
-        int y = (int)(p.y * 100);
+        int x = (int)(p.x * pixelsPerUnit);
+        int y = (int)(p.y * pixelsPerUnit);
         return new IntPoint(x, y);
     }
 
     private Vector2 IntPointToVector2 (IntPoint p) {
-        float x = (float)p.X / 100f;
-        float y = (float)p.Y / 100f;
+        float x = (float)p.X / pixelsPerUnit;
+        float y = (float)p.Y / pixelsPerUnit;
         return new Vector2(x, y);
     }
 
@@ -170,14 +170,24 @@ public class TileMap : MonoBehaviour {
                     TileObject tileObject = tile.objectGroup.objects[0];
                     float x = offset.x * (float)tileObject.x / (float)tileSet.tileWidth;
                     float y = offset.y * (float)tileObject.y / (float)tileSet.tileHeight;
-                    float width = offset.x * (float)tileObject.width / (float)tileSet.tileWidth;
-                    float height = offset.y * (float)tileObject.height / (float)tileSet.tileHeight;
-                    idToPhysics[tile.id + tileSet.firstGID] = new Vector3[] {
-                        new Vector3(x, y, 0),
-                        new Vector3(x, y + height, 0),
-                        new Vector3(x + width, y + height, 0),
-                        new Vector3(x + width, y, 0)
-                    };
+                    if (tileObject.polygonSpecified) {
+                        idToPhysics[tile.id + tileSet.firstGID] = System.Array.ConvertAll(tileObject.polygon.path, (p) => {
+                            Vector3 v = new Vector3(x, y, 0);
+                            v.x += offset.x * (float)p.x / (float)tileSet.tileWidth;
+                            v.y -= offset.x * (float)p.y / (float)tileSet.tileHeight;
+                            return v;
+                        });
+                    }
+                    else {
+                        float width = offset.x * (float)tileObject.width / (float)tileSet.tileWidth;
+                        float height = offset.y * (float)tileObject.height / (float)tileSet.tileHeight;
+                        idToPhysics[tile.id + tileSet.firstGID] = new Vector3[] {
+                            new Vector3(x,         y,          0),
+                            new Vector3(x,         y + height, 0),
+                            new Vector3(x + width, y + height, 0),
+                            new Vector3(x + width, y,          0)
+                        };
+                    }
                 }
             }
         }
@@ -344,13 +354,13 @@ public class TileMap : MonoBehaviour {
 
         obj.GetComponent<MeshFilter>().sharedMesh = mesh;
 
-        paths = Clipper.SimplifyPolygons(paths, PolyFillType.pftPositive);
-        paths = RemoveColinnear(paths);
+        paths = Clipper.SimplifyPolygons(paths, PolyFillType.pftNonZero);
+        paths = RemoveColinnearAndDoubles(paths);
 
         layerPaths[layerIndex][submeshIndex] = paths;
     }
 
-    List<List<IntPoint>> RemoveColinnear (List<List<IntPoint>> paths) {
+    List<List<IntPoint>> RemoveColinnearAndDoubles (List<List<IntPoint>> paths, int minAngle = 5, int minDist = 5) {
         for (int i = 0; i < paths.Count; i++) {
             List<IntPoint> path = paths[i];
             List<IntPoint> newPath = new List<IntPoint>(path);
@@ -359,7 +369,7 @@ public class TileMap : MonoBehaviour {
                 Vector2 a = new Vector2(path[j].X - path[j-1].X, path[j].Y - path[j-1].Y);
                 Vector2 b = new Vector2(path[j+1].X - path[j].X, path[j+1].Y - path[j].Y);
                 ang = Vector2.Angle(a, b);
-                if (Mathf.Abs(ang) < 5) {
+                if (Mathf.Abs(ang) < 5 || a.magnitude < minDist) {
                     newPath.Remove(path[j]);
                 }
             }

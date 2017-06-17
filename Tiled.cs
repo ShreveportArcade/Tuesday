@@ -335,10 +335,7 @@ public class Layer {
 	}
 
 	public TilePoint GetTileLocation (int index) {
-		TilePoint loc = new TilePoint();
-		loc.x = index % width;
-		loc.y = index / width;
-		return loc;
+		return new TilePoint(index % width, index / width);
 	}
 }
 
@@ -381,6 +378,12 @@ public class Data {
 public class TilePoint {
 	[XmlAttribute("x")] public int x = 0; 
 	[XmlAttribute("y")] public int y = 0;
+
+	public TilePoint () {}
+	public TilePoint (int x, int y) {
+		this.x = x;
+		this.y = y;
+	}
 }
 
 [System.Serializable]
@@ -470,11 +473,8 @@ public class Polygon {
 			string[] pts = points.Split(' ');
 			TilePoint[] _path = new TilePoint[pts.Length];
 			for (int i = 0; i < pts.Length; i++) {
-				TilePoint point = new TilePoint();
 				string[] pt = pts[i].Trim().Split(',');
-				point.x = int.Parse(pt[0]);
-				point.y = int.Parse(pt[1]);
-				_path[i] = point;
+				_path[i] = new TilePoint(int.Parse(pt[0]), int.Parse(pt[1]));
 			}
 			return _path;
 		}
