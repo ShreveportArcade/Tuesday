@@ -28,6 +28,9 @@ namespace Tiled {
 public class TileMapEditor : Editor {
 
     private static bool showTileSets = true;
+    private static bool showGrid = true;
+    private static Color gridColor = new Color(0,0,0,0.25f);
+    
 
     private TileMap tileMap {
     	get { return (target as TileMap); }
@@ -175,6 +178,8 @@ public class TileMapEditor : Editor {
             Event.current.Use();
         }
 
+        if (selectedTileSet == null) tileRect = new Rect(-1,-1,0,0);
+
         if (tileSetFoldoutStates[tileSet.firstGID]) {
             Texture2D currentTexture = GetTileSetTexture(tileSet, path);
             Texture2D tex = EditorGUILayout.ObjectField(currentTexture, typeof(Texture2D), false) as Texture2D;
@@ -217,6 +222,9 @@ public class TileMapEditor : Editor {
 
     private static int editState = 0;
     public override void OnInspectorGUI() {	
+        showGrid = EditorGUILayout.Toggle("Show Grid?", showGrid);
+        if (showGrid) gridColor = EditorGUILayout.ColorField("Grid Color", gridColor);
+
 		base.OnInspectorGUI();
 
     	EditorGUIUtility.hierarchyMode = true;
@@ -284,6 +292,8 @@ public class TileMapEditor : Editor {
     Vector3 selectionEnd;
     int[] selectedTileIndices = null;
     void OnSceneGUI () {
+        DrawGrid();
+
     	if (editState == 0) return;
         else if (editState == 3) DrawSelection();
         else Undo.RecordObject(target, "Draw/Erase Tiles");
@@ -334,6 +344,30 @@ public class TileMapEditor : Editor {
             new Color(1,1,1,0.1f),
             new Color(1,1,1,0.5f)
         );  
+    }
+
+    
+    public void DrawGrid () {
+        if (!showGrid || tmxFile == null) return;
+
+        Handles.color = gridColor;
+        Handles.matrix = tileMap.gameObject.transform.localToWorldMatrix;
+        if (tmxFile.orientation == "orthogonal") {
+            for (int x = 1; x < tmxFile.width; x++) {
+                Handles.DrawLine(
+                    new Vector3(x * tileMap.offset.x, 0, 0),
+                    new Vector3(x * tileMap.offset.x, tmxFile.height * tileMap.offset.y, 0)
+                );
+            }
+
+            for (int y = 1; y < tmxFile.height; y++) {
+                Handles.DrawLine(
+                    new Vector3(0, y * tileMap.offset.y, 0),
+                    new Vector3(tmxFile.width * tileMap.offset.x, y * tileMap.offset.y, 0)
+                );   
+            }
+        }
+        HandleUtility.Repaint();
     }
 
     void DrawTile () {

@@ -24,10 +24,6 @@ using ClipperLib;
 namespace Tiled {
 public class TileMap : MonoBehaviour {
 
-    #if UNITY_EDITOR
-    public bool showGrid = false;
-    public Color gridColor = new Color(1,1,1,0.1f);
-    #endif
     [Range(0, 0.01f)]public float uvInset = 0;
 
 	public string tmxFilePath;
@@ -413,29 +409,5 @@ public class TileMap : MonoBehaviour {
         if (updateMesh) UpdateMesh(layerIndex, submeshIndex);
         return true;
     }
-
-    #if UNITY_EDITOR
-    public void OnDrawGizmos () {
-        if (!showGrid || tmxFile == null) return;
-
-        Gizmos.color = gridColor;
-        Gizmos.matrix = transform.localToWorldMatrix;
-        if (tmxFile.orientation == "orthogonal") {
-            for (int x = 1; x < tmxFile.width; x++) {
-                Gizmos.DrawLine(
-                    new Vector3(x * offset.x, 0, 0),
-                    new Vector3(x * offset.x, tmxFile.height * offset.y, 0)
-                );
-            }
-
-            for (int y = 1; y < tmxFile.height; y++) {
-                Gizmos.DrawLine(
-                    new Vector3(0, y * offset.y, 0),
-                    new Vector3(tmxFile.width * offset.x, y * offset.y, 0)
-                );   
-            }
-        }
-    }
-    #endif
 }
 }
