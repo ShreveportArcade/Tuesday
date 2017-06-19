@@ -360,7 +360,7 @@ public class TileMap : MonoBehaviour {
         layerPaths[layerIndex][submeshIndex] = paths;
     }
 
-    List<List<IntPoint>> RemoveColinnearAndDoubles (List<List<IntPoint>> paths, int minAngle = 5, int minDist = 5) {
+    List<List<IntPoint>> RemoveColinnearAndDoubles (List<List<IntPoint>> paths, int minAngle = 1, int minDist = 1) {
         for (int i = 0; i < paths.Count; i++) {
             List<IntPoint> path = paths[i];
             List<IntPoint> newPath = new List<IntPoint>(path);

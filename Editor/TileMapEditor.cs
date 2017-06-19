@@ -236,7 +236,7 @@ public class TileMapEditor : Editor {
     	EditorGUIUtility.hierarchyMode = true;
         showTileSets = EditorGUILayout.Foldout(showTileSets, "Tile Sets:");
         EditorGUIUtility.hierarchyMode = false;
-        if (showTileSets) {
+        if (showTileSets && tmxFile.tileSets != null) {
 	    	editState = GUILayout.Toolbar(editState, new string[] {"Move", "Paint", "Erase", "Select"});
             foreach (TileSet tileSet in tmxFile.tileSets){
                 TileSetField(tileSet); 

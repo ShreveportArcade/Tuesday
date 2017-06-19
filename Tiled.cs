@@ -29,6 +29,7 @@ namespace Tiled {
 [System.Serializable]
 public class TMXFile {
 	[XmlAttribute("version")] public string version = "1.0";
+	[XmlAttribute("tiledversion")] public string tiledVersion = "1.0.1";
 	[XmlAttribute("orientation")] public string orientation = "orthogonal";
 	[XmlAttribute("renderorder")] public string renderOrder = "right-down";
 	[XmlAttribute("width")] public int width = 0;
@@ -376,11 +377,11 @@ public class Data {
 
 [System.Serializable]
 public class TilePoint {
-	[XmlAttribute("x")] public int x = 0; 
-	[XmlAttribute("y")] public int y = 0;
+	[XmlAttribute("x")] public float x = 0; 
+	[XmlAttribute("y")] public float y = 0;
 
 	public TilePoint () {}
-	public TilePoint (int x, int y) {
+	public TilePoint (float x, float y) {
 		this.x = x;
 		this.y = y;
 	}
@@ -437,10 +438,10 @@ public class TileObject {
 	[XmlAttribute("id")] public int id = 0;
 	[XmlAttribute("name")] public string name;
 	[XmlAttribute("type")] public string type;
-	[XmlAttribute("x")] public int x = 0;
-	[XmlAttribute("y")] public int y = 0;
-	[XmlAttribute("width")] public int width = 0;
-	[XmlAttribute("height")] public int height = 0;
+	[XmlAttribute("x")] public float x = 0;
+	[XmlAttribute("y")] public float y = 0;
+	[XmlAttribute("width")] public float width = 0;
+	[XmlAttribute("height")] public float height = 0;
 	[XmlAttribute("rotation")] public float? rotation;
 	[XmlAttribute("gid")] public int? gid;
 	[XmlAttribute("visible")] public int? visible;
@@ -459,10 +460,10 @@ public class TileObject {
 
 [System.Serializable]
 public class Ellipse {
-	[XmlAttribute("x")] public int x = 0;
-	[XmlAttribute("y")] public int y = 0;
-	[XmlAttribute("width")] public int width  = 0;
-	[XmlAttribute("height")] public int height = 0;
+	[XmlAttribute("x")] public float x = 0;
+	[XmlAttribute("y")] public float y = 0;
+	[XmlAttribute("width")] public float width  = 0;
+	[XmlAttribute("height")] public float height = 0;
 }
 
 [System.Serializable]
@@ -474,7 +475,7 @@ public class Polygon {
 			TilePoint[] _path = new TilePoint[pts.Length];
 			for (int i = 0; i < pts.Length; i++) {
 				string[] pt = pts[i].Trim().Split(',');
-				_path[i] = new TilePoint(int.Parse(pt[0]), int.Parse(pt[1]));
+				_path[i] = new TilePoint(float.Parse(pt[0]), float.Parse(pt[1]));
 			}
 			return _path;
 		}
