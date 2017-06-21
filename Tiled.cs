@@ -199,6 +199,15 @@ public class TileSet {
         textWriter.Close();
         this.source = source;
     }
+
+	public Tile GetTile (int tileGID) {
+		if (tileGID < firstGID) return null;
+		int tileIndex = tileGID - firstGID;
+		for (int i = 0; i < tiles.Length; i++) {
+			if (tileIndex == tiles[i].id) return tiles[i];
+		}
+		return null;
+	}
 	
 	public TileRect GetTileUVs (int tileGID, float inset = 0) {
 		if (tileGID < firstGID) return null;

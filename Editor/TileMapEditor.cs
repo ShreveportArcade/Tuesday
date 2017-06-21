@@ -278,7 +278,7 @@ public class TileMapEditor : Editor {
     public override void OnPreviewGUI(Rect r, GUIStyle background) {
         if (Event.current.type != EventType.Repaint) return;
 
-        Texture2D tex = GetTileSetTexture(tmxFile.tileSets[0], path);
+        Texture2D tex = GetTileSetTexture(selectedTileSet, path);
         TileRect uvTileRect = selectedTileSet.GetTileUVs(selectedTileIndex);
         if (uvTileRect == null) return;
         Rect uvRect = new Rect(uvTileRect.x, uvTileRect.y, uvTileRect.width, uvTileRect.height);
@@ -292,6 +292,25 @@ public class TileMapEditor : Editor {
         }
         r.x = (Screen.width - r.width) * 0.5f;
         GUI.DrawTextureWithTexCoords(r, tex, uvRect, true);
+
+        Tile t = selectedTileSet.GetTile(selectedTileIndex);
+        if (t != null && t.objectGroup != null && t.objectGroup.objects.Length > 0) {
+            foreach (TileObject obj in t.objectGroup.objects) {
+                if (obj.polygonSpecified) {
+                    TilePoint[] path = obj.polygon.path;
+                    Vector3[] poly = System.Array.ConvertAll(path, (p) => {
+                        Vector3 v = new Vector3(p.x + obj.x, p.y + obj.y, 0);
+                        v.x *= r.width / (float)tmxFile.tileWidth;
+                        v.y *= r.height / (float)tmxFile.tileHeight;
+                        v.x += r.x;
+                        v.y += r.y;
+                        return v;
+                    });
+                    Handles.color = new Color(1,1,1,0.1f);
+                    Handles.DrawAAConvexPolygon(poly);
+                }
+            }
+        }
     }
 
     Vector3 selectionStart;
