@@ -85,7 +85,8 @@ public class TileMapEditor : Editor {
                 materialPath = Path.GetFullPath(materialPath);
                 string materialDir = Path.GetDirectoryName(materialPath);                
                 Directory.CreateDirectory(materialDir);
-                materialPath = materialPath.Replace(Application.dataPath, "Assets");
+                string dataPath = Path.GetFullPath(Application.dataPath);
+                materialPath = materialPath.Replace(dataPath, "Assets");
                 mat = AssetDatabase.LoadAssetAtPath(materialPath, typeof(Material)) as Material;
                 if (mat == null) {
                     mat = new Material(Shader.Find("Unlit/Transparent"));
@@ -111,7 +112,8 @@ public class TileMapEditor : Editor {
             string texturePath = tileSet.image.source;
             texturePath = Path.Combine(Path.GetDirectoryName(path), texturePath);
             texturePath = Path.GetFullPath(texturePath);
-            texturePath = texturePath.Replace(Application.dataPath, "Assets");
+            string dataPath = Path.GetFullPath(Application.dataPath);
+            texturePath = texturePath.Replace(dataPath, "Assets");
             tex = AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D)) as Texture2D;
         }
 
