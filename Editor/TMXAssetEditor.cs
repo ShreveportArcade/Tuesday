@@ -75,28 +75,6 @@ class TMXAssetEditor : Editor {
         GUI.enabled = true;
 
         pixelsPerUnit = EditorGUILayout.IntField("Pixels / Unit: ", pixelsPerUnit);
-
-        EditorGUILayout.Space();
-        EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Revert")) {
-            tmxFiles[path] = TMXFile.Load(path);
-        }
-        if (GUILayout.Button("Save")) {
-            tmxFiles[path].Save(path);
-            AssetDatabase.ImportAsset(path);
-        }
-        if (GUILayout.Button("Save As")) {
-            tmxFiles[path].Save(
-                EditorUtility.SaveFilePanel(
-                    "Save as TMX",
-                    Path.GetDirectoryName(path),
-                    Path.GetFileNameWithoutExtension(path),
-                    Path.GetExtension(path).TrimStart(new char[]{'.'})
-                )
-            );
-            AssetDatabase.ImportAsset(path);
-        }
-        EditorGUILayout.EndHorizontal();
     }
 
     static TMXAssetEditor () {
