@@ -37,9 +37,16 @@ public class TMXFile {
 	[XmlAttribute("tilewidth")] public int tileWidth = 0;
 	[XmlAttribute("tileheight")] public int tileHeight = 0;
 	[XmlAttribute("hexsidelength")] public int? hexSideLength;
+	
 	[XmlAttribute("staggeraxis")] public string staggerAxis;
+	[XmlIgnore] public bool staggerAxisSpecified { get { return !string.IsNullOrEmpty(staggerAxis); } set {}}
+	
 	[XmlAttribute("staggerindex")] public string staggerIndex;
+	[XmlIgnore] public bool staggerIndexSpecified { get { return !string.IsNullOrEmpty(staggerIndex); } set {}}
+	
 	[XmlAttribute("backgroundcolor")] public string backgroundColor;
+	[XmlIgnore] public bool backgroundColorSpecified { get { return !string.IsNullOrEmpty(backgroundColor); } set {}}
+	
 	[XmlAttribute("nextobjectid")] public int nextObjectID = 0;	
 
 	[XmlElement("tileset", typeof(TileSet))] public TileSet[] tileSets;
@@ -53,14 +60,14 @@ public class TMXFile {
 
 		for (int i = 0; i < map.tileSets.Length; i++) {
 			TileSet tileSet = map.tileSets[i];
-			if (!string.IsNullOrEmpty(tileSet.source)) {
+			if (tileSet.hasSource) {
 				string tsxPath = tileSet.source;
 				tsxPath = Path.Combine(Path.GetDirectoryName(path), tsxPath);
                 tsxPath = Path.GetFullPath(tsxPath);
 				TileSet tsxFile = TileSet.Load(tsxPath);
 
 				tsxFile.firstGID = tileSet.firstGID;
-				tsxFile.isTSX = true;
+				tsxFile.source = tileSet.source;
 				tileSet = tsxFile;
 			}
 
@@ -83,7 +90,7 @@ public class TMXFile {
 
         for (int i = 0; i < tileSets.Length; i++) {
 			TileSet tileSet = tileSets[i];
-			if (tileSet.isTSX) {
+			if (tileSet.hasSource) {
 				string tsxPath = tileSet.source;
 				tsxPath = Path.Combine(Path.GetDirectoryName(path), tsxPath);
                 tsxPath = Path.GetFullPath(tsxPath);
@@ -131,33 +138,34 @@ public class TMXFile {
 [XmlRoot("tileset")]
 [System.Serializable]
 public class TileSet {
-	[XmlIgnore] public bool isTSX = false;
+	[XmlIgnore] public bool hasSource { get { return !string.IsNullOrEmpty(source); }}
+
 	[XmlAttribute("firstgid")] public int firstGID;
-	[XmlIgnore] public bool firstGIDSpecified { get { return !isTSX; } set {} }
+	[XmlIgnore] public bool firstGIDSpecified { get { return hasSource; } set {} }
 
 	[XmlAttribute("source")] public string source;
-	[XmlIgnore] public bool sourceSpecified { get { return !isTSX; } set {} }
+	[XmlIgnore] public bool sourceSpecified { get { return hasSource; } set {} }
 
 	[XmlAttribute("name")] public string name = "";
-	[XmlIgnore] public bool nameSpecified { get { return string.IsNullOrEmpty(source); } set {} }
+	[XmlIgnore] public bool nameSpecified { get { return !hasSource; } set {} }
 
 	[XmlAttribute("tilewidth")] public int tileWidth = 0;
-	[XmlIgnore] public bool tileWidthSpecified { get { return string.IsNullOrEmpty(source); } set {} }
+	[XmlIgnore] public bool tileWidthSpecified { get { return !hasSource; } set {} }
 
 	[XmlAttribute("tileheight")] public int tileHeight = 0;
-	[XmlIgnore] public bool tileHeightSpecified { get { return string.IsNullOrEmpty(source); } set {} }
+	[XmlIgnore] public bool tileHeightSpecified { get { return !hasSource; } set {} }
 
 	[XmlAttribute("spacing")] public int spacing = 0;
-	[XmlIgnore] public bool spacingSpecified { get { return string.IsNullOrEmpty(source); } set {} }
+	[XmlIgnore] public bool spacingSpecified { get { return spacing > 0 && !hasSource; } set {} }
 
 	[XmlAttribute("margin")] public int margin = 0;
-	[XmlIgnore] public bool marginSpecified { get { return string.IsNullOrEmpty(source); } set {} }
+	[XmlIgnore] public bool marginSpecified { get { return margin > 0 && !hasSource; } set {} }
 
 	[XmlAttribute("tilecount")] public int tileCount = 0;
-	[XmlIgnore] public bool tileCountSpecified { get { return string.IsNullOrEmpty(source); } set {} }
+	[XmlIgnore] public bool tileCountSpecified { get { return !hasSource; } set {} }
 
 	[XmlAttribute("columns")] public int columns = 0;
-	[XmlIgnore] public bool columnsSpecified { get { return string.IsNullOrEmpty(source); } set {} }
+	[XmlIgnore] public bool columnsSpecified { get { return !hasSource; } set {} }
 	
     [XmlIgnore] public int rows { 
 		get { return (columns > 0) ? tileCount / columns : 0; } 
@@ -165,19 +173,22 @@ public class TileSet {
 	}
 
 	[XmlElement("tileoffset", typeof(TilePoint))] public TilePoint tileOffset;
-	[XmlIgnore] public bool tileOffsetSpecified { get { return string.IsNullOrEmpty(source); } set {} }
+	[XmlIgnore] public bool tileOffsetSpecified { 
+		get { return string.IsNullOrEmpty(source) && tileOffset.x != 0 && tileOffset.y != 0; } 
+		set {} 
+	}
 
 	[XmlElement("image", typeof(Image))]  public Image image;
-	[XmlIgnore] public bool imageSpecified { get { return string.IsNullOrEmpty(source); } set {} }
+	[XmlIgnore] public bool imageSpecified { get { return !hasSource; } set {} }
 
 	[XmlElement("tile", typeof(Tile))] public Tile[] tiles;
-	[XmlIgnore] public bool tilesSpecified { get { return string.IsNullOrEmpty(source); } set {} }
+	[XmlIgnore] public bool tilesSpecified { get { return !hasSource; } set {} }
 
 	[XmlElement("terraintypes", typeof(Terrain))] public Terrain[] terrainTypes;
-	[XmlIgnore] public bool terrainTypesSpecified { get { return string.IsNullOrEmpty(source); } set {} }
+	[XmlIgnore] public bool terrainTypesSpecified { get { return !hasSource; } set {} }
 
 	[XmlElement("properties", typeof(Property))] public Property[] properties;
-	[XmlIgnore] public bool propertiesSpecified { get { return string.IsNullOrEmpty(source); } set {} }
+	[XmlIgnore] public bool propertiesSpecified { get { return !hasSource; } set {} }
 
 	public static TileSet Load (string path) {
 		XmlSerializer deserializer = new XmlSerializer(typeof(TileSet));
@@ -191,7 +202,7 @@ public class TileSet {
 	public void Save (string path) {
 		string source = this.source;
 		this.source = null;
-        XmlSerializer serializer = new XmlSerializer(typeof(TMXFile));
+        XmlSerializer serializer = new XmlSerializer(typeof(TileSet));
         TextWriter textWriter = new StreamWriter(path);
         XmlSerializerNamespaces nameSpaces = new XmlSerializerNamespaces();
         nameSpaces.Add("","");
@@ -353,6 +364,8 @@ public class Layer {
 public class Tile {
 	[XmlAttribute("id")] public int id = 0;
 	[XmlAttribute("terrain")] public string terrain;
+	[XmlIgnore] public bool terrainSpecified { get { return !string.IsNullOrEmpty(terrain); } set {} }
+
 	[XmlAttribute("probability")] public float? probability;
 
 	[XmlElement("properties", typeof(Property))] public Property[] properties;
@@ -369,18 +382,30 @@ public class Tile {
 [System.Serializable]
 public class Image {
 	[XmlAttribute("format")] public string format;
+	[XmlIgnore] public bool formatSpecified { get { return !string.IsNullOrEmpty(format); } set{} }
+
 	[XmlAttribute("source")] public string source;
+
 	[XmlAttribute("trans")] public string trans;
+	[XmlIgnore] public bool transSpecified { get { return !string.IsNullOrEmpty(trans); } set{} }
+
 	[XmlAttribute("width")] public int width = 0;
 	[XmlAttribute("height")] public int height = 0;
 
 	[XmlElement("data", typeof(Data))] public Data data;
+	[XmlIgnore] public bool dataSpecified { 
+		get { return data != null && !string.IsNullOrEmpty(data.contents); } 
+		set {} 
+	}
 }
 
 [System.Serializable]
 public class Data {
 	[XmlAttribute("encoding")] public string encoding = "csv";
+
 	[XmlAttribute("compression")] public string compression;
+	[XmlIgnore] public bool compressionSpecified { get { return !string.IsNullOrEmpty(compression); } set{} }
+
 	[XmlText] public string contents = "";
 }
 
@@ -431,7 +456,11 @@ public class Frame {
 [System.Serializable]
 public class ObjectGroup {
 	[XmlAttribute("name")] public string name;
+	[XmlIgnore] public bool nameSpecified { get { return !string.IsNullOrEmpty(name); } set {} }
+
 	[XmlAttribute("color")] public string color;
+	[XmlIgnore] public bool colorSpecified { get { return !string.IsNullOrEmpty(color); } set {} }
+
 	[XmlAttribute("opacity")] public float? opacity;
 	[XmlAttribute("visible")] public int? visible;
 	[XmlAttribute("offsetx")] public int? offsetX;
@@ -446,7 +475,11 @@ public class ObjectGroup {
 public class TileObject {
 	[XmlAttribute("id")] public int id = 0;
 	[XmlAttribute("name")] public string name;
+	[XmlIgnore] public bool nameSpecified { get { return !string.IsNullOrEmpty(name); } set {} }
+
 	[XmlAttribute("type")] public string type;
+	[XmlIgnore] public bool typeSpecified { get { return !string.IsNullOrEmpty(type); } set {} }
+
 	[XmlAttribute("x")] public float x = 0;
 	[XmlAttribute("y")] public float y = 0;
 	[XmlAttribute("width")] public float width = 0;
