@@ -22,7 +22,6 @@ using System.Collections.Generic;
 using System.Xml.Serialization;
 using System.IO;
 using System.IO.Compression;
-using UnityEngine;
 
 namespace Tiled {
 [XmlRoot("map")]

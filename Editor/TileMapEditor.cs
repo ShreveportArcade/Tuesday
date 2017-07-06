@@ -232,7 +232,16 @@ public class TileMapEditor : Editor {
     public override void OnInspectorGUI() {	
         showGrid = EditorGUILayout.Toggle("Show Grid?", showGrid);
         if (showGrid) gridColor = EditorGUILayout.ColorField("Grid Color", gridColor);
-
+        
+        DefaultAsset asset = AssetDatabase.LoadAssetAtPath(path, typeof(DefaultAsset)) as DefaultAsset;
+        asset = EditorGUILayout.ObjectField("TMX File", asset, typeof(DefaultAsset), false) as DefaultAsset;
+        string assetPath = AssetDatabase.GetAssetPath(asset);
+        if (path != assetPath && Path.GetExtension(assetPath) == ".tmx") {
+            Undo.RecordObject(target, "Assign new TMX file");
+            tmxFile = TMXFile.Load(assetPath);
+            tileMap.Setup();
+        }
+        
 		base.OnInspectorGUI();
 
     	EditorGUIUtility.hierarchyMode = true;

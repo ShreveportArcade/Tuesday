@@ -24,9 +24,9 @@ using ClipperLib;
 namespace Tiled {
 public class TileMap : MonoBehaviour {
 
-    [Range(0, 0.01f)]public float uvInset = 0;
+    [Range(0, 0.01f)] public float uvInset = 0;
 
-	public string tmxFilePath;
+	[HideInInspector] public string tmxFilePath;
 	public TMXFile tmxFile;
 
     [HideInInspector] public float pixelsPerUnit = -1;
@@ -94,6 +94,12 @@ public class TileMap : MonoBehaviour {
 
         offset *= 1f / pixelsPerUnit;
 
+        if (layers != null) {
+            foreach (GameObject layer in layers) {
+                DestroyImmediate(layer);
+            }
+        }
+
         layers = new GameObject[tmxFile.layers.Length];
         _layerSubmeshObjects = new GameObject[tmxFile.layers.Length][];
         for (int i = 0; i < tmxFile.layers.Length; i++) {
@@ -105,6 +111,7 @@ public class TileMap : MonoBehaviour {
         Layer layerData = tmxFile.layers[layerIndex];
         GameObject layer = new GameObject(layerData.name);
         layer.transform.SetParent(transform);
+        layer.transform.localPosition = Vector3.zero;
         layers[layerIndex] = layer;
 
         _layerSubmeshObjects[layerIndex] = new GameObject[meshesPerLayer];
