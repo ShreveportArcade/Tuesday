@@ -76,16 +76,11 @@ public class TileMap : MonoBehaviour {
         if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileWidth;
 
         string[] xyDirections = tmxFile.renderOrder.Split('-');
-        offset = new Vector4(
-            (xyDirections[0] == "right") ? tmxFile.tileWidth : -tmxFile.tileWidth,
-            (xyDirections[1] == "up") ? tmxFile.tileHeight : -tmxFile.tileHeight,
-            (xyDirections[0] == "right") ? tmxFile.tileWidth : -tmxFile.tileWidth,
-            (xyDirections[1] == "up") ? tmxFile.tileHeight : -tmxFile.tileHeight
-        );
+        offset = new Vector4(tmxFile.tileWidth, -tmxFile.tileHeight, tmxFile.tileWidth, -tmxFile.tileHeight);
 
         if (tmxFile.orientation == "hexagonal" && tmxFile.hexSideLength != null) {
-            if (tmxFile.staggerAxis == "x") offset.z = Mathf.Sign(offset.z) * (tmxFile.tileWidth - tmxFile.hexSideLength.Value * 0.5f);
-            else offset.w = Mathf.Sign(offset.w) * (tmxFile.tileHeight - tmxFile.hexSideLength.Value * 0.5f);
+            if (tmxFile.staggerAxis == "x") offset.z = tmxFile.tileWidth - tmxFile.hexSideLength.Value * 0.5f;
+            else offset.w = -tmxFile.tileHeight + tmxFile.hexSideLength.Value * 0.5f;
         }
         else if (tmxFile.orientation == "staggered") {
             if (tmxFile.staggerAxis == "x") offset.z -= offset.x * 0.5f;
