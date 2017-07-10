@@ -387,6 +387,7 @@ public class TileMap : MonoBehaviour {
     }
 
     public void UpdatePolygonCollider (int layerIndex, int submeshIndex) {
+        if (layerPaths[layerIndex].Length <= submeshIndex) return;
         List<List<IntPoint>> paths = layerPaths[layerIndex][submeshIndex];
         PolygonCollider2D poly = layerSubmeshObjects[layerIndex][submeshIndex].GetComponent<PolygonCollider2D>();
         poly.pathCount = paths.Count;

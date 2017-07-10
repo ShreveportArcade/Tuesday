@@ -238,6 +238,7 @@ public class TileMapEditor : Editor {
         string assetPath = AssetDatabase.GetAssetPath(asset);
         if (path != assetPath && Path.GetExtension(assetPath) == ".tmx") {
             Undo.RecordObject(target, "Assign new TMX file");
+            path = assetPath;
             tmxFile = TMXFile.Load(assetPath);
             tileMap.Setup();
         }
