@@ -259,7 +259,7 @@ public class TileMapEditor : Editor {
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Revert")) {
             tmxFile = TMXFile.Load(path);
-			tileMap.ReloadMap();
+			tileMap.Setup();
         }
         if (GUILayout.Button("Save")) {
             tmxFile.Save(path);
@@ -392,15 +392,31 @@ public class TileMapEditor : Editor {
         if (tmxFile.orientation == "orthogonal") {
             for (int x = 1; x < tmxFile.width; x++) {
                 Handles.DrawLine(
-                    new Vector3(x * tileMap.offset.x, 0, 0),
-                    new Vector3(x * tileMap.offset.x, tmxFile.height * tileMap.offset.y, 0)
+                    new Vector3(
+                        x * tileMap.tileOffset.x + tileMap.offset.x, 
+                        tileMap.offset.y, 
+                        0
+                    ),
+                    new Vector3(
+                        x * tileMap.tileOffset.x + tileMap.offset.x, 
+                        tmxFile.height * tileMap.tileOffset.y + tileMap.offset.y, 
+                        0
+                    )
                 );
             }
 
             for (int y = 1; y < tmxFile.height; y++) {
                 Handles.DrawLine(
-                    new Vector3(0, y * tileMap.offset.y, 0),
-                    new Vector3(tmxFile.width * tileMap.offset.x, y * tileMap.offset.y, 0)
+                    new Vector3(
+                        tileMap.offset.x, 
+                        y * tileMap.tileOffset.y + tileMap.offset.y, 
+                        0
+                    ),
+                    new Vector3(
+                        tmxFile.width * tileMap.tileOffset.x + tileMap.offset.x, 
+                        y * tileMap.tileOffset.y + tileMap.offset.y, 
+                        0
+                    )
                 );   
             }
         }
@@ -434,11 +450,11 @@ public class TileMapEditor : Editor {
         Vector3 startPos = selectionStart - tileMap.transform.position;
         Vector3 endPos = selectionEnd - tileMap.transform.position;
 
-		int startX = Mathf.Clamp(Mathf.FloorToInt(startPos.x / tileMap.offset.x), 0, tmxFile.width);
-		int startY = Mathf.Clamp(Mathf.FloorToInt(startPos.y / tileMap.offset.y), 0, tmxFile.height);
+		int startX = Mathf.Clamp(Mathf.FloorToInt(startPos.x / tileMap.tileOffset.x), 0, tmxFile.width);
+		int startY = Mathf.Clamp(Mathf.FloorToInt(startPos.y / tileMap.tileOffset.y), 0, tmxFile.height);
     
-		int endX = Mathf.Clamp(Mathf.FloorToInt(endPos.x / tileMap.offset.x), 0, tmxFile.width);
-		int endY = Mathf.Clamp(Mathf.FloorToInt(endPos.y / tileMap.offset.y), 0, tmxFile.height);
+		int endX = Mathf.Clamp(Mathf.FloorToInt(endPos.x / tileMap.tileOffset.x), 0, tmxFile.width);
+		int endY = Mathf.Clamp(Mathf.FloorToInt(endPos.y / tileMap.tileOffset.y), 0, tmxFile.height);
     
     	int width = Mathf.Abs(endX - startX);
     	int height = Mathf.Abs(endY - startY);

@@ -24,12 +24,15 @@ using ClipperLib;
 namespace Tiled {
 public class TileMap : MonoBehaviour {
 
+    [Tooltip("Fixes UV bleed from unpadded tilesets by insetting the corners of the tile.")] 
     [Range(0, 0.01f)] public float uvInset = 0;
+    public Vector2 pivot;
 
 	[HideInInspector] public string tmxFilePath;
 	public TMXFile tmxFile;
 
     [HideInInspector] public float pixelsPerUnit = -1;
+    [HideInInspector] public Vector4 tileOffset;
     [HideInInspector] public Vector4 offset;
     [HideInInspector] public GameObject[] layers;
     [HideInInspector] public Material[] tileSetMaterials;
@@ -75,19 +78,22 @@ public class TileMap : MonoBehaviour {
     public void Setup () {
         if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileWidth;
 
-        string[] xyDirections = tmxFile.renderOrder.Split('-');
-        offset = new Vector4(tmxFile.tileWidth, -tmxFile.tileHeight, tmxFile.tileWidth, -tmxFile.tileHeight);
+        tileOffset = new Vector4(tmxFile.tileWidth, -tmxFile.tileHeight, tmxFile.tileWidth, -tmxFile.tileHeight);
+        offset = new Vector2(
+            pivot.x * -tmxFile.tileWidth * tmxFile.width / pixelsPerUnit,
+            (1 - pivot.y) * tmxFile.tileHeight * tmxFile.height / pixelsPerUnit
+        );
 
         if (tmxFile.orientation == "hexagonal" && tmxFile.hexSideLength != null) {
-            if (tmxFile.staggerAxis == "x") offset.z = tmxFile.tileWidth - tmxFile.hexSideLength.Value * 0.5f;
-            else offset.w = -tmxFile.tileHeight + tmxFile.hexSideLength.Value * 0.5f;
+            if (tmxFile.staggerAxis == "x") tileOffset.z = tmxFile.tileWidth - tmxFile.hexSideLength.Value * 0.5f;
+            else tileOffset.w = -tmxFile.tileHeight + tmxFile.hexSideLength.Value * 0.5f;
         }
         else if (tmxFile.orientation == "staggered") {
-            if (tmxFile.staggerAxis == "x") offset.z -= offset.x * 0.5f;
-            else offset.w -= offset.y *0.5f;
+            if (tmxFile.staggerAxis == "x") tileOffset.z -= tileOffset.x * 0.5f;
+            else tileOffset.w -= tileOffset.y *0.5f;
         }
 
-        offset *= 1f / pixelsPerUnit;
+        tileOffset *= 1f / pixelsPerUnit;
 
         if (layers != null) {
             foreach (GameObject layer in layers) {
@@ -170,19 +176,19 @@ public class TileMap : MonoBehaviour {
             foreach (Tile tile in tileSet.tiles) {
                 if (tile.objectGroup != null && tile.objectGroup.objects != null && tile.objectGroup.objects.Length > 0) {
                     TileObject tileObject = tile.objectGroup.objects[0];
-                    float x = offset.x * (float)tileObject.x / (float)tileSet.tileWidth;
-                    float y = offset.y * (float)tileObject.y / (float)tileSet.tileHeight;
+                    float x = tileOffset.x * (float)tileObject.x / (float)tileSet.tileWidth;
+                    float y = tileOffset.y * (float)tileObject.y / (float)tileSet.tileHeight;
                     if (tileObject.polygonSpecified) {
                         idToPhysics[tile.id + tileSet.firstGID] = System.Array.ConvertAll(tileObject.polygon.path, (p) => {
                             Vector3 v = new Vector3(x, y, 0);
-                            v.x += offset.x * (float)p.x / (float)tileSet.tileWidth;
-                            v.y -= offset.x * (float)p.y / (float)tileSet.tileHeight;
+                            v.x += tileOffset.x * (float)p.x / (float)tileSet.tileWidth;
+                            v.y -= tileOffset.x * (float)p.y / (float)tileSet.tileHeight;
                             return v;
                         });
                     }
                     else {
-                        float width = offset.x * (float)tileObject.width / (float)tileSet.tileWidth;
-                        float height = offset.y * (float)tileObject.height / (float)tileSet.tileHeight;
+                        float width = tileOffset.x * (float)tileObject.width / (float)tileSet.tileWidth;
+                        float height = tileOffset.y * (float)tileObject.height / (float)tileSet.tileHeight;
                         idToPhysics[tile.id + tileSet.firstGID] = new Vector3[] {
                             new Vector3(x,         y,          0),
                             new Vector3(x,         y + height, 0),
@@ -228,29 +234,29 @@ public class TileMap : MonoBehaviour {
             bool rotated120 = layerData.RotatedHexagonal120(tileIndex);
 
             TilePoint tileLocation = layerData.GetTileLocation(tileIndex);
-            Vector3 pos = new Vector3(tileLocation.x * offset.x, tileLocation.y * offset.y, 0);
+            Vector3 pos = new Vector3(offset.x + tileLocation.x * tileOffset.x, offset.y + tileLocation.y * tileOffset.y, 0);
             if (isHexMap || isStagMap) {
                 if (staggerX) {
-                    pos.x = tileLocation.x * offset.z;
-                    if (tileLocation.x % 2 == staggerIndex) pos.y += offset.w * 0.5f;
+                    pos.x = tileLocation.x * tileOffset.z;
+                    if (tileLocation.x % 2 == staggerIndex) pos.y += tileOffset.w * 0.5f;
                 }
                 else {
-                    pos.y = tileLocation.y * offset.w;
-                    if (tileLocation.y % 2 == staggerIndex) pos.x += offset.z * 0.5f;
+                    pos.y = tileLocation.y * tileOffset.w;
+                    if (tileLocation.y % 2 == staggerIndex) pos.x += tileOffset.z * 0.5f;
                 }
             }
             else if (isIsoMap) {
-                pos.x = (tileLocation.x * offset.x  / 2) - (tileLocation.y * offset.x  / 2);
-                pos.y = (tileLocation.y * offset.y / 2) + (tileLocation.x * offset.y / 2);
+                pos.x = (tileLocation.x * tileOffset.x  / 2) - (tileLocation.y * tileOffset.x  / 2);
+                pos.y = (tileLocation.y * tileOffset.y / 2) + (tileLocation.x * tileOffset.y / 2);
             }
 
             float widthMult = (float)tileSet.tileWidth / (float)tmxFile.tileWidth;
             float heightMult = (float)tileSet.tileHeight / (float)tmxFile.tileHeight;
             Vector3[] v = new Vector3[] {
                 pos,
-                pos + Vector3.up * offset.y * heightMult,
-                pos + new Vector3(offset.x * widthMult, offset.y * heightMult, 0),
-                pos + Vector3.right * offset.x * widthMult
+                pos + Vector3.up * tileOffset.y * heightMult,
+                pos + new Vector3(tileOffset.x * widthMult, tileOffset.y * heightMult, 0),
+                pos + Vector3.right * tileOffset.x * widthMult
             };
 
             if (rotated120 || (flipAntiDiag && isHexMap)) {
@@ -289,7 +295,7 @@ public class TileMap : MonoBehaviour {
                 new Vector2(right, bottom)
             };
 
-            if (offset.x < 0 != flipX) {
+            if (tileOffset.x < 0 != flipX) {
                 uvArray = new Vector2[] {
                     new Vector2(right, bottom),
                     new Vector2(right, top),
@@ -298,7 +304,7 @@ public class TileMap : MonoBehaviour {
                 };
             }
 
-            if (offset.y < 0 != flipY) {
+            if (tileOffset.y < 0 != flipY) {
                 uvArray = new Vector2[]{uvArray[1], uvArray[0], uvArray[3], uvArray[2]};
             }
 
@@ -399,8 +405,8 @@ public class TileMap : MonoBehaviour {
     }
 
     public bool SetTile (int tileID, int layerIndex, Vector3 pos, bool updateMesh = true) {
-        int x = Mathf.FloorToInt(pos.x / offset.x);
-        int y = Mathf.FloorToInt(pos.y / offset.y);
+        int x = Mathf.FloorToInt(pos.x / tileOffset.x);
+        int y = Mathf.FloorToInt(pos.y / tileOffset.y);
         return SetTile(tileID, layerIndex, x, y, updateMesh);
     }
 
