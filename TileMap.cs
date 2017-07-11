@@ -19,6 +19,7 @@ DEALINGS IN THE SOFTWARE.
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 using ClipperLib;
 
 namespace Tiled {
@@ -125,6 +126,10 @@ public class TileMap : MonoBehaviour {
             meshObject.AddComponent<MeshRenderer>();
             meshObject.AddComponent<MeshFilter>();
             meshObject.AddComponent<PolygonCollider2D>();
+            SortingGroup sort = meshObject.AddComponent<SortingGroup>();
+            sort.sortingOrder = layerIndex;
+            if (SortingLayer.NameToID(layerData.name) != 0) sort.sortingLayerName = layerData.name;
+
 
             _layerSubmeshObjects[layerIndex][submeshIndex] = meshObject;
 
