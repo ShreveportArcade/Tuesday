@@ -22,7 +22,7 @@ using System.Collections.Generic;
 using System.Xml.Serialization;
 using System.IO;
 using System.IO.Compression;
-
+using UnityEngine;
 namespace Tiled {
 [XmlRoot("map")]
 [System.Serializable]
@@ -232,10 +232,10 @@ public class TileSet {
 		uvs.width = tileWidth;
 		uvs.height = tileHeight;
 
-		uvs.x /= (float)image.width;
-		uvs.y /= (float)image.height;
-		uvs.width /= (float)image.width;
-		uvs.height /= (float)image.height;
+		uvs.x /= (float)(image.width+margin+spacing*columns);
+		uvs.y /= (float)(image.height+margin+spacing*rows);
+		uvs.width /= (float)(image.width+margin+spacing*columns);
+		uvs.height /= (float)(image.height+margin+spacing*rows);
 
 		uvs.x += inset;
 		uvs.y += inset;
