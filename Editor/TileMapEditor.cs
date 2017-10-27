@@ -110,7 +110,8 @@ public class TileMapEditor : Editor {
         }
         else {
             string texturePath = tileSet.image.source;
-            texturePath = Path.Combine(Path.GetDirectoryName(path), texturePath);
+            string tileSetPath = Path.Combine(Path.GetDirectoryName(path), tileSet.source);
+            texturePath = Path.Combine(Path.GetDirectoryName(tileSetPath), texturePath);
             texturePath = Path.GetFullPath(texturePath);
             string dataPath = Path.GetFullPath(Application.dataPath);
             texturePath = texturePath.Replace(dataPath, "Assets");
@@ -306,7 +307,7 @@ public class TileMapEditor : Editor {
         GUI.DrawTextureWithTexCoords(r, tex, uvRect, true);
 
         Tile t = selectedTileSet.GetTile(selectedTileIndex);
-        if (t != null && t.objectGroup != null && t.objectGroup.objects.Length > 0) {
+        if (t != null && t.objectGroup != null && t.objectGroup.objects != null && t.objectGroup.objects.Length > 0) {
             foreach (TileObject obj in t.objectGroup.objects) {
                 if (obj.polygonSpecified) {
                     TilePoint[] path = obj.polygon.path;
