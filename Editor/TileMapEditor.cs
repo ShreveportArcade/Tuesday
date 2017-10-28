@@ -111,8 +111,13 @@ public class TileMapEditor : Editor {
         }
         else {
             string texturePath = tileSet.image.source;
-            string tileSetPath = Path.Combine(Path.GetDirectoryName(path), tileSet.source);
-            texturePath = Path.Combine(Path.GetDirectoryName(tileSetPath), texturePath);
+            if (tileSet.source == null) {
+                texturePath = Path.Combine(Path.GetDirectoryName(path), texturePath);
+            }
+            else {
+                string tileSetPath = Path.Combine(Path.GetDirectoryName(path), tileSet.source);
+                texturePath = Path.Combine(Path.GetDirectoryName(tileSetPath), texturePath);
+            }
             texturePath = Path.GetFullPath(texturePath);
             string dataPath = Path.GetFullPath(Application.dataPath);
             texturePath = texturePath.Replace(dataPath, "Assets");
