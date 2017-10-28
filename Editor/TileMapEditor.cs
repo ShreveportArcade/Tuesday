@@ -28,8 +28,9 @@ namespace Tiled {
 public class TileMapEditor : Editor {
 
     private static bool showTileSets = true;
-    private static bool showGrid = true;
-    private static Color gridColor = new Color(0,0,0,0.25f);
+    private static bool showLayers = true;
+    private static int selectedLayer = 0;
+    private static Color gridColor = new Color(1,1,1,0.1f);
     
 
     private TileMap tileMap {
@@ -231,9 +232,9 @@ public class TileMapEditor : Editor {
 
     private static int editState = 0;
     public override void OnInspectorGUI() {	
-        showGrid = EditorGUILayout.Toggle("Show Grid?", showGrid);
-        if (showGrid) gridColor = EditorGUILayout.ColorField("Grid Color", gridColor);
-        
+        editState = GUILayout.Toolbar(editState, new string[] {"Move", "Paint", "Erase", "Select"});
+        gridColor = EditorGUILayout.ColorField("Grid Color", gridColor);
+            
         DefaultAsset asset = AssetDatabase.LoadAssetAtPath(path, typeof(DefaultAsset)) as DefaultAsset;
         asset = EditorGUILayout.ObjectField("TMX File", asset, typeof(DefaultAsset), false) as DefaultAsset;
         string assetPath = AssetDatabase.GetAssetPath(asset);
@@ -245,13 +246,19 @@ public class TileMapEditor : Editor {
         }
         
 		base.OnInspectorGUI();
+        EditorGUIUtility.hierarchyMode = true;
+        showLayers = EditorGUILayout.Foldout(showLayers, "Layers:");
+        EditorGUIUtility.hierarchyMode = false;
+        if (showLayers && tmxFile.layers != null) {
+            string[] layerNames = Array.ConvertAll(tmxFile.layers, (layer) => layer.name);
+            selectedLayer = GUILayout.SelectionGrid(selectedLayer, layerNames, 1);
+        }
 
     	EditorGUIUtility.hierarchyMode = true;
         showTileSets = EditorGUILayout.Foldout(showTileSets, "Tile Sets:");
         EditorGUIUtility.hierarchyMode = false;
         if (showTileSets && tmxFile.tileSets != null) {
-	    	editState = GUILayout.Toolbar(editState, new string[] {"Move", "Paint", "Erase", "Select"});
-            foreach (TileSet tileSet in tmxFile.tileSets){
+	    	foreach (TileSet tileSet in tmxFile.tileSets){
                 TileSetField(tileSet); 
             }
         }
@@ -354,7 +361,7 @@ public class TileMapEditor : Editor {
         }
     	else if (e.type == EventType.MouseUp) {
             if (editState == 3) SelectTiles();
-            else tileMap.UpdatePolygonColliders(0);
+            else tileMap.UpdatePolygonColliders(selectedLayer);
             GUIUtility.hotControl = 0;
             Undo.FlushUndoRecordObjects();
     	}
@@ -386,7 +393,7 @@ public class TileMapEditor : Editor {
 
     
     public void DrawGrid () {
-        if (!showGrid || tmxFile == null) return;
+        if (tmxFile == null || gridColor.a < 0.01f) return;
 
         Handles.color = gridColor;
         Handles.matrix = tileMap.gameObject.transform.localToWorldMatrix;
@@ -440,7 +447,7 @@ public class TileMapEditor : Editor {
         Plane plane = new Plane(Vector3.forward, tileMap.transform.position);
         if (plane.Raycast(ray, out dist)) {
         	Vector3 p = ray.GetPoint(dist);
-        	if (tileMap.SetTile(tileIndex, 0, p - tileMap.transform.position)) {
+        	if (tileMap.SetTile(tileIndex, selectedLayer, p - tileMap.transform.position)) {
 		        Event.current.Use();
                 EditorUtility.SetDirty(target);
 	        }

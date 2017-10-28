@@ -410,8 +410,8 @@ public class TileMap : MonoBehaviour {
     }
 
     public bool SetTile (int tileID, int layerIndex, Vector3 pos, bool updateMesh = true) {
-        int x = Mathf.FloorToInt(pos.x / tileOffset.x);
-        int y = Mathf.FloorToInt(pos.y / tileOffset.y);
+        int x = Mathf.FloorToInt((pos.x - offset.x) / tileOffset.x);
+        int y = Mathf.FloorToInt((pos.y - offset.y) / tileOffset.y);
         return SetTile(tileID, layerIndex, x, y, updateMesh);
     }
 
