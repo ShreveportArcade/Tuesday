@@ -166,12 +166,12 @@ public class TileMapEditor : Editor {
             int index = tmxFile.GetIndexOfTileSet(tileSet);
             if (index > 0) {
                 menu.AddItem(new GUIContent("Move Up"), false, () => {
-
+                    // TODO: implement move tileset up
                 });
             }
             if (index < (tmxFile.tileSets.Length - 1)) {
                 menu.AddItem(new GUIContent("Move Down"), false, () => {
-
+                    // TODO: implement move tileset down
                 });
             }
             menu.AddSeparator("");
@@ -367,7 +367,10 @@ public class TileMapEditor : Editor {
         }
     	else if (e.type == EventType.MouseUp) {
             if (editState == 3) SelectTiles();
-            else tileMap.UpdatePolygonColliders(selectedLayer);
+            else {
+                tileMap.tmxFile.layers[selectedLayer].Encode();
+                tileMap.UpdatePolygonColliders(selectedLayer);
+            }
             GUIUtility.hotControl = 0;
             Undo.FlushUndoRecordObjects();
     	}

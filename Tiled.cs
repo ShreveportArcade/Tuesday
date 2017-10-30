@@ -320,16 +320,18 @@ public class Layer {
 		int index = x + y * width;
 		tileIDs[index] = id;
 		tileFlags[index] = (uint)id | flags;
+	}
 
-		//TODO: encode in separate function (ie. on mouse up)
+	public void Encode () {
 		if (tileData.encoding == "csv") {
-			string[] tileStrings = tileData.contents.Split(',');
-			string tileString = tileStrings[index];
-
-			if (tileString.StartsWith("\n")) tileStrings[index] = "\n" + id.ToString();
-			else tileStrings[index] = id.ToString();
-			
-			tileData.contents = string.Join(",", tileStrings);	
+			string csv = "";
+			for (int j = 0; j < height; j++) {
+				for (int i = 0; i < width; i++) {
+					csv += tileFlags[i + j * width] + ",";
+				}
+				csv += "\n";
+			}
+			tileData.contents = csv;	
 		}
 		else if (tileData.encoding == "base64") {
 			MemoryStream stream = new MemoryStream();
@@ -347,6 +349,7 @@ public class Layer {
 					using (GZipStream gzip = new GZipStream(compress, CompressionMode.Compress)) {
 						gzip.Write(bytes, 0, bytes.Length);
 					}
+					bytes = compress.ToArray();
 				}
 			}
 			else if (tileData.compression == "zlib") {
@@ -366,8 +369,12 @@ public class Layer {
 					int len = compressedBytes.Length;
 					bytes = new byte[len+6];
 					Array.ConstrainedCopy(compressedBytes, 0, bytes, 2, len);
-					bytes[0] = 120;
-					bytes[1] = 156;
+					
+					// first 2 bytes - zlib header for default compression
+					bytes[0] = 0x78;
+					bytes[1] = 0x9C;
+					
+					// last 4 bytes - alder32 checksum
 					bytes[len+2] = (byte)((alder>>24) & 0xFF);
 					bytes[len+3] = (byte)((alder>>16) & 0xFF);
 					bytes[len+4] = (byte)((alder>>8) & 0xFF);
