@@ -287,6 +287,7 @@ public class TileMapEditor : Editor {
                     Path.GetExtension(path).TrimStart(new char[]{'.'})
                 )
             );
+            AssetDatabase.Refresh();
             AssetDatabase.ImportAsset(path);
         }
         EditorGUILayout.EndHorizontal();

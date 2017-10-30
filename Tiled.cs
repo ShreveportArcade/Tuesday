@@ -22,7 +22,7 @@ using System.Collections.Generic;
 using System.Xml.Serialization;
 using System.IO;
 using System.IO.Compression;
-using UnityEngine;
+
 namespace Tiled {
 [XmlRoot("map")]
 [System.Serializable]
@@ -291,13 +291,15 @@ public class Layer {
 		                stream = new DeflateStream(stream, CompressionMode.Decompress);
 					}
 					
-					using (BinaryReader binaryReader = new BinaryReader(stream)){
+					using (BinaryReader binaryReader = new BinaryReader(stream)) {
 						for (int j = 0; j < height; j++) {
 							for (int i = 0; i < width; i++) {
 								tileFlags[i + j * width] = binaryReader.ReadUInt32();
 							}
 						}
 					}
+
+					stream.Dispose();
 				}
 			}
 
@@ -314,10 +316,12 @@ public class Layer {
 		}
 	}
 
-	public void SetTileID (int id, int x, int y) {
+	public void SetTileID (int id, int x, int y, uint flags = 0) {
 		int index = x + y * width;
 		tileIDs[index] = id;
+		tileFlags[index] = (uint)id | flags;
 
+		//TODO: encode in separate function (ie. on mouse up)
 		if (tileData.encoding == "csv") {
 			string[] tileStrings = tileData.contents.Split(',');
 			string tileString = tileStrings[index];
@@ -325,12 +329,54 @@ public class Layer {
 			if (tileString.StartsWith("\n")) tileStrings[index] = "\n" + id.ToString();
 			else tileStrings[index] = id.ToString();
 			
-			tileData.contents = string.Join(",", tileStrings);
-
-			//TODO: handle flags
+			tileData.contents = string.Join(",", tileStrings);	
 		}
 		else if (tileData.encoding == "base64") {
-			// TODO: encode as base64
+			MemoryStream stream = new MemoryStream();
+			using (BinaryWriter binaryWriter = new BinaryWriter(stream)){
+				for (int j = 0; j < height; j++) {
+					for (int i = 0; i < width; i++) {
+						binaryWriter.Write(tileFlags[i + j * width]);
+					}
+				}
+			}
+
+			byte[] bytes = stream.ToArray();
+			if (tileData.compression == "gzip") {
+				using (MemoryStream compress = new MemoryStream()) {
+					using (GZipStream gzip = new GZipStream(compress, CompressionMode.Compress)) {
+						gzip.Write(bytes, 0, bytes.Length);
+					}
+				}
+			}
+			else if (tileData.compression == "zlib") {
+				using (MemoryStream compress = new MemoryStream()) {
+					using (DeflateStream zlib = new DeflateStream(compress, CompressionMode.Compress)) {
+						zlib.Write(bytes, 0, bytes.Length);
+					}					
+					UInt32 a = 1;
+					UInt32 b = 0;
+					for (int i = 0; i < bytes.Length; i++) {
+						a = (a + bytes[i]) % 65521;
+						b = (b + a) % 65521;
+					}
+					UInt32 alder = (b << 16) | a;
+
+					byte[] compressedBytes = compress.ToArray();
+					int len = compressedBytes.Length;
+					bytes = new byte[len+6];
+					Array.ConstrainedCopy(compressedBytes, 0, bytes, 2, len);
+					bytes[0] = 120;
+					bytes[1] = 156;
+					bytes[len+2] = (byte)((alder>>24) & 0xFF);
+					bytes[len+3] = (byte)((alder>>16) & 0xFF);
+					bytes[len+4] = (byte)((alder>>8) & 0xFF);
+					bytes[len+5] = (byte)(alder & 0xFF);
+				}
+			}
+			
+			tileData.contents = Convert.ToBase64String(bytes);
+			stream.Dispose();
 		}
 	}
 
