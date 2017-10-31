@@ -211,7 +211,7 @@ public class TileSet {
     }
 
 	public Tile GetTile (int tileGID) {
-		if (tileGID < firstGID) return null;
+		if (tileGID < firstGID || tiles == null) return null;
 		int tileIndex = tileGID - firstGID;
 		for (int i = 0; i < tiles.Length; i++) {
 			if (tileIndex == tiles[i].id) return tiles[i];

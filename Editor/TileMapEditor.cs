@@ -345,12 +345,12 @@ public class TileMapEditor : Editor {
     void OnSceneGUI () {
         DrawGrid();
 
-    	if (editState == 0) return;
-        else if (editState == 3) DrawSelection();
-        else Undo.RecordObject(target, "Draw/Erase Tiles");
-
     	Event e = Event.current;
     	if (e == null) return;
+
+    	if (editState == 0 || e.modifiers != EventModifiers.None) return;
+        else if (editState == 3) DrawSelection();
+        else Undo.RecordObject(target, "Draw/Erase Tiles");
 
     	if (e.type == EventType.MouseDown) {
             GUIUtility.hotControl = GUIUtility.GetControlID(FocusType.Passive);
