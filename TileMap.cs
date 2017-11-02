@@ -34,9 +34,25 @@ public class TileMap : MonoBehaviour {
 
     [HideInInspector] public float pixelsPerUnit = -1;
     [HideInInspector] public Vector4 tileOffset;
-    [HideInInspector] public Vector4 offset;
+    [HideInInspector] public Vector2 offset;
     [HideInInspector] public GameObject[] layers;
     [HideInInspector] public Material[] tileSetMaterials;
+
+    public Bounds bounds {
+        get {
+            Vector3 size = Vector3.one;
+            if (tmxFile != null) {
+                size = new Vector3(
+                    tmxFile.width * tmxFile.tileWidth, 
+                    tmxFile.height * tmxFile.tileHeight, 
+                    0
+                );
+                size /= pixelsPerUnit;
+            }
+            Vector3 origin = new Vector3(size.x * (0.5f - pivot.x), size.y * (0.5f - pivot.y), 0);
+            return new Bounds(transform.position + origin, size * 0.5f);
+        }
+    }
 
     private GameObject[][] _layerSubmeshObjects;
     private GameObject[][] layerSubmeshObjects {

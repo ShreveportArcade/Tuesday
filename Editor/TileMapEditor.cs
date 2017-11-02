@@ -348,6 +348,12 @@ public class TileMapEditor : Editor {
     	Event e = Event.current;
     	if (e == null) return;
 
+        if (e.isKey && e.modifiers == EventModifiers.None && e.keyCode == KeyCode.F) {
+            SceneView.lastActiveSceneView.Frame(tileMap.bounds, false);
+            e.Use();
+            return;
+        }
+
     	if (editState == 0 || e.modifiers != EventModifiers.None) return;
         else if (editState == 3) DrawSelection();
         else Undo.RecordObject(target, "Draw/Erase Tiles");

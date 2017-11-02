@@ -125,7 +125,7 @@ class TMXAssetEditor : Editor {
                         else {
                             // place at origin relative to object dropped on in Hierarchy
                         }
-
+                        Selection.activeGameObject = map;
                         Undo.RegisterCreatedObjectUndo (map, "Created '" + name + "' from TMX file.");
                         foundTMX = true;
                     }

@@ -50,6 +50,7 @@ public class TMXFile {
 
 	[XmlElement("tileset", typeof(TileSet))] public TileSet[] tileSets;
 	[XmlElement("layer", typeof(Layer))] public Layer[] layers;
+	[XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup[] objectGroups;
 
 	public static TMXFile Load (string path) {
 		XmlSerializer deserializer = new XmlSerializer(typeof(TMXFile));
@@ -140,7 +141,7 @@ public class TileSet {
 	[XmlIgnore] public bool hasSource { get { return !string.IsNullOrEmpty(source); }}
 
 	[XmlAttribute("firstgid")] public int firstGID;
-	[XmlIgnore] public bool firstGIDSpecified { get { return hasSource; } set {} }
+	[XmlIgnore] public bool firstGIDSpecified { get { return firstGID != 0; } set {} }
 
 	[XmlAttribute("source")] public string source;
 	[XmlIgnore] public bool sourceSpecified { get { return hasSource; } set {} }
@@ -183,11 +184,14 @@ public class TileSet {
 	[XmlElement("tile", typeof(Tile))] public Tile[] tiles;
 	[XmlIgnore] public bool tilesSpecified { get { return !hasSource; } set {} }
 
-	[XmlElement("terraintypes", typeof(Terrain))] public Terrain[] terrainTypes;
+	[XmlArray("terraintypes")] [XmlArrayItem("terrain", typeof(Terrain))] public Terrain[] terrainTypes;
 	[XmlIgnore] public bool terrainTypesSpecified { get { return !hasSource; } set {} }
 
-	[XmlElement("properties", typeof(Property))] public Property[] properties;
+	[XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
 	[XmlIgnore] public bool propertiesSpecified { get { return !hasSource; } set {} }
+
+	[XmlArray("wangsets")] [XmlArrayItem("wangset", typeof(WangSet))] public WangSet[] wangSets;
+	[XmlIgnore] public bool wangSetsSpecified { get { return !hasSource; } set { } }
 
 	public static TileSet Load (string path) {
 		XmlSerializer deserializer = new XmlSerializer(typeof(TileSet));
@@ -519,8 +523,8 @@ public class ObjectGroup {
 	[XmlAttribute("offsety")] public int? offsetY;
 	[XmlAttribute("draworder")] public string drawOrder = "topdown";
 
-	[XmlElement("property", typeof(Property))] public Property[] properties;
-	[XmlElement("object", typeof(TileObject))] public TileObject[] objects;
+	[XmlArray("properties")][XmlArrayItem("property", typeof(Property))] public Property[] properties;
+	[XmlArray("objects")][XmlArrayItem("object", typeof(TileObject))] public TileObject[] objects;
 }
 
 [System.Serializable]
@@ -541,15 +545,15 @@ public class TileObject {
 	[XmlAttribute("visible")] public int? visible;
 
 	[XmlElement("property", typeof(Property))] public Property[] properties;
-	[XmlIgnore] public bool propertiesSpecified {get { return properties != null && properties.Length > 0; } set {} }
+	[XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set {} }
 	[XmlElement("ellipse", typeof(Ellipse))] public Ellipse ellipse;
-	[XmlIgnore] public bool ellipseSpecified {get { return ellipse != null && ellipse.width > 0 && ellipse.height > 0; } set {} }
+	[XmlIgnore] public bool ellipseSpecified { get { return ellipse != null && ellipse.width > 0 && ellipse.height > 0; } set {} }
 	[XmlElement("polygon", typeof(Polygon))] public Polygon polygon;
-	[XmlIgnore] public bool polygonSpecified {get { return polygon != null && !string.IsNullOrEmpty(polygon.points); } set {} }
+	[XmlIgnore] public bool polygonSpecified { get { return polygon != null && !string.IsNullOrEmpty(polygon.points); } set {} }
 	[XmlElement("polyline", typeof(Polygon))] public Polygon polyline;
-	[XmlIgnore] public bool polylineSpecified {get { return polyline != null && !string.IsNullOrEmpty(polyline.points); } set {} }
+	[XmlIgnore] public bool polylineSpecified { get { return polyline != null && !string.IsNullOrEmpty(polyline.points); } set {} }
 	[XmlElement("image", typeof(Image))] public Image image;
-	[XmlIgnore] public bool imageSpecified {get { return image != null && !string.IsNullOrEmpty(image.source); } set {} }
+	[XmlIgnore] public bool imageSpecified { get { return image != null && !string.IsNullOrEmpty(image.source); } set {} }
 }
 
 [System.Serializable]
@@ -587,6 +591,33 @@ public class ImageLayer {
 
 	[XmlElement("property", typeof(Property))] public Property[] properties;
 	[XmlElement("image", typeof(Image))] public Image image;
+}
 
+
+[System.Serializable]
+public class WangSet {
+	[XmlAttribute("name")] public string name = "";
+	[XmlAttribute("tile")] public int tileID = 0;
+	[XmlElement("wangcornercolor", typeof(WangColor))] public WangColor[] cornerColors;
+	[XmlElement("wangedgecolor", typeof(WangColor))] public WangColor[] edgeColors;
+	[XmlElement("wangtile", typeof(WangTile))] public WangTile[] tiles;
+}
+
+[System.Serializable]
+public class WangColor {
+	[XmlAttribute("name")] public string name = "";
+	[XmlAttribute("color")] public string color = "";
+	[XmlAttribute("tile")] public int tileID = 0;
+	[XmlAttribute("probability")] public float probability = 1;
+}
+
+[System.Serializable]
+public class WangTile {
+	[XmlAttribute("tileid")] public int tileID = 0;
+	[XmlAttribute("wangid")] public string _wangID = "0x00000000";
+    [XmlIgnore] public UInt32 wangID {
+		get { return UInt32.Parse(_wangID.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber); }
+		set { _wangID = "0x" + value.ToString("X"); }
+	}
 }
 }
