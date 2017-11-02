@@ -19,6 +19,7 @@ DEALINGS IN THE SOFTWARE.
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Xml;
 using System.Xml.Serialization;
 using System.IO;
 using System.IO.Compression;
@@ -82,10 +83,16 @@ public class TMXFile {
 
 	public void Save (string path) {
         XmlSerializer serializer = new XmlSerializer(typeof(TMXFile));
-        TextWriter textWriter = new StreamWriter(path);
-        XmlSerializerNamespaces nameSpaces = new XmlSerializerNamespaces();
+		TextWriter textWriter = new StreamWriter(path);
+		XmlTextWriter xmlWriter = new XmlTextWriter(textWriter);
+		xmlWriter.Formatting = Formatting.Indented;
+		xmlWriter.Indentation = 1;
+		xmlWriter.WriteStartDocument(); // Why is C# writing "UTF-8" as lowercase?
+		// xmlWriter.WriteDocType("map", null, "http://mapeditor.org/dtd/1.0/map.dtd", null); // no longer used?
+		XmlSerializerNamespaces nameSpaces = new XmlSerializerNamespaces();
         nameSpaces.Add("","");
-        serializer.Serialize(textWriter, this, nameSpaces);
+        serializer.Serialize(xmlWriter, this, nameSpaces);
+		xmlWriter.Close();
         textWriter.Close();
 
         for (int i = 0; i < tileSets.Length; i++) {
@@ -423,8 +430,9 @@ public class Tile {
 	[XmlIgnore] public bool terrainSpecified { get { return !string.IsNullOrEmpty(terrain); } set {} }
 
 	[XmlAttribute("probability")] public float? probability;
+	[XmlIgnore] public bool probabilitySpecified { get { return probability != null; } set { } }
 
-	[XmlElement("properties", typeof(Property))] public Property[] properties;
+    [XmlElement("properties", typeof(Property))] public Property[] properties;
 	[XmlElement("animation", typeof(Frame))] public Frame[] animation;
 	[XmlElement("image", typeof(Image))] public Image image;
 	[XmlIgnore] public bool imageSpecified { get { return image != null && !string.IsNullOrEmpty(image.source); } set {} }

@@ -20,4 +20,5 @@ The goals of this project are full support of the TMX file format, feature parit
  * read/write Tiled Objects
  * Wang Tile support
  * Template Group (TGX) support
- * feature parity with Tiled standalone 
+ * feature parity with Tiled standalone
+ * save files with identical element ordering 
