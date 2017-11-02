@@ -29,7 +29,7 @@ namespace Tiled {
 [System.Serializable]
 public class TMXFile {
     [XmlAttribute("version")] public string version = "1.0";
-    [XmlAttribute("tiledversion")] public string tiledVersion = "1.0.1";
+    [XmlAttribute("tiledversion")] public string tiledVersion = "1.0.3";
     [XmlAttribute("orientation")] public string orientation = "orthogonal";
     [XmlAttribute("renderorder")] public string renderOrder = "right-down";
     [XmlAttribute("width")] public int width = 0;
@@ -52,6 +52,8 @@ public class TMXFile {
     [XmlElement("tileset", typeof(TileSet))] public TileSet[] tileSets;
     [XmlElement("layer", typeof(Layer))] public Layer[] layers;
     [XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup[] objectGroups;
+
+    [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
 
     public static TMXFile Load (string path) {
         XmlSerializer deserializer = new XmlSerializer(typeof(TMXFile));
