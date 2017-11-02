@@ -40,17 +40,13 @@ public class TileMap : MonoBehaviour {
 
     public Bounds bounds {
         get {
-            Vector3 size = Vector3.one;
-            if (tmxFile != null) {
-                size = new Vector3(
-                    tmxFile.width * tmxFile.tileWidth, 
-                    tmxFile.height * tmxFile.tileHeight, 
-                    0
-                );
-                size /= pixelsPerUnit;
+            MeshRenderer[] renderers = GetComponentsInChildren<MeshRenderer>();
+            Bounds b = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) {
+                b.Encapsulate(renderers[i].bounds);
             }
-            Vector3 origin = new Vector3(size.x * (0.5f - pivot.x), size.y * (0.5f - pivot.y), 0);
-            return new Bounds(transform.position + origin, size * 0.5f);
+            b.size *= 0.5f;
+            return b;
         }
     }
 
