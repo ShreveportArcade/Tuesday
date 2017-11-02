@@ -29,8 +29,8 @@ public class TileMap : MonoBehaviour {
     [Range(0, 0.01f)] public float uvInset = 0;
     public Vector2 pivot;
 
-	[HideInInspector] public string tmxFilePath;
-	public TMXFile tmxFile;
+    [HideInInspector] public string tmxFilePath;
+    public TMXFile tmxFile;
 
     [HideInInspector] public float pixelsPerUnit = -1;
     [HideInInspector] public Vector4 tileOffset;
@@ -85,8 +85,8 @@ public class TileMap : MonoBehaviour {
         get { return 1 + tmxFile.width * tmxFile.height / 16250; }
     }
 
-	public void Setup (TMXFile tmxFile, string tmxFilePath, float pixelsPerUnit = -1) {
-		this.tmxFilePath = tmxFilePath;
+    public void Setup (TMXFile tmxFile, string tmxFilePath, float pixelsPerUnit = -1) {
+        this.tmxFilePath = tmxFilePath;
         this.tmxFile = tmxFile;
         this.pixelsPerUnit = pixelsPerUnit;
         Setup();

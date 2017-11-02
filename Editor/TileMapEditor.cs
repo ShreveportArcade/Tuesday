@@ -34,17 +34,17 @@ public class TileMapEditor : Editor {
     
 
     private TileMap tileMap {
-    	get { return (target as TileMap); }
+        get { return (target as TileMap); }
     }
 
     private TMXFile tmxFile {
-    	get { return tileMap.tmxFile; }
-    	set { tileMap.tmxFile = value; }
+        get { return tileMap.tmxFile; }
+        set { tileMap.tmxFile = value; }
     }
 
     private string path {
-    	get { return tileMap.tmxFilePath; }
-    	set { tileMap.tmxFilePath = value; }
+        get { return tileMap.tmxFilePath; }
+        set { tileMap.tmxFilePath = value; }
     }
 
     void OnEnable () {
@@ -66,7 +66,7 @@ public class TileMapEditor : Editor {
         }
     }    
 
-	private static Dictionary<int, bool> tileSetFoldoutStates = new Dictionary<int, bool>();
+    private static Dictionary<int, bool> tileSetFoldoutStates = new Dictionary<int, bool>();
     private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
     private static Dictionary<string, Material> tileSetMaterials = new Dictionary<string, Material>();
     public static Material[] GetMaterials (TMXFile tmxFile, string path) {
@@ -125,17 +125,17 @@ public class TileMapEditor : Editor {
         }
 
         if (tex == null) {
-        	tex = EditorGUIUtility.FindTexture(Path.GetFileNameWithoutExtension(path));
+            tex = EditorGUIUtility.FindTexture(Path.GetFileNameWithoutExtension(path));
         }
 
         if (tex != null) {
-        	tileSetTextures[tileSet.image.source] = tex;
+            tileSetTextures[tileSet.image.source] = tex;
         }
 
         return tex;
     }
 
-	private static TileSet selectedTileSet;
+    private static TileSet selectedTileSet;
     private static int selectedTileIndex;
     private int GetTileIndex (TileSet tileSet, Rect rect, Vector2 pos) {
         pos -= rect.min;
@@ -250,7 +250,7 @@ public class TileMapEditor : Editor {
             tileMap.Setup();
         }
         
-		base.OnInspectorGUI();
+        base.OnInspectorGUI();
         EditorGUIUtility.hierarchyMode = true;
         showLayers = EditorGUILayout.Foldout(showLayers, "Layers:");
         EditorGUIUtility.hierarchyMode = false;
@@ -259,11 +259,11 @@ public class TileMapEditor : Editor {
             selectedLayer = GUILayout.SelectionGrid(selectedLayer, layerNames, 1);
         }
 
-    	EditorGUIUtility.hierarchyMode = true;
+        EditorGUIUtility.hierarchyMode = true;
         showTileSets = EditorGUILayout.Foldout(showTileSets, "Tile Sets:");
         EditorGUIUtility.hierarchyMode = false;
         if (showTileSets && tmxFile.tileSets != null) {
-	    	foreach (TileSet tileSet in tmxFile.tileSets){
+            foreach (TileSet tileSet in tmxFile.tileSets){
                 TileSetField(tileSet); 
             }
         }
@@ -272,7 +272,7 @@ public class TileMapEditor : Editor {
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Revert")) {
             tmxFile = TMXFile.Load(path);
-			tileMap.Setup();
+            tileMap.Setup();
         }
         if (GUILayout.Button("Save")) {
             tmxFile.Save(path);
@@ -291,14 +291,14 @@ public class TileMapEditor : Editor {
             AssetDatabase.ImportAsset(path);
         }
         EditorGUILayout.EndHorizontal();
-	}
+    }
 
     public override bool HasPreviewGUI() {
         return selectedTileSet != null;
     }
 
     public override GUIContent GetPreviewTitle() {
-    	return new GUIContent(selectedTileSet.name + " - Tile: " + selectedTileIndex);
+        return new GUIContent(selectedTileSet.name + " - Tile: " + selectedTileIndex);
     }
 
     public override void OnPreviewGUI(Rect r, GUIStyle background) {
@@ -345,8 +345,8 @@ public class TileMapEditor : Editor {
     void OnSceneGUI () {
         DrawGrid();
 
-    	Event e = Event.current;
-    	if (e == null) return;
+        Event e = Event.current;
+        if (e == null) return;
 
         if (e.isKey && e.modifiers == EventModifiers.None && e.keyCode == KeyCode.F) {
             SceneView.lastActiveSceneView.Frame(tileMap.bounds, false);
@@ -354,16 +354,16 @@ public class TileMapEditor : Editor {
             return;
         }
 
-    	if (editState == 0 || e.modifiers != EventModifiers.None) return;
+        if (editState == 0 || e.modifiers != EventModifiers.None) return;
         else if (editState == 3) DrawSelection();
         else Undo.RecordObject(target, "Draw/Erase Tiles");
 
-    	if (e.type == EventType.MouseDown) {
+        if (e.type == EventType.MouseDown) {
             GUIUtility.hotControl = GUIUtility.GetControlID(FocusType.Passive);
-    		selectedTileIndices = null;
-    		if (editState == 3) selectionStart = MouseToWorldPoint();
-    		else DrawTile();
-    	}
+            selectedTileIndices = null;
+            if (editState == 3) selectionStart = MouseToWorldPoint();
+            else DrawTile();
+        }
         else if (e.type == EventType.MouseDrag) {
             if (editState != 3) DrawTile(); 
             else {
@@ -371,7 +371,7 @@ public class TileMapEditor : Editor {
                 HandleUtility.Repaint();
             }
         }
-    	else if (e.type == EventType.MouseUp) {
+        else if (e.type == EventType.MouseUp) {
             if (editState == 3) SelectTiles();
             else {
                 tileMap.tmxFile.layers[selectedLayer].Encode();
@@ -379,9 +379,9 @@ public class TileMapEditor : Editor {
             }
             GUIUtility.hotControl = 0;
             Undo.FlushUndoRecordObjects();
-    	}
+        }
 
-    	
+        
     }
 
     Vector3 MouseToWorldPoint () {
@@ -447,25 +447,25 @@ public class TileMapEditor : Editor {
     }
 
     void DrawTile () {
-    	int tileIndex = selectedTileIndex;
-    	if (selectedTileSet == null) { 
-    		selectedTileSet = tmxFile.tileSets[0];
-    		tileIndex = selectedTileSet.firstGID;
-    	}
+        int tileIndex = selectedTileIndex;
+        if (selectedTileSet == null) { 
+            selectedTileSet = tmxFile.tileSets[0];
+            tileIndex = selectedTileSet.firstGID;
+        }
 
-    	if (editState == 2) {
-    		tileIndex = selectedTileSet.firstGID - 1;
-    	}
+        if (editState == 2) {
+            tileIndex = selectedTileSet.firstGID - 1;
+        }
 
-    	Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+        Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
         float dist = 0;
         Plane plane = new Plane(Vector3.forward, tileMap.transform.position);
         if (plane.Raycast(ray, out dist)) {
-        	Vector3 p = ray.GetPoint(dist);
-        	if (tileMap.SetTile(tileIndex, selectedLayer, p - tileMap.transform.position)) {
-		        Event.current.Use();
+            Vector3 p = ray.GetPoint(dist);
+            if (tileMap.SetTile(tileIndex, selectedLayer, p - tileMap.transform.position)) {
+                Event.current.Use();
                 EditorUtility.SetDirty(target);
-	        }
+            }
         }
     }
 
@@ -473,27 +473,27 @@ public class TileMapEditor : Editor {
         Vector3 startPos = selectionStart - tileMap.transform.position;
         Vector3 endPos = selectionEnd - tileMap.transform.position;
 
-		int startX = Mathf.Clamp(Mathf.FloorToInt(startPos.x / tileMap.tileOffset.x), 0, tmxFile.width);
-		int startY = Mathf.Clamp(Mathf.FloorToInt(startPos.y / tileMap.tileOffset.y), 0, tmxFile.height);
+        int startX = Mathf.Clamp(Mathf.FloorToInt(startPos.x / tileMap.tileOffset.x), 0, tmxFile.width);
+        int startY = Mathf.Clamp(Mathf.FloorToInt(startPos.y / tileMap.tileOffset.y), 0, tmxFile.height);
     
-		int endX = Mathf.Clamp(Mathf.FloorToInt(endPos.x / tileMap.tileOffset.x), 0, tmxFile.width);
-		int endY = Mathf.Clamp(Mathf.FloorToInt(endPos.y / tileMap.tileOffset.y), 0, tmxFile.height);
+        int endX = Mathf.Clamp(Mathf.FloorToInt(endPos.x / tileMap.tileOffset.x), 0, tmxFile.width);
+        int endY = Mathf.Clamp(Mathf.FloorToInt(endPos.y / tileMap.tileOffset.y), 0, tmxFile.height);
     
-    	int width = Mathf.Abs(endX - startX);
-    	int height = Mathf.Abs(endY - startY);
-    	int a = Mathf.Min(startX, endX);
-    	int b = Mathf.Min(startY, endY);
-		selectedTileIndices = new int[width * height];
+        int width = Mathf.Abs(endX - startX);
+        int height = Mathf.Abs(endY - startY);
+        int a = Mathf.Min(startX, endX);
+        int b = Mathf.Min(startY, endY);
+        selectedTileIndices = new int[width * height];
 
-		int i = 0;
-		for (int x = a; x < a + width; x++) {
-			for (int y = b; y < b + width; y++) {
-				selectedTileIndices[i] = x + y * tmxFile.width;
-			}
-		}
+        int i = 0;
+        for (int x = a; x < a + width; x++) {
+            for (int y = b; y < b + width; y++) {
+                selectedTileIndices[i] = x + y * tmxFile.width;
+            }
+        }
 
         if (selectedTileIndices != null) {
-	        Event.current.Use();
+            Event.current.Use();
         }
     }
 }
