@@ -15,8 +15,8 @@ The goals of this project are full support of the TMX file format, feature parit
  * lightweight code, only requires one component per map
 
 ## Roadmap
- * Compartmentalize TileMapEditor code
  * Paint Terrains
+ * Compartmentalize TileMapEditor code
  * Tiled Object support
  * Wang Tile support
  * Template Group (TGX) support

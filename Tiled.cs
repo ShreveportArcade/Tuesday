@@ -28,8 +28,10 @@ namespace Tiled {
 [XmlRoot("map")]
 [System.Serializable]
 public class TMXFile {
+    [XmlIgnore] public bool hasDocType = false;
     [XmlAttribute("version")] public string version = "1.0";
-    [XmlAttribute("tiledversion")] public string tiledVersion = "1.0.3";
+    [XmlAttribute("tiledversion")] public string tiledVersion;
+    [XmlIgnore] public bool tiledVersionSpecified { get { return tiledVersion != null; } set { } }
     [XmlAttribute("orientation")] public string orientation = "orthogonal";
     [XmlAttribute("renderorder")] public string renderOrder = "right-down";
     [XmlAttribute("width")] public int width = 0;
@@ -46,6 +48,7 @@ public class TMXFile {
     [XmlAttribute("nextobjectid")] public int nextObjectID = 0;
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
+    [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
     [XmlElement("tileset", typeof(TileSet))] public TileSet[] tileSets;
     [XmlElement("layer", typeof(Layer))] public Layer[] layers;
     [XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup[] objectGroups;
@@ -55,6 +58,18 @@ public class TMXFile {
         TextReader textReader = new StreamReader(path);
         TMXFile map = (TMXFile)deserializer.Deserialize(textReader);
         textReader.Close();
+
+        XmlTextReader xmlReader = new XmlTextReader(path);
+        bool hasDocType = false;
+        for (int i = 0; i < 3; i++) {
+            xmlReader.Read();
+            if (xmlReader.NodeType == XmlNodeType.DocumentType) {
+                hasDocType = true;
+                break;
+            }
+        }
+        map.hasDocType = hasDocType;
+        xmlReader.Close();
 
         for (int i = 0; i < map.tileSets.Length; i++) {
             TileSet tileSet = map.tileSets[i];
@@ -85,7 +100,7 @@ public class TMXFile {
         xmlWriter.Formatting = Formatting.Indented;
         xmlWriter.Indentation = 1;
         xmlWriter.WriteStartDocument(); // Why is C# writing "UTF-8" as lowercase?
-        // xmlWriter.WriteDocType("map", null, "http://mapeditor.org/dtd/1.0/map.dtd", null); // no longer used?
+        if (hasDocType) xmlWriter.WriteDocType("map", null, "http://mapeditor.org/dtd/1.0/map.dtd", null);
         XmlSerializerNamespaces nameSpaces = new XmlSerializerNamespaces();
         nameSpaces.Add("","");
         serializer.Serialize(xmlWriter, this, nameSpaces);
@@ -192,7 +207,7 @@ public class TileSet {
     [XmlIgnore] public bool tilesSpecified { get { return !hasSource; } set {} }
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
-    [XmlIgnore] public bool propertiesSpecified { get { return !hasSource; } set {} }
+    [XmlIgnore] public bool propertiesSpecified { get { return !hasSource && properties != null && properties.Length > 0; } set { } }
 
     [XmlArray("wangsets")] [XmlArrayItem("wangset", typeof(WangSet))] public WangSet[] wangSets;
     [XmlIgnore] public bool wangSetsSpecified { get { return !hasSource; } set { } }
@@ -211,9 +226,14 @@ public class TileSet {
         this.source = null;
         XmlSerializer serializer = new XmlSerializer(typeof(TileSet));
         TextWriter textWriter = new StreamWriter(path);
+        XmlTextWriter xmlWriter = new XmlTextWriter(textWriter);
+        xmlWriter.Formatting = Formatting.Indented;
+        xmlWriter.Indentation = 1;
+        xmlWriter.WriteStartDocument();
         XmlSerializerNamespaces nameSpaces = new XmlSerializerNamespaces();
         nameSpaces.Add("","");
-        serializer.Serialize(textWriter, this, nameSpaces);
+        serializer.Serialize(xmlWriter, this, nameSpaces);
+        xmlWriter.Close();
         textWriter.Close();
         this.source = source;
     }
@@ -265,6 +285,7 @@ public class Layer {
     [XmlAttribute("height")] public int height;
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
+    [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
     [XmlElement("data", typeof(Data))] public Data tileData;
     
     const uint FlippedHorizontallyFlag = 0x80000000;
@@ -430,6 +451,7 @@ public class Tile {
     [XmlIgnore] public bool probabilitySpecified { get { return probability != null; } set { } }
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
+    [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
     [XmlElement("animation", typeof(Frame))] public Frame[] animation;
     [XmlElement("image", typeof(Image))] public Image image;
     [XmlIgnore] public bool imageSpecified { get { return image != null && !string.IsNullOrEmpty(image.source); } set {} }
@@ -529,6 +551,7 @@ public class ObjectGroup {
     [XmlAttribute("draworder")] public string drawOrder;
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
+    [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
     [XmlElement("object", typeof(TileObject))] public TileObject[] objects;
 }
 
@@ -550,6 +573,7 @@ public class TileObject {
     [XmlAttribute("visible")] public int? visible;
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
+    [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
     [XmlElement("ellipse")] public string ellipse;
     [XmlIgnore] public bool ellipseSpecified { get { return ellipse != null; } set {} }
     [XmlElement("polygon", typeof(Polygon))] public Polygon polygon;
@@ -585,7 +609,8 @@ public class ImageLayer {
     [XmlAttribute("opacity")] public float opacity = 1;
     [XmlAttribute("visible")] public int visible = 1;
 
-    [XmlElement("property", typeof(Property))] public Property[] properties;
+    [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
+    [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
     [XmlElement("image", typeof(Image))] public Image image;
 }
 
