@@ -17,8 +17,7 @@ The goals of this project are full support of the TMX file format, feature parit
 ## Roadmap
  * Compartmentalize TileMapEditor code
  * Paint Terrains
- * read/write Tiled Objects
+ * Tiled Object support
  * Wang Tile support
  * Template Group (TGX) support
  * feature parity with Tiled standalone
- * save files with identical element ordering 

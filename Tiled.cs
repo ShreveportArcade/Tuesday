@@ -37,23 +37,18 @@ public class TMXFile {
     [XmlAttribute("tilewidth")] public int tileWidth = 0;
     [XmlAttribute("tileheight")] public int tileHeight = 0;
     [XmlAttribute("hexsidelength")] public int? hexSideLength;
-    
     [XmlAttribute("staggeraxis")] public string staggerAxis;
     [XmlIgnore] public bool staggerAxisSpecified { get { return !string.IsNullOrEmpty(staggerAxis); } set {}}
-    
     [XmlAttribute("staggerindex")] public string staggerIndex;
     [XmlIgnore] public bool staggerIndexSpecified { get { return !string.IsNullOrEmpty(staggerIndex); } set {}}
-    
     [XmlAttribute("backgroundcolor")] public string backgroundColor;
     [XmlIgnore] public bool backgroundColorSpecified { get { return !string.IsNullOrEmpty(backgroundColor); } set {}}
-    
-    [XmlAttribute("nextobjectid")] public int nextObjectID = 0;	
+    [XmlAttribute("nextobjectid")] public int nextObjectID = 0;
 
+    [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlElement("tileset", typeof(TileSet))] public TileSet[] tileSets;
     [XmlElement("layer", typeof(Layer))] public Layer[] layers;
     [XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup[] objectGroups;
-
-    [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
 
     public static TMXFile Load (string path) {
         XmlSerializer deserializer = new XmlSerializer(typeof(TMXFile));
@@ -190,11 +185,11 @@ public class TileSet {
     [XmlElement("image", typeof(Image))]  public Image image;
     [XmlIgnore] public bool imageSpecified { get { return !hasSource; } set {} }
 
+    [XmlArray("terraintypes")] [XmlArrayItem("terrain", typeof(Terrain))] public Terrain[] terrainTypes;
+    [XmlIgnore] public bool terrainTypesSpecified { get { return !hasSource; } set { } }
+
     [XmlElement("tile", typeof(Tile))] public Tile[] tiles;
     [XmlIgnore] public bool tilesSpecified { get { return !hasSource; } set {} }
-
-    [XmlArray("terraintypes")] [XmlArrayItem("terrain", typeof(Terrain))] public Terrain[] terrainTypes;
-    [XmlIgnore] public bool terrainTypesSpecified { get { return !hasSource; } set {} }
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return !hasSource; } set {} }
@@ -269,7 +264,7 @@ public class Layer {
     [XmlAttribute("width")] public int width;
     [XmlAttribute("height")] public int height;
 
-    [XmlElement("property", typeof(Property))] public Property[] properties;
+    [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlElement("data", typeof(Data))] public Data tileData;
     
     const uint FlippedHorizontallyFlag = 0x80000000;
@@ -434,7 +429,7 @@ public class Tile {
     [XmlAttribute("probability")] public float? probability;
     [XmlIgnore] public bool probabilitySpecified { get { return probability != null; } set { } }
 
-    [XmlElement("properties", typeof(Property))] public Property[] properties;
+    [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlElement("animation", typeof(Frame))] public Frame[] animation;
     [XmlElement("image", typeof(Image))] public Image image;
     [XmlIgnore] public bool imageSpecified { get { return image != null && !string.IsNullOrEmpty(image.source); } set {} }
@@ -531,10 +526,10 @@ public class ObjectGroup {
     [XmlAttribute("visible")] public int? visible;
     [XmlAttribute("offsetx")] public int? offsetX;
     [XmlAttribute("offsety")] public int? offsetY;
-    [XmlAttribute("draworder")] public string drawOrder = "topdown";
+    [XmlAttribute("draworder")] public string drawOrder;
 
-    [XmlArray("properties")][XmlArrayItem("property", typeof(Property))] public Property[] properties;
-    [XmlArray("objects")][XmlArrayItem("object", typeof(TileObject))] public TileObject[] objects;
+    [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
+    [XmlElement("object", typeof(TileObject))] public TileObject[] objects;
 }
 
 [System.Serializable]
@@ -546,32 +541,23 @@ public class TileObject {
     [XmlAttribute("type")] public string type;
     [XmlIgnore] public bool typeSpecified { get { return !string.IsNullOrEmpty(type); } set {} }
 
+    [XmlAttribute("gid")] public uint? gid;
     [XmlAttribute("x")] public float x = 0;
     [XmlAttribute("y")] public float y = 0;
     [XmlAttribute("width")] public float width = 0;
     [XmlAttribute("height")] public float height = 0;
     [XmlAttribute("rotation")] public float? rotation;
-    [XmlAttribute("gid")] public int? gid;
     [XmlAttribute("visible")] public int? visible;
 
-    [XmlElement("property", typeof(Property))] public Property[] properties;
-    [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set {} }
-    [XmlElement("ellipse", typeof(Ellipse))] public Ellipse ellipse;
-    [XmlIgnore] public bool ellipseSpecified { get { return ellipse != null && ellipse.width > 0 && ellipse.height > 0; } set {} }
+    [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
+    [XmlElement("ellipse")] public string ellipse;
+    [XmlIgnore] public bool ellipseSpecified { get { return ellipse != null; } set {} }
     [XmlElement("polygon", typeof(Polygon))] public Polygon polygon;
     [XmlIgnore] public bool polygonSpecified { get { return polygon != null && !string.IsNullOrEmpty(polygon.points); } set {} }
     [XmlElement("polyline", typeof(Polygon))] public Polygon polyline;
     [XmlIgnore] public bool polylineSpecified { get { return polyline != null && !string.IsNullOrEmpty(polyline.points); } set {} }
     [XmlElement("image", typeof(Image))] public Image image;
     [XmlIgnore] public bool imageSpecified { get { return image != null && !string.IsNullOrEmpty(image.source); } set {} }
-}
-
-[System.Serializable]
-public class Ellipse {
-    [XmlAttribute("x")] public float x = 0;
-    [XmlAttribute("y")] public float y = 0;
-    [XmlAttribute("width")] public float width  = 0;
-    [XmlAttribute("height")] public float height = 0;
 }
 
 [System.Serializable]
