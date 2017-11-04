@@ -444,9 +444,29 @@ public class Layer {
 [System.Serializable]
 public class Tile {
     [XmlAttribute("id")] public int id = 0;
-    [XmlAttribute("terrain")] public string terrain;
-    [XmlIgnore] public bool terrainSpecified { get { return !string.IsNullOrEmpty(terrain); } set {} }
 
+    [XmlIgnore] public int[] terrain;
+    [XmlAttribute("terrain")] public string terrainStr {
+        get {
+            if (terrain == null || terrain.Length == 0) return null;
+            string s = (terrain[0] == -1) ? "" : terrain[0].ToString();
+            for (int i = 1; i < terrain.Length; i++) {
+                s += ",";
+                s += (terrain[0] == -1) ? "" : terrain[0].ToString();
+            }
+            return s;
+        }
+        set {
+            string[] s = value.Split(',');
+            terrain = new int[s.Length];
+            for (int i = 0; i < s.Length; i++) {
+                if (s[i] == "") terrain[i] = -1;
+                else terrain[i] = int.Parse(s[i]);
+            }
+        }
+    }
+    [XmlIgnore] public bool terrainStrSpecified { get { return !string.IsNullOrEmpty(terrainStr); } set {} }
+    
     [XmlAttribute("probability")] public float? probability;
     [XmlIgnore] public bool probabilitySpecified { get { return probability != null; } set { } }
 
@@ -635,10 +655,24 @@ public class WangColor {
 [System.Serializable]
 public class WangTile {
     [XmlAttribute("tileid")] public int tileID = 0;
-    [XmlAttribute("wangid")] public string _wangID = "0x00000000";
+    [XmlAttribute("wangid")] public string _wangIDStr = "0x00000000";
+    [XmlIgnore] public UInt32? _wangID;
     [XmlIgnore] public UInt32 wangID {
-        get { return UInt32.Parse(_wangID.Replace("0x", ""), System.Globalization.NumberStyles.HexNumber); }
-        set { _wangID = "0x" + value.ToString("X"); }
+        get { 
+            if (_wangID == null) {
+                _wangID = UInt32.Parse(
+                    _wangIDStr.Replace("0x", ""), 
+                    System.Globalization.NumberStyles.HexNumber
+                );
+            }
+            return _wangID.Value;
+        }
+        set { 
+            if (value != _wangID.Value) {
+                _wangID = value;
+                _wangIDStr = "0x" + value.ToString("X"); 
+            }
+        }
     }
 }
 }

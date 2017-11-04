@@ -428,6 +428,29 @@ public class TileMap : MonoBehaviour {
         return SetTile(tileID, layerIndex, x, y, updateMesh);
     }
 
+    public bool SetTiles (int tileID, int layerIndex, Vector3 start, Vector3 end, bool updateMesh = true) {
+        bool tileSet = false;
+        float d = 0.5f * Mathf.Clamp01(tileOffset.magnitude / Vector3.Distance(start, end));
+        List<int> submeshes = new List<int>();
+        for (float t = 0; t <= 1; t += d) {
+            Vector3 pos = Vector3.Lerp(start, end, t);
+            int x = Mathf.FloorToInt((pos.x - offset.x) / tileOffset.x);
+            int y = Mathf.FloorToInt((pos.y - offset.y) / tileOffset.y);
+            if (SetTile(tileID, layerIndex, x, y, false)) {
+                if (updateMesh) {
+                    int index = x + y * tmxFile.width;
+                    int submeshIndex = index / 16250;
+                    if (!submeshes.Contains(submeshIndex)) submeshes.Add(submeshIndex);
+                }
+                tileSet = true;
+            }
+        }
+        if (updateMesh) {
+            foreach (int submeshIndex in submeshes) UpdateMesh(layerIndex, submeshIndex);
+        }
+        return tileSet;
+    }
+
     private int lastTileX = -1;
     private int lastTileY = -1;
     private int lastTileID = -1;
@@ -440,10 +463,11 @@ public class TileMap : MonoBehaviour {
         lastTileY = y;
         lastTileID = tileID;
 
-        int index = x + y * tmxFile.width;
-        int submeshIndex = index / 16250;
-        
-        if (updateMesh) UpdateMesh(layerIndex, submeshIndex);
+        if (updateMesh) {
+            int index = x + y * tmxFile.width;
+            int submeshIndex = index / 16250;
+            UpdateMesh(layerIndex, submeshIndex);
+        }
         return true;
     }
 }

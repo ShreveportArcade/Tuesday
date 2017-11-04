@@ -27,12 +27,8 @@ namespace Tiled {
 [CustomEditor(typeof(TileMap))]
 public class TileMapEditor : Editor {
 
-    private static bool showTileSets = true;
-    private static bool showLayers = true;
-    private static int selectedLayer = 0;
     private static Color gridColor = new Color(1,1,1,0.1f);
     
-
     private TileMap tileMap {
         get { return (target as TileMap); }
     }
@@ -147,47 +143,43 @@ public class TileMapEditor : Editor {
         return i;
     }
 
+    private static int selectedLayer = 0;
+    private static int selectedTerrainIndex = 0;
+    private Terrain[] _terrains;
+    private Terrain[] terrains {
+        get {
+            if (_terrains == null || _terrains.Length == 0) {
+                List<Terrain> terrainList = new List<Terrain>();
+                foreach (TileSet tileSet in tmxFile.tileSets) {
+                    foreach (Terrain terrain in tileSet.terrainTypes) {
+                        terrainList.Add(terrain);
+                    }
+                }
+                _terrains = terrainList.ToArray();
+            }
+            return _terrains;
+        }
+    }
+    private Terrain selectedTerrain {
+        get {
+            if (selectedTerrainIndex > 0 && selectedTerrainIndex < terrains.Length) {
+                return terrains[selectedTerrainIndex];
+            }
+            return null;
+        }
+    }
+
     Rect tileRect;
     private void TileSetField (TileSet tileSet) {
         int id = tileSet.firstGID;
+
+        EditorGUIUtility.hierarchyMode = false;
         Rect r = GUILayoutUtility.GetRect(Screen.width - 40, EditorGUIUtility.singleLineHeight);
         float w = r.width;
         r.width = 20;
         bool show = !tileSetFoldoutStates.ContainsKey(id) || tileSetFoldoutStates[id];
-        tileSetFoldoutStates[id] = EditorGUI.Foldout(r, show, "");
-
-        r.x += 20;
-        r.width = w - 40;
-        tileSet.name = EditorGUI.TextField(r, "", tileSet.name);
-
-        r.x += r.width;
-        r.width = 20;
-        if (EditorGUI.DropdownButton(r, new GUIContent(""), FocusType.Passive)) {
-            GenericMenu menu = new GenericMenu();
-            int index = tmxFile.GetIndexOfTileSet(tileSet);
-            if (index > 0) {
-                menu.AddItem(new GUIContent("Move Up"), false, () => {
-                    // TODO: implement move tileset up
-                });
-            }
-            if (index < (tmxFile.tileSets.Length - 1)) {
-                menu.AddItem(new GUIContent("Move Down"), false, () => {
-                    // TODO: implement move tileset down
-                });
-            }
-            menu.AddSeparator("");
-            menu.AddItem(new GUIContent("Delete"), false, () => {
-                TileSet[] newTileSets = new TileSet[tmxFile.tileSets.Length - 1];
-                for (int i = 0; i < newTileSets.Length; i++) {
-                    if (i < index) newTileSets[i] = tmxFile.tileSets[i];
-                    else if (i > index) newTileSets[i] = tmxFile.tileSets[i+1];
-                }
-                tmxFile.tileSets = newTileSets;
-            });
-            menu.ShowAsContext();
-            Event.current.Use();
-        }
-
+        tileSetFoldoutStates[id] = EditorGUI.Foldout(r, show, tileSet.name);
+        
         if (selectedTileSet == null) tileRect = new Rect(-1,-1,0,0);
 
         if (tileSetFoldoutStates[tileSet.firstGID]) {
@@ -237,6 +229,7 @@ public class TileMapEditor : Editor {
     }
 
     private static int editState = 0;
+    private static int paintType = 0;
     public override void OnInspectorGUI() {	
         editState = GUILayout.Toolbar(editState, new string[] {"Move", "Paint", "Erase", "Select"});
         gridColor = EditorGUILayout.ColorField("Grid Color", gridColor);
@@ -252,24 +245,34 @@ public class TileMapEditor : Editor {
         }
         
         base.OnInspectorGUI();
-        EditorGUIUtility.hierarchyMode = true;
-        showLayers = EditorGUILayout.Foldout(showLayers, "Layers:");
-        EditorGUIUtility.hierarchyMode = false;
-        if (showLayers && tmxFile.layers != null) {
+        EditorGUILayout.Separator();
+
+        if (tmxFile.layers != null) {
+            EditorGUILayout.LabelField("Layers", EditorStyles.boldLabel);
             string[] layerNames = Array.ConvertAll(tmxFile.layers, (layer) => layer.name);
             selectedLayer = GUILayout.SelectionGrid(selectedLayer, layerNames, 1);
+            EditorGUILayout.Separator();
         }
-
-        EditorGUIUtility.hierarchyMode = true;
-        showTileSets = EditorGUILayout.Foldout(showTileSets, "Tile Sets:");
-        EditorGUIUtility.hierarchyMode = false;
-        if (showTileSets && tmxFile.tileSets != null) {
-            foreach (TileSet tileSet in tmxFile.tileSets){
-                TileSetField(tileSet); 
+        
+        if (tmxFile.tileSets != null) {
+            EditorGUILayout.LabelField("Tile Sets", EditorStyles.boldLabel);
+            paintType = GUILayout.Toolbar(paintType, new string[] {"Tiles", "Terrains"});
+            switch (paintType) {
+                case 0:
+                    foreach (TileSet tileSet in tmxFile.tileSets) {
+                        TileSetField(tileSet);
+                    }
+                    break;
+                case 1:
+                    string[] terrainNames = Array.ConvertAll(terrains, (terrain) => terrain.name);
+                    selectedTerrainIndex = GUILayout.SelectionGrid(selectedTerrainIndex, terrainNames, 1);
+                    break;
+                default:
+                    break;
             }
+            EditorGUILayout.Separator();
         }
 
-        EditorGUILayout.Space();
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Revert")) {
             tmxFile = TMXFile.Load(path);
@@ -363,10 +366,10 @@ public class TileMapEditor : Editor {
             GUIUtility.hotControl = GUIUtility.GetControlID(FocusType.Passive);
             selectedTileIndices = null;
             if (editState == 3) selectionStart = MouseToWorldPoint();
-            else DrawTile();
+            else DrawTile(false);
         }
         else if (e.type == EventType.MouseDrag) {
-            if (editState != 3) DrawTile(); 
+            if (editState != 3) DrawTile(true); 
             else {
                 selectionEnd = MouseToWorldPoint();
                 HandleUtility.Repaint();
@@ -447,7 +450,9 @@ public class TileMapEditor : Editor {
         HandleUtility.Repaint();
     }
 
-    void DrawTile () {
+    Vector3 lastTilePos;
+    Vector3 tilePos;
+    void DrawTile (bool drag) {
         int tileIndex = selectedTileIndex;
         if (selectedTileSet == null) { 
             selectedTileSet = tmxFile.tileSets[0];
@@ -462,8 +467,11 @@ public class TileMapEditor : Editor {
         float dist = 0;
         Plane plane = new Plane(Vector3.forward, tileMap.transform.position);
         if (plane.Raycast(ray, out dist)) {
-            Vector3 p = ray.GetPoint(dist);
-            if (tileMap.SetTile(tileIndex, selectedLayer, p - tileMap.transform.position)) {
+            Vector3 p = ray.GetPoint(dist) - tileMap.transform.position;
+            lastTilePos = drag ? tilePos : p;
+            tilePos = p;
+            if ((!drag && tileMap.SetTile(tileIndex, selectedLayer, tilePos)) || 
+                (drag && tileMap.SetTiles(tileIndex, selectedLayer, lastTilePos, tilePos))) {
                 Event.current.Use();
                 EditorUtility.SetDirty(target);
             }
