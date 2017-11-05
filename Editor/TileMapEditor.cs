@@ -470,10 +470,22 @@ public class TileMapEditor : Editor {
             Vector3 p = ray.GetPoint(dist) - tileMap.transform.position;
             lastTilePos = drag ? tilePos : p;
             tilePos = p;
-            if ((!drag && tileMap.SetTile(tileIndex, selectedLayer, tilePos)) || 
-                (drag && tileMap.SetTiles(tileIndex, selectedLayer, lastTilePos, tilePos))) {
-                Event.current.Use();
-                EditorUtility.SetDirty(target);
+            switch (paintType) {
+                case 0:
+                    if ((!drag && tileMap.SetTile(tileIndex, selectedLayer, tilePos)) || 
+                        (drag && tileMap.SetTiles(tileIndex, selectedLayer, lastTilePos, tilePos))) {
+                        Event.current.Use();
+                        EditorUtility.SetDirty(target);
+                    }
+                    break;
+                case 1:
+                    if (selectedTerrain != null && tileMap.SetTerrain(selectedTerrain.tile, selectedLayer, tilePos)) {
+                        Event.current.Use();
+                        EditorUtility.SetDirty(target);
+                    }
+                    break;
+                default:
+                    break;
             }
         }
     }

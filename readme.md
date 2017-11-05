@@ -16,6 +16,7 @@ The goals of this project are full support of the TMX file format, feature parit
 
 ## Roadmap
  * Paint Terrains
+ * Optimize mesh generation by only updating UVs when geo isn't changed
  * Compartmentalize TileMapEditor code
  * Tiled Object support
  * Wang Tile support

@@ -172,6 +172,7 @@ public class TileMap : MonoBehaviour {
     }
 
     public void UpdateMesh(int layerIndex, int submeshIndex) {
+        // TODO: only update uvs if number of tiles haven't changed
         Layer layerData = tmxFile.layers[layerIndex];
 
         List<Vector3> verts = new List<Vector3>();
@@ -431,7 +432,7 @@ public class TileMap : MonoBehaviour {
     public bool SetTiles (int tileID, int layerIndex, Vector3 start, Vector3 end, bool updateMesh = true) {
         bool tileSet = false;
         float d = 0.5f * Mathf.Clamp01(tileOffset.magnitude / Vector3.Distance(start, end));
-        List<int> submeshes = new List<int>();
+        List<int> changedSubmeshes = new List<int>();
         for (float t = 0; t <= 1; t += d) {
             Vector3 pos = Vector3.Lerp(start, end, t);
             int x = Mathf.FloorToInt((pos.x - offset.x) / tileOffset.x);
@@ -440,15 +441,122 @@ public class TileMap : MonoBehaviour {
                 if (updateMesh) {
                     int index = x + y * tmxFile.width;
                     int submeshIndex = index / 16250;
-                    if (!submeshes.Contains(submeshIndex)) submeshes.Add(submeshIndex);
+                    if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
                 }
                 tileSet = true;
             }
         }
         if (updateMesh) {
-            foreach (int submeshIndex in submeshes) UpdateMesh(layerIndex, submeshIndex);
+            foreach (int submeshIndex in changedSubmeshes) UpdateMesh(layerIndex, submeshIndex);
         }
         return tileSet;
+    }
+
+    public bool SetTerrain (int tileID, int layerIndex, Vector3 pos, bool updateMesh = true) {
+        // HACK: hardcoded GIDs to test with local IDs
+        int x = Mathf.FloorToInt((pos.x - offset.x) / tileOffset.x);
+        int y = Mathf.FloorToInt((pos.y - offset.y) / tileOffset.y);
+        Layer layer = tmxFile.layers[layerIndex];
+        TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
+        List<int> changedSubmeshes = new List<int>();
+
+        if (!SetTile(tileID+1, layerIndex, x, y, false)) return false;
+
+        Tile center      = tmxFile.GetTile(layer, x  , y  );
+        int[] c = center.terrain;
+
+        Tile topLeft     = tmxFile.GetTile(layer, x-1, y-1);
+        int[] n = topLeft.terrain;
+        Tile tile = tmxFile.GetTile(tileSet, new int[]{n[0], n[1], n[2], c[0]});
+        if (tile != null && SetTile(tile.id+1, layerIndex, x-1, y-1, false)) {
+            if (updateMesh) {
+                int index = x + y * tmxFile.width;
+                int submeshIndex = index / 16250;
+                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+            }
+        }
+
+        Tile top         = tmxFile.GetTile(layer, x  , y-1);
+        n = top.terrain;
+        tile = tmxFile.GetTile(tileSet, new int[]{n[0], n[1], c[0], c[1]});
+        if (tile != null && SetTile(tile.id+1, layerIndex, x  , y-1, false)) {
+            if (updateMesh) {
+                int index = x + y * tmxFile.width;
+                int submeshIndex = index / 16250;
+                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+            }
+        }
+        
+        Tile topRight    = tmxFile.GetTile(layer, x+1, y-1);
+        n = topRight.terrain;
+        tile = tmxFile.GetTile(tileSet, new int[]{n[0], n[1], c[1], n[3]});
+        if (tile != null && SetTile(tile.id+1, layerIndex, x+1, y-1, false)) {
+            if (updateMesh) {
+                int index = x + y * tmxFile.width;
+                int submeshIndex = index / 16250;
+                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+            }
+        }
+        
+        Tile right       = tmxFile.GetTile(layer, x+1, y  );
+        n = right.terrain;
+        tile = tmxFile.GetTile(tileSet, new int[]{c[1], n[1], c[3], n[3]});
+        if (tile != null && SetTile(tile.id+1, layerIndex, x+1, y  , false)) {
+            if (updateMesh) {
+                int index = x + y * tmxFile.width;
+                int submeshIndex = index / 16250;
+                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+            }
+        }
+        
+        Tile bottomRight = tmxFile.GetTile(layer, x+1, y+1);
+        n = bottomRight.terrain;
+        tile = tmxFile.GetTile(tileSet, new int[]{c[3], n[1], n[2], n[3]});
+        if (tile != null && SetTile(tile.id+1, layerIndex, x+1, y+1, false)) {
+            if (updateMesh) {
+                int index = x + y * tmxFile.width;
+                int submeshIndex = index / 16250;
+                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+            }
+        }
+        
+        Tile bottom      = tmxFile.GetTile(layer, x  , y+1);
+        n = bottom.terrain;
+        tile = tmxFile.GetTile(tileSet, new int[]{c[2], c[3], n[2], n[3]});
+        if (tile != null && SetTile(tile.id+1, layerIndex, x  , y+1, false)) {
+            if (updateMesh) {
+                int index = x + y * tmxFile.width;
+                int submeshIndex = index / 16250;
+                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+            }
+        }
+        
+        Tile bottomLeft  = tmxFile.GetTile(layer, x-1, y+1);
+        n = bottomLeft.terrain;
+        tile = tmxFile.GetTile(tileSet, new int[]{n[0], c[2], n[2], n[3]});
+        if (tile != null && SetTile(tile.id+1, layerIndex, x-1, y+1, false)) {
+            if (updateMesh) {
+                int index = x + y * tmxFile.width;
+                int submeshIndex = index / 16250;
+                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+            }
+        }
+        
+        Tile left        = tmxFile.GetTile(layer, x-1, y  );
+        n = left.terrain;
+        tile = tmxFile.GetTile(tileSet, new int[]{n[0], c[0], n[2], c[2]});
+        if (tile != null && SetTile(tile.id+1, layerIndex, x-1, y  , false)) {
+            if (updateMesh) {
+                int index = x + y * tmxFile.width;
+                int submeshIndex = index / 16250;
+                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+            }
+        }
+
+        if (updateMesh) {
+            foreach (int submeshIndex in changedSubmeshes) UpdateMesh(layerIndex, submeshIndex);
+        }
+        return true;
     }
 
     private int lastTileX = -1;

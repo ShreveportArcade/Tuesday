@@ -144,13 +144,48 @@ public class TMXFile {
     public Tile GetTile (Layer layer, int x, int y) {
         int tileID = layer.GetTileID(x, y);
         TileSet tileSet = GetTileSetByTileID(tileID);
-        return tileSet.tiles[tileID - tileSet.firstGID];
+        return tileSet.GetTile(tileID);
     }
 
     public Tile GetTile (Layer layer, int index) {
         int tileID = layer.tileIDs[index];
         TileSet tileSet = GetTileSetByTileID(tileID);
-        return tileSet.tiles[tileID - tileSet.firstGID];
+        return tileSet.GetTile(tileID);
+    }
+
+    public Tile GetTile (TileSet tileSet, int tileID) {
+        return tileSet.GetTile(tileID);
+    }
+
+    public Tile GetTile (int[] terrain) {
+        foreach (TileSet tileSet in tileSets) {
+            foreach (Tile tile in tileSet.tiles) {
+                if (terrain == tile.terrain) return tile;
+            }
+        }
+        return null;
+    }
+
+    public Tile GetTile (TileSet tileSet, int[] terrain) {
+        int mostMatches = 0;
+        Tile bestMatch = null;
+        System.Random r = new System.Random();
+        foreach (Tile tile in tileSet.tiles) {
+            int matches = 0;
+            for (int i = 0; i < terrain.Length; i++) {
+                if (terrain[i] == tile.terrain[i]) matches++;
+            }
+            if (matches > mostMatches) {
+                mostMatches = matches;
+                bestMatch = tile;
+            }
+            else if (matches == mostMatches 
+                && tile.probability.HasValue 
+                && tile.probability.Value > r.NextDouble()) {
+                bestMatch = tile;
+            }
+        }
+        return bestMatch;
     }
 }
 
