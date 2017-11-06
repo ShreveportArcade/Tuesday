@@ -223,15 +223,20 @@ public class TileMap : MonoBehaviour {
         return new Vector2(x, y);
     }
 
-    public bool SubmeshChanged(int layerIndex, int submeshIndex) {
+    public bool VertsChanged(int layerIndex, int submeshIndex) {
         Layer layerData = tmxFile.layers[layerIndex];
         for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileIDs.Length); tileIndex++) {
             int tileID = layerData.tileIDs[tileIndex];
+            TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
+            if ((tileSet == null || tileID < tileSet.firstGID) == layerTileExists[layerIndex][tileIndex]) return true;
         }
         return false;
     }
 
     public void UpdateMesh(int layerIndex, int submeshIndex) {
+        // vertsChanged is not enough, must also check for material changes, rotations, etc.
+        bool vertsChanged = VertsChanged(layerIndex, submeshIndex);
+
         Layer layerData = tmxFile.layers[layerIndex];
         
         List<List<IntPoint>> paths = new List<List<IntPoint>>();
@@ -259,7 +264,10 @@ public class TileMap : MonoBehaviour {
 
             int tileID = layerData.tileIDs[tileIndex];
             TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
-            if (tileSet == null) continue;
+            if (tileSet == null) {
+                layerTileExists[layerIndex][tileIndex] = false;
+                continue;
+            }
 
             if (tileSet.columns == 0 || tileSet.rows == 0) {
                 if (tileSet.image.width == 0 || tileSet.image.height == 0) {
@@ -273,7 +281,10 @@ public class TileMap : MonoBehaviour {
             }
             
             TileRect uvRect = tileSet.GetTileUVs(tileID, uvInset);
-            if (uvRect == null) continue;
+            if (uvRect == null) {
+                layerTileExists[layerIndex][tileIndex] = false;
+                continue;
+            }
 
             bool flipX = layerData.FlippedHorizontally(tileIndex);
             bool flipY = layerData.FlippedVertically(tileIndex);
@@ -374,20 +385,25 @@ public class TileMap : MonoBehaviour {
                 tilesPlaced * 4, tilesPlaced * 4 + 2, tilesPlaced * 4 + 1,
                 tilesPlaced * 4, tilesPlaced * 4 + 3, tilesPlaced * 4 + 2
             });
+
             tilesPlaced++;
+            layerTileExists[layerIndex][tileIndex] = true;
         }
 
         GameObject obj = layerSubmeshObjects[layerIndex][submeshIndex];
-        
-        Mesh mesh = new Mesh();
-        
-        mesh.name = layerData.name;
-        if (meshesPerLayer > 1) mesh.name += "_submesh" + submeshIndex;
-        
-        mesh.SetVertices(verts);
-        mesh.SetNormals(norms);
-        mesh.SetUVs(0, uvs);
-        mesh.SetColors(colors);
+        MeshFilter filter = obj.GetComponent<MeshFilter>();
+        if (filter.sharedMesh == null) {
+            filter.sharedMesh = new Mesh();
+            filter.sharedMesh.name = layerData.name;
+            if (meshesPerLayer > 1) {
+                filter.sharedMesh.name += "_submesh" + submeshIndex;
+            }
+        }
+        filter.sharedMesh.Clear();            
+        filter.sharedMesh.SetVertices(verts);
+        filter.sharedMesh.SetNormals(norms);
+        filter.sharedMesh.SetUVs(0, uvs);
+        filter.sharedMesh.SetColors(colors);
         
         List<Material> mats = new List<Material>();
         List<List<int>> triLists = new List<List<int>>();       
@@ -400,14 +416,13 @@ public class TileMap : MonoBehaviour {
         }
         obj.GetComponent<MeshRenderer>().sharedMaterials = mats.ToArray();
 
-        mesh.subMeshCount = mats.Count;
-        for (int i = 0; i < mesh.subMeshCount; i++) {
-            mesh.SetTriangles(triLists[i], i);
+        filter.sharedMesh.subMeshCount = mats.Count;
+        for (int i = 0; i < filter.sharedMesh.subMeshCount; i++) {
+            filter.sharedMesh.SetTriangles(triLists[i], i);
         }
 
-        mesh.RecalculateBounds();
+        filter.sharedMesh.RecalculateBounds();
 
-        obj.GetComponent<MeshFilter>().sharedMesh = mesh;
 
         paths = Clipper.SimplifyPolygons(paths, PolyFillType.pftNonZero);
         paths = RemoveColinnearAndDoubles(paths);
