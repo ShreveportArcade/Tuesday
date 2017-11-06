@@ -125,6 +125,7 @@ public class TMXFile {
         return -1;
     }
 
+    // TODO: cache results in tileID to TileSet dictionary
     public TileSet GetTileSetByTileID (int tileID) {
         foreach (TileSet tileSet in tileSets) {
             if (tileID >= tileSet.firstGID && 
@@ -142,6 +143,7 @@ public class TMXFile {
     }
 
     public Tile GetTile (Layer layer, int x, int y) {
+        if (x < 0 || x >= width || y < 0 || y >= height) return null;
         int tileID = layer.GetTileID(x, y);
         TileSet tileSet = GetTileSetByTileID(tileID);
         return tileSet.GetTile(tileID);
@@ -487,7 +489,7 @@ public class Tile {
             string s = (terrain[0] == -1) ? "" : terrain[0].ToString();
             for (int i = 1; i < terrain.Length; i++) {
                 s += ",";
-                s += (terrain[0] == -1) ? "" : terrain[0].ToString();
+                s += (terrain[i] == -1) ? "" : terrain[i].ToString();
             }
             return s;
         }

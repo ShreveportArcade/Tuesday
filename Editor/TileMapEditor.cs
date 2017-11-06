@@ -151,6 +151,7 @@ public class TileMapEditor : Editor {
             if (_terrains == null || _terrains.Length == 0) {
                 List<Terrain> terrainList = new List<Terrain>();
                 foreach (TileSet tileSet in tmxFile.tileSets) {
+                    if (tileSet.terrainTypes == null) continue;
                     foreach (Terrain terrain in tileSet.terrainTypes) {
                         terrainList.Add(terrain);
                     }

@@ -77,6 +77,58 @@ public class TileMap : MonoBehaviour {
         }
     }
 
+    private bool[][] _layerTileExists;
+    private bool[][] layerTileExists {
+        get {
+            if (_layerTileExists == null) {
+                _layerTileExists = new bool[layers.Length][];
+                for (int layerIndex = 0; layerIndex < layers.Length; layerIndex++) {
+                    _layerTileExists[layerIndex] = new bool[tmxFile.width * tmxFile.height];
+                }
+            }
+            return _layerTileExists;
+        }
+    }
+
+    Dictionary<int, Vector3[]> _idToPhysics;
+    Dictionary<int, Vector3[]> idToPhysics {
+        get {
+            if (_idToPhysics == null) {
+                _idToPhysics = new Dictionary<int, Vector3[]>();
+                foreach (TileSet tileSet in tmxFile.tileSets) {
+                    if (tileSet.tiles == null) continue;
+                    foreach (Tile tile in tileSet.tiles) {
+                        if (tile.objectGroup != null && tile.objectGroup.objects != null && tile.objectGroup.objects.Length > 0) {
+                            TileObject tileObject = tile.objectGroup.objects[0];
+                            float x = tileOffset.x * (float)tileObject.x / (float)tileSet.tileWidth;
+                            float y = tileOffset.y * (float)tileObject.y / (float)tileSet.tileHeight;
+                            if (tileObject.polygonSpecified) {
+                                idToPhysics[tile.id + tileSet.firstGID] = System.Array.ConvertAll(tileObject.polygon.path, (p) => {
+                                    Vector3 v = new Vector3(x, y, 0);
+                                    v.x += tileOffset.x * (float)p.x / (float)tileSet.tileWidth;
+                                    v.y -= tileOffset.x * (float)p.y / (float)tileSet.tileHeight;
+                                    return v;
+                                });
+                            }
+                            else {
+                                float width = tileOffset.x * (float)tileObject.width / (float)tileSet.tileWidth;
+                                float height = tileOffset.y * (float)tileObject.height / (float)tileSet.tileHeight;
+                                idToPhysics[tile.id + tileSet.firstGID] = new Vector3[] {
+                                    new Vector3(x,         y,          0),
+                                    new Vector3(x,         y + height, 0),
+                                    new Vector3(x + width, y + height, 0),
+                                    new Vector3(x + width, y,          0)
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+            return _idToPhysics;
+        }
+    }
+
+
     private int meshesPerLayer {
         get { return 1 + tmxFile.width * tmxFile.height / 16250; }
     }
@@ -171,10 +223,18 @@ public class TileMap : MonoBehaviour {
         return new Vector2(x, y);
     }
 
-    public void UpdateMesh(int layerIndex, int submeshIndex) {
-        // TODO: only update uvs if number of tiles haven't changed
+    public bool SubmeshChanged(int layerIndex, int submeshIndex) {
         Layer layerData = tmxFile.layers[layerIndex];
+        for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileIDs.Length); tileIndex++) {
+            int tileID = layerData.tileIDs[tileIndex];
+        }
+        return false;
+    }
 
+    public void UpdateMesh(int layerIndex, int submeshIndex) {
+        Layer layerData = tmxFile.layers[layerIndex];
+        
+        List<List<IntPoint>> paths = new List<List<IntPoint>>();
         List<Vector3> verts = new List<Vector3>();
         List<Vector3> norms = new List<Vector3>();
         List<Vector2> uvs = new List<Vector2>();
@@ -185,37 +245,6 @@ public class TileMap : MonoBehaviour {
         for (int i = 0; i < tmxFile.tileSets.Length; i++) {
             matTris[i] = new List<int>();
             firstGIDToIndex[tmxFile.tileSets[i].firstGID] = i;
-        }
-
-        List<List<IntPoint>> paths = new List<List<IntPoint>>();
-        Dictionary<int, Vector3[]> idToPhysics = new Dictionary<int, Vector3[]>();
-        foreach (TileSet tileSet in tmxFile.tileSets) {
-            if (tileSet.tiles == null) continue;
-            foreach (Tile tile in tileSet.tiles) {
-                if (tile.objectGroup != null && tile.objectGroup.objects != null && tile.objectGroup.objects.Length > 0) {
-                    TileObject tileObject = tile.objectGroup.objects[0];
-                    float x = tileOffset.x * (float)tileObject.x / (float)tileSet.tileWidth;
-                    float y = tileOffset.y * (float)tileObject.y / (float)tileSet.tileHeight;
-                    if (tileObject.polygonSpecified) {
-                        idToPhysics[tile.id + tileSet.firstGID] = System.Array.ConvertAll(tileObject.polygon.path, (p) => {
-                            Vector3 v = new Vector3(x, y, 0);
-                            v.x += tileOffset.x * (float)p.x / (float)tileSet.tileWidth;
-                            v.y -= tileOffset.x * (float)p.y / (float)tileSet.tileHeight;
-                            return v;
-                        });
-                    }
-                    else {
-                        float width = tileOffset.x * (float)tileObject.width / (float)tileSet.tileWidth;
-                        float height = tileOffset.y * (float)tileObject.height / (float)tileSet.tileHeight;
-                        idToPhysics[tile.id + tileSet.firstGID] = new Vector3[] {
-                            new Vector3(x,         y,          0),
-                            new Vector3(x,         y + height, 0),
-                            new Vector3(x + width, y + height, 0),
-                            new Vector3(x + width, y,          0)
-                        };
-                    }
-                }
-            }
         }
 
         bool isHexMap = tmxFile.orientation == "hexagonal";
@@ -453,103 +482,119 @@ public class TileMap : MonoBehaviour {
     }
 
     public bool SetTerrain (int tileID, int layerIndex, Vector3 pos, bool updateMesh = true) {
-        // HACK: hardcoded GIDs to test with local IDs
         int x = Mathf.FloorToInt((pos.x - offset.x) / tileOffset.x);
         int y = Mathf.FloorToInt((pos.y - offset.y) / tileOffset.y);
         Layer layer = tmxFile.layers[layerIndex];
         TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
+        int gid = tileSet.firstGID;
         List<int> changedSubmeshes = new List<int>();
 
         if (!SetTile(tileID+1, layerIndex, x, y, false)) return false;
 
-        Tile center      = tmxFile.GetTile(layer, x  , y  );
+        Tile center = tmxFile.GetTile(layer, x, y);
         int[] c = center.terrain;
 
-        Tile topLeft     = tmxFile.GetTile(layer, x-1, y-1);
-        int[] n = topLeft.terrain;
-        Tile tile = tmxFile.GetTile(tileSet, new int[]{n[0], n[1], n[2], c[0]});
-        if (tile != null && SetTile(tile.id+1, layerIndex, x-1, y-1, false)) {
-            if (updateMesh) {
-                int index = x + y * tmxFile.width;
-                int submeshIndex = index / 16250;
-                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+        Tile topLeft = tmxFile.GetTile(layer, x-1, y-1);
+        if (topLeft != null && topLeft.terrain != null) {
+            int[] n = topLeft.terrain;
+            Tile tile = tmxFile.GetTile(tileSet, new int[]{n[0], n[1], n[2], c[0]});
+            if (tile != null && SetTile(tile.id+gid, layerIndex, x-1, y-1, false)) {
+                if (updateMesh) {
+                    int index = x + y * tmxFile.width;
+                    int submeshIndex = index / 16250;
+                    if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+                }
             }
         }
 
-        Tile top         = tmxFile.GetTile(layer, x  , y-1);
-        n = top.terrain;
-        tile = tmxFile.GetTile(tileSet, new int[]{n[0], n[1], c[0], c[1]});
-        if (tile != null && SetTile(tile.id+1, layerIndex, x  , y-1, false)) {
-            if (updateMesh) {
-                int index = x + y * tmxFile.width;
-                int submeshIndex = index / 16250;
-                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+        Tile top = tmxFile.GetTile(layer, x, y-1);
+        if (top != null && top.terrain != null) {
+            int[] n = top.terrain;
+            Tile tile = tmxFile.GetTile(tileSet, new int[]{n[0], n[1], c[0], c[1]});
+            if (tile != null && SetTile(tile.id+gid, layerIndex, x, y-1, false)) {
+                if (updateMesh) {
+                    int index = x + y * tmxFile.width;
+                    int submeshIndex = index / 16250;
+                    if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+                }
             }
         }
         
-        Tile topRight    = tmxFile.GetTile(layer, x+1, y-1);
-        n = topRight.terrain;
-        tile = tmxFile.GetTile(tileSet, new int[]{n[0], n[1], c[1], n[3]});
-        if (tile != null && SetTile(tile.id+1, layerIndex, x+1, y-1, false)) {
-            if (updateMesh) {
-                int index = x + y * tmxFile.width;
-                int submeshIndex = index / 16250;
-                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+        Tile topRight = tmxFile.GetTile(layer, x+1, y-1);
+        if (topRight != null && topRight.terrain != null) {
+            int[] n = topRight.terrain;
+            Tile tile = tmxFile.GetTile(tileSet, new int[]{n[0], n[1], c[1], n[3]});
+            if (tile != null && SetTile(tile.id+gid, layerIndex, x+1, y-1, false)) {
+                if (updateMesh) {
+                    int index = x + y * tmxFile.width;
+                    int submeshIndex = index / 16250;
+                    if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+                }
             }
         }
         
-        Tile right       = tmxFile.GetTile(layer, x+1, y  );
-        n = right.terrain;
-        tile = tmxFile.GetTile(tileSet, new int[]{c[1], n[1], c[3], n[3]});
-        if (tile != null && SetTile(tile.id+1, layerIndex, x+1, y  , false)) {
-            if (updateMesh) {
-                int index = x + y * tmxFile.width;
-                int submeshIndex = index / 16250;
-                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+        Tile right = tmxFile.GetTile(layer, x+1, y);
+        if (right != null && right.terrain != null) {
+            int[] n = right.terrain;
+            Tile tile = tmxFile.GetTile(tileSet, new int[]{c[1], n[1], c[3], n[3]});
+            if (tile != null && SetTile(tile.id+gid, layerIndex, x+1, y, false)) {
+                if (updateMesh) {
+                    int index = x + y * tmxFile.width;
+                    int submeshIndex = index / 16250;
+                    if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+                }
             }
         }
         
         Tile bottomRight = tmxFile.GetTile(layer, x+1, y+1);
-        n = bottomRight.terrain;
-        tile = tmxFile.GetTile(tileSet, new int[]{c[3], n[1], n[2], n[3]});
-        if (tile != null && SetTile(tile.id+1, layerIndex, x+1, y+1, false)) {
-            if (updateMesh) {
-                int index = x + y * tmxFile.width;
-                int submeshIndex = index / 16250;
-                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+        if (bottomRight != null && bottomRight.terrain != null) {
+            int[] n = bottomRight.terrain;
+            Tile tile = tmxFile.GetTile(tileSet, new int[]{c[3], n[1], n[2], n[3]});
+            if (tile != null && SetTile(tile.id+gid, layerIndex, x+1, y+1, false)) {
+                if (updateMesh) {
+                    int index = x + y * tmxFile.width;
+                    int submeshIndex = index / 16250;
+                    if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+                }
             }
         }
         
-        Tile bottom      = tmxFile.GetTile(layer, x  , y+1);
-        n = bottom.terrain;
-        tile = tmxFile.GetTile(tileSet, new int[]{c[2], c[3], n[2], n[3]});
-        if (tile != null && SetTile(tile.id+1, layerIndex, x  , y+1, false)) {
-            if (updateMesh) {
-                int index = x + y * tmxFile.width;
-                int submeshIndex = index / 16250;
-                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+        Tile bottom = tmxFile.GetTile(layer, x, y+1);
+        if (bottom != null && bottom.terrain != null) {
+            int[] n = bottom.terrain;
+            Tile tile = tmxFile.GetTile(tileSet, new int[]{c[2], c[3], n[2], n[3]});
+            if (tile != null && SetTile(tile.id+gid, layerIndex, x, y+1, false)) {
+                if (updateMesh) {
+                    int index = x + y * tmxFile.width;
+                    int submeshIndex = index / 16250;
+                    if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+                }
             }
         }
         
-        Tile bottomLeft  = tmxFile.GetTile(layer, x-1, y+1);
-        n = bottomLeft.terrain;
-        tile = tmxFile.GetTile(tileSet, new int[]{n[0], c[2], n[2], n[3]});
-        if (tile != null && SetTile(tile.id+1, layerIndex, x-1, y+1, false)) {
-            if (updateMesh) {
-                int index = x + y * tmxFile.width;
-                int submeshIndex = index / 16250;
-                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+        Tile bottomLeft = tmxFile.GetTile(layer, x-1, y+1);
+        if (bottomLeft != null && bottomLeft.terrain != null) {
+            int[] n = bottomLeft.terrain;
+            Tile tile = tmxFile.GetTile(tileSet, new int[]{n[0], c[2], n[2], n[3]});
+            if (tile != null && SetTile(tile.id+gid, layerIndex, x-1, y+1, false)) {
+                if (updateMesh) {
+                    int index = x + y * tmxFile.width;
+                    int submeshIndex = index / 16250;
+                    if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+                }
             }
         }
         
-        Tile left        = tmxFile.GetTile(layer, x-1, y  );
-        n = left.terrain;
-        tile = tmxFile.GetTile(tileSet, new int[]{n[0], c[0], n[2], c[2]});
-        if (tile != null && SetTile(tile.id+1, layerIndex, x-1, y  , false)) {
-            if (updateMesh) {
-                int index = x + y * tmxFile.width;
-                int submeshIndex = index / 16250;
-                if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+        Tile left = tmxFile.GetTile(layer, x-1, y);
+        if (left != null && left.terrain != null) {
+            int[] n = left.terrain;
+            Tile tile = tmxFile.GetTile(tileSet, new int[]{n[0], c[0], n[2], c[2]});
+            if (tile != null && SetTile(tile.id+gid, layerIndex, x-1, y, false)) {
+                if (updateMesh) {
+                    int index = x + y * tmxFile.width;
+                    int submeshIndex = index / 16250;
+                    if (!changedSubmeshes.Contains(submeshIndex)) changedSubmeshes.Add(submeshIndex);
+                }
             }
         }
 
