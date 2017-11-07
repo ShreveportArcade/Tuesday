@@ -52,6 +52,14 @@ public class TileMapEditor : Editor {
         tileMap.ReloadMap();
     }   
 
+    private static Material _mat;
+    private static Material mat {
+        get {
+            if (_mat == null) _mat = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
+            return _mat;
+        }
+    }
+
     private static Dictionary<int, bool> tileSetFoldoutStates = new Dictionary<int, bool>();
     private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
     private static Dictionary<string, Material> tileSetMaterials = new Dictionary<string, Material>();
@@ -193,7 +201,7 @@ public class TileMapEditor : Editor {
                 r.width = r.height * (float)tex.width / (float)tex.height;
                 r.height = r.width * (float)tex.height / (float)tex.width;
                 r.x = (Screen.width - r.width) * 0.5f;
-                EditorGUI.DrawPreviewTexture(r, tex);
+                EditorGUI.DrawPreviewTexture(r, tex, mat);
 
                 if (selectedTileSet != null && selectedTileSet == tileSet && selectedTileIndex > 0) {
                     TileRect uvTileRect = selectedTileSet.GetTileUVs(selectedTileIndex);
