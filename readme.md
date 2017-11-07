@@ -11,14 +11,13 @@ The goals of this project are full support of the TMX file format, feature parit
  * CSV, Base64, GZIP, and zLib encoding/decoding
  * Collision geometry support
  * Paint individual tiles in Unity
+ * Paint Terrains in Unity
  * Export your changes back out as TMX/TSX files
- * lightweight code, only requires one component per map
+ * minimal component requirements
 
 ## Roadmap
- * Paint Terrains
- * Optimize mesh generation by only updating UVs when geo isn't changed
  * Compartmentalize TileMapEditor code
  * Tiled Object support
- * Wang Tile support
+ * Paint Wang Tiles
  * Template Group (TGX) support
  * feature parity with Tiled standalone
