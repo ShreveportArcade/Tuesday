@@ -77,19 +77,6 @@ public class TileMap : MonoBehaviour {
         }
     }
 
-    private bool[][] _layerTileExists;
-    private bool[][] layerTileExists {
-        get {
-            if (_layerTileExists == null) {
-                _layerTileExists = new bool[layers.Length][];
-                for (int layerIndex = 0; layerIndex < layers.Length; layerIndex++) {
-                    _layerTileExists[layerIndex] = new bool[tmxFile.width * tmxFile.height];
-                }
-            }
-            return _layerTileExists;
-        }
-    }
-
     Dictionary<int, Vector3[]> _idToPhysics;
     Dictionary<int, Vector3[]> idToPhysics {
         get {
@@ -223,33 +210,35 @@ public class TileMap : MonoBehaviour {
         return new Vector2(x, y);
     }
 
-    public bool VertsChanged(int layerIndex, int submeshIndex) {
+    public void UpdateMesh(int layerIndex, int submeshIndex) {
         Layer layerData = tmxFile.layers[layerIndex];
+
+        Dictionary<int, int> firstGIDToIndex = new Dictionary<int, int>();
+        for (int i = 0; i < tmxFile.tileSets.Length; i++) {
+            firstGIDToIndex[tmxFile.tileSets[i].firstGID] = i;
+        }
+
+        int vertCount = 0;
+        int[] triIDsPerMat = new int[tmxFile.tileSets.Length];
         for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileIDs.Length); tileIndex++) {
             int tileID = layerData.tileIDs[tileIndex];
             TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
-            if ((tileSet == null || tileID < tileSet.firstGID) == layerTileExists[layerIndex][tileIndex]) return true;
+            if (tileSet == null || tileID < tileSet.firstGID) continue;
+
+            vertCount += 4;
+            triIDsPerMat[firstGIDToIndex[tileSet.firstGID]] += 6;
         }
-        return false;
-    }
 
-    public void UpdateMesh(int layerIndex, int submeshIndex) {
-        // vertsChanged is not enough, must also check for material changes, rotations, etc.
-        bool vertsChanged = VertsChanged(layerIndex, submeshIndex);
 
-        Layer layerData = tmxFile.layers[layerIndex];
-        
         List<List<IntPoint>> paths = new List<List<IntPoint>>();
-        List<Vector3> verts = new List<Vector3>();
-        List<Vector3> norms = new List<Vector3>();
-        List<Vector2> uvs = new List<Vector2>();
-        List<Color> colors = new List<Color>();
+        Vector3[] verts = new Vector3[vertCount];
+        Vector3[] norms = new Vector3[vertCount];
+        Vector2[] uvs = new Vector2[vertCount];
+        Color[] colors = new Color[vertCount];
         
-        List<int>[] matTris = new List<int>[tmxFile.tileSets.Length];
-        Dictionary<int, int> firstGIDToIndex = new Dictionary<int, int>();
-        for (int i = 0; i < tmxFile.tileSets.Length; i++) {
-            matTris[i] = new List<int>();
-            firstGIDToIndex[tmxFile.tileSets[i].firstGID] = i;
+        int[][] matTris = new int[tmxFile.tileSets.Length][];
+        for (int i = 0; i < triIDsPerMat.Length; i++) {
+            matTris[i] = new int[triIDsPerMat[i]];
         }
 
         bool isHexMap = tmxFile.orientation == "hexagonal";
@@ -259,15 +248,13 @@ public class TileMap : MonoBehaviour {
         bool staggerX = tmxFile.staggerAxis == "x";
         int staggerIndex = (tmxFile.staggerAxis == "even") ? 0 : 1;
 
-        int tilesPlaced = 0;        
+        Color white = Color.white;
+        int vertIndex = 0;      
+        int[] matTriIndices = new int[tmxFile.tileSets.Length];
         for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileIDs.Length); tileIndex++) {        
-
             int tileID = layerData.tileIDs[tileIndex];
             TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
-            if (tileSet == null) {
-                layerTileExists[layerIndex][tileIndex] = false;
-                continue;
-            }
+            if (tileSet == null || tileID < tileSet.firstGID) continue;
 
             if (tileSet.columns == 0 || tileSet.rows == 0) {
                 if (tileSet.image.width == 0 || tileSet.image.height == 0) {
@@ -281,10 +268,6 @@ public class TileMap : MonoBehaviour {
             }
             
             TileRect uvRect = tileSet.GetTileUVs(tileID, uvInset);
-            if (uvRect == null) {
-                layerTileExists[layerIndex][tileIndex] = false;
-                continue;
-            }
 
             bool flipX = layerData.FlippedHorizontally(tileIndex);
             bool flipY = layerData.FlippedVertically(tileIndex);
@@ -326,7 +309,10 @@ public class TileMap : MonoBehaviour {
                 }
             }
 
-            verts.AddRange(v);
+            verts[vertIndex] = v[0];
+            verts[vertIndex+1] = v[1];
+            verts[vertIndex+2] = v[2];
+            verts[vertIndex+3] = v[3];
 
             if (idToPhysics.ContainsKey(tileID)) {
                 Vector3[] phys = idToPhysics[tileID];
@@ -334,12 +320,10 @@ public class TileMap : MonoBehaviour {
                 paths.Add(new List<IntPoint>(path));
             }
 
-            norms.AddRange(new Vector3[] {
-                Vector3.forward,
-                Vector3.forward,
-                Vector3.forward,
-                Vector3.forward
-            });
+            norms[vertIndex] = Vector3.forward;
+            norms[vertIndex+1] = Vector3.forward;
+            norms[vertIndex+2] = Vector3.forward;
+            norms[vertIndex+3] = Vector3.forward;
 
             float left = uvRect.left;
             float right = uvRect.right;
@@ -372,22 +356,26 @@ public class TileMap : MonoBehaviour {
                 uvArray[2] = tmp;
             }
 
-            uvs.AddRange(uvArray);
+            uvs[vertIndex] = uvArray[0];
+            uvs[vertIndex+1] = uvArray[1];
+            uvs[vertIndex+2] = uvArray[2];
+            uvs[vertIndex+3] = uvArray[3];
 
-            colors.AddRange(new Color[] {
-                Color.white,
-                Color.white,
-                Color.white,
-                Color.white
-            });
+            colors[vertIndex] = white;
+            colors[vertIndex+1] = white;
+            colors[vertIndex+2] = white;
+            colors[vertIndex+3] = white;
 
-            matTris[firstGIDToIndex[tileSet.firstGID]].AddRange(new int[] {
-                tilesPlaced * 4, tilesPlaced * 4 + 2, tilesPlaced * 4 + 1,
-                tilesPlaced * 4, tilesPlaced * 4 + 3, tilesPlaced * 4 + 2
-            });
+            int matIndex = firstGIDToIndex[tileSet.firstGID];
+            matTris[matIndex][matTriIndices[matIndex]] = vertIndex;
+            matTris[matIndex][matTriIndices[matIndex]+1] = vertIndex+2;
+            matTris[matIndex][matTriIndices[matIndex]+2] = vertIndex+1;
+            matTris[matIndex][matTriIndices[matIndex]+3] = vertIndex;
+            matTris[matIndex][matTriIndices[matIndex]+4] = vertIndex+3;
+            matTris[matIndex][matTriIndices[matIndex]+5] = vertIndex+2;
 
-            tilesPlaced++;
-            layerTileExists[layerIndex][tileIndex] = true;
+            matTriIndices[matIndex] += 6;
+            vertIndex += 4;
         }
 
         GameObject obj = layerSubmeshObjects[layerIndex][submeshIndex];
@@ -400,16 +388,16 @@ public class TileMap : MonoBehaviour {
             }
         }
         filter.sharedMesh.Clear();            
-        filter.sharedMesh.SetVertices(verts);
-        filter.sharedMesh.SetNormals(norms);
-        filter.sharedMesh.SetUVs(0, uvs);
-        filter.sharedMesh.SetColors(colors);
+        filter.sharedMesh.vertices = verts;
+        filter.sharedMesh.normals = norms;
+        filter.sharedMesh.uv = uvs;
+        filter.sharedMesh.colors = colors;
         
         List<Material> mats = new List<Material>();
-        List<List<int>> triLists = new List<List<int>>();       
+        List<int[]> triLists = new List<int[]>();       
         for (int i = 0; i < tmxFile.tileSets.Length; i++) {
-            List<int> tris = matTris[i];
-            if (tris != null && tris.Count > 0) {
+            int[] tris = matTris[i];
+            if (tris != null && tris.Length > 0) {
                 mats.Add(tileSetMaterials[i]);
                 triLists.Add(tris);
             }

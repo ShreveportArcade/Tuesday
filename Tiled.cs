@@ -284,9 +284,8 @@ public class TileSet {
         return null;
     }
     
+    // TODO: Cache UVs
     public TileRect GetTileUVs (int tileGID, float inset = 0) {
-        if (tileGID < firstGID) return null;
-
         TileRect uvs = new TileRect();
         int tileIndex = tileGID - firstGID;
         int i = tileIndex % columns;
@@ -550,11 +549,10 @@ public class Data {
 }
 
 [System.Serializable]
-public class TilePoint {
-    [XmlAttribute("x")] public float x = 0; 
-    [XmlAttribute("y")] public float y = 0;
+public struct TilePoint {
+    [XmlAttribute("x")] public float x; 
+    [XmlAttribute("y")] public float y;
 
-    public TilePoint () {}
     public TilePoint (float x, float y) {
         this.x = x;
         this.y = y;
@@ -562,11 +560,11 @@ public class TilePoint {
 }
 
 [System.Serializable]
-public class TileRect {
-    public float x = 0;
-    public float y = 0;
-    public float width = 1;
-    public float height = 1;
+public struct TileRect {
+    public float x;
+    public float y;
+    public float width;
+    public float height;
 
     public float left { get { return x; } }
     public float right { get { return x + width; } }

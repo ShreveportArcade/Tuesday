@@ -299,7 +299,7 @@ public class TileMapEditor : Editor {
 
         Texture2D tex = GetTileSetTexture(selectedTileSet, path);
         TileRect uvTileRect = selectedTileSet.GetTileUVs(selectedTileIndex);
-        if (uvTileRect == null) return;
+
         Rect uvRect = new Rect(uvTileRect.x, uvTileRect.y, uvTileRect.width, uvTileRect.height);
         if (r.height > r.width) {
             r.height = r.width;
