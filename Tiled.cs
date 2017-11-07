@@ -247,7 +247,7 @@ public class TileSet {
     [XmlIgnore] public bool propertiesSpecified { get { return !hasSource && properties != null && properties.Length > 0; } set { } }
 
     [XmlArray("wangsets")] [XmlArrayItem("wangset", typeof(WangSet))] public WangSet[] wangSets;
-    [XmlIgnore] public bool wangSetsSpecified { get { return !hasSource; } set { } }
+    [XmlIgnore] public bool wangSetsSpecified { get { return !hasSource && wangSets != null && wangSets.Length > 0; } set { } }
 
     public static TileSet Load (string path) {
         XmlSerializer deserializer = new XmlSerializer(typeof(TileSet));
