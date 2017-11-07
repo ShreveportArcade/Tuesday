@@ -161,7 +161,7 @@ public class TileMapEditor : Editor {
     }
     private Terrain selectedTerrain {
         get {
-            if (selectedTerrainIndex > 0 && selectedTerrainIndex < terrains.Length) {
+            if (selectedTerrainIndex >= 0 && selectedTerrainIndex < terrains.Length) {
                 return terrains[selectedTerrainIndex];
             }
             return null;
