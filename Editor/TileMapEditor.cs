@@ -347,11 +347,13 @@ public class TileMapEditor : Editor {
         Event e = Event.current;
         if (e == null) return;
 
+        #if UNITY_2017_1_OR_NEWER
         if (e.isKey && e.modifiers == EventModifiers.None && e.keyCode == KeyCode.F) {
             SceneView.lastActiveSceneView.Frame(tileMap.bounds, false);
             e.Use();
             return;
         }
+        #endif
 
         if (editState == 0 || e.modifiers != EventModifiers.None) return;
         else if (editState == 3) DrawSelection();

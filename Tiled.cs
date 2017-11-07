@@ -168,10 +168,12 @@ public class TMXFile {
         return null;
     }
 
+    static int seed = 0;
     public Tile GetTile (TileSet tileSet, int[] terrain) {
         int mostMatches = 0;
         Tile bestMatch = null;
-        System.Random r = new System.Random();
+        System.Random r = new System.Random(seed + Environment.TickCount);
+        seed++;
         foreach (Tile tile in tileSet.tiles) {
             int matches = 0;
             for (int i = 0; i < terrain.Length; i++) {

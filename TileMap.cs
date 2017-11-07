@@ -179,8 +179,7 @@ public class TileMap : MonoBehaviour {
             meshObject.AddComponent<PolygonCollider2D>();
             SortingGroup sort = meshObject.AddComponent<SortingGroup>();
             sort.sortingOrder = layerIndex;
-            if (SortingLayer.NameToID(layerData.name) != 0) sort.sortingLayerName = layerData.name;
-
+            sort.sortingLayerName = layerData.name;
 
             _layerSubmeshObjects[layerIndex][submeshIndex] = meshObject;
 
