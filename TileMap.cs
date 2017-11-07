@@ -491,10 +491,9 @@ public class TileMap : MonoBehaviour {
         int gid = tileSet.firstGID;
         List<int> changedSubmeshes = new List<int>();
 
-        if (!SetTile(tileID+1, layerIndex, x, y, false)) return false;
-
-        Tile center = tmxFile.GetTile(layer, x, y);
+        Tile center = tmxFile.GetTile(tileSet, tmxFile.GetTile(tileSet, tileID+gid).terrain);
         int[] c = center.terrain;
+        if (!SetTile(center.id+gid, layerIndex, x, y, false)) return false;
 
         Tile topLeft = tmxFile.GetTile(layer, x-1, y-1);
         if (topLeft != null && topLeft.terrain != null) {
