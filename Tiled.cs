@@ -391,11 +391,13 @@ public class Layer {
         if (tileData.encoding == "csv") {
             string csv = "";
             for (int j = 0; j < height; j++) {
+                csv += "\n";
                 for (int i = 0; i < width; i++) {
                     csv += tileFlags[i + j * width] + ",";
                 }
-                csv += "\n";
             }
+            csv = csv.TrimEnd(',');
+            csv += "\n";
             tileData.contents = csv;	
         }
         else if (tileData.encoding == "base64") {
