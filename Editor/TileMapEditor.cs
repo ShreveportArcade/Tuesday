@@ -52,15 +52,7 @@ public class TileMapEditor : Editor {
 
     void UndoRedo () {
         tileMap.ReloadMap();
-    }
-
-    private static Material _mat;
-    private static Material mat {
-        get {
-            if (_mat == null) _mat = AssetDatabase.GetBuiltinExtraResource<Material>("Sprites-Default.mat");
-            return _mat;
-        }
-    }    
+    }   
 
     private static Dictionary<int, bool> tileSetFoldoutStates = new Dictionary<int, bool>();
     private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
@@ -203,7 +195,7 @@ public class TileMapEditor : Editor {
                 r.width = r.height * (float)tex.width / (float)tex.height;
                 r.height = r.width * (float)tex.height / (float)tex.width;
                 r.x = (Screen.width - r.width) * 0.5f;
-                EditorGUI.DrawPreviewTexture(r, tex, mat);
+                EditorGUI.DrawPreviewTexture(r, tex);
 
                 if (selectedTileSet != null && selectedTileSet == tileSet && selectedTileIndex > 0) {
                     TileRect uvTileRect = selectedTileSet.GetTileUVs(selectedTileIndex);
@@ -215,7 +207,6 @@ public class TileMapEditor : Editor {
                 }
 
                 Handles.DrawSolidRectangleWithOutline(tileRect, Color.clear, Color.white);
-                HandleUtility.Repaint();
 
                 if (Event.current.type == EventType.MouseDown && 
                     Event.current.button == 0 && 
@@ -373,7 +364,6 @@ public class TileMapEditor : Editor {
             if (editState != 3) DrawTile(true); 
             else {
                 selectionEnd = MouseToWorldPoint();
-                HandleUtility.Repaint();
             }
         }
         else if (e.type == EventType.MouseUp) {
@@ -448,7 +438,6 @@ public class TileMapEditor : Editor {
                 );   
             }
         }
-        HandleUtility.Repaint();
     }
 
     Vector3 lastTilePos;
