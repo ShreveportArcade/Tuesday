@@ -276,12 +276,12 @@ public class TileSet {
     }
 
     public Tile GetTile (int tileGID) {
-        if (tileGID < firstGID || tiles == null) return null;
+        if (tileGID < firstGID || tiles == null) return Tile.empty;
         int tileIndex = tileGID - firstGID;
         for (int i = 0; i < tiles.Length; i++) {
             if (tileIndex == tiles[i].id) return tiles[i];
         }
-        return null;
+        return Tile.empty;
     }
     
     // TODO: Cache UVs
@@ -481,6 +481,19 @@ public class Layer {
 
 [System.Serializable]
 public class Tile {
+
+    private static Tile _empty;
+    public static Tile empty {
+        get { 
+            if (_empty == null) {
+                _empty = new Tile();
+                _empty.id = -1;
+                _empty.terrainStr = ",,,";
+            }
+            return _empty;
+        }
+    }
+        
     [XmlAttribute("id")] public int id = 0;
 
     [XmlIgnore] public int[] terrain;
