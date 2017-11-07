@@ -26,8 +26,6 @@ using UnityEditor;
 namespace Tiled {
 [CustomEditor(typeof(TileMap))]
 public class TileMapEditor : Editor {
-
-    private static Color gridColor = new Color(1,1,1,0.1f);
     
     private TileMap tileMap {
         get { return (target as TileMap); }
@@ -224,7 +222,6 @@ public class TileMapEditor : Editor {
     private static int paintType = 0;
     public override void OnInspectorGUI() {	
         editState = GUILayout.Toolbar(editState, new string[] {"Move", "Paint", "Erase", "Select"});
-        gridColor = EditorGUILayout.ColorField("Grid Color", gridColor);
             
         DefaultAsset asset = AssetDatabase.LoadAssetAtPath(path, typeof(DefaultAsset)) as DefaultAsset;
         asset = EditorGUILayout.ObjectField("TMX File", asset, typeof(DefaultAsset), false) as DefaultAsset;
@@ -339,8 +336,6 @@ public class TileMapEditor : Editor {
     Vector3 selectionEnd;
     int[] selectedTileIndices = null;
     void OnSceneGUI () {
-        DrawGrid();
-
         Event e = Event.current;
         if (e == null) return;
 
@@ -399,45 +394,6 @@ public class TileMapEditor : Editor {
             new Color(1,1,1,0.1f),
             new Color(1,1,1,0.5f)
         );  
-    }
-
-    
-    public void DrawGrid () {
-        if (tmxFile == null || gridColor.a < 0.01f) return;
-
-        Handles.color = gridColor;
-        Handles.matrix = tileMap.gameObject.transform.localToWorldMatrix;
-        if (tmxFile.orientation == "orthogonal") {
-            for (int x = 1; x < tmxFile.width; x++) {
-                Handles.DrawLine(
-                    new Vector3(
-                        x * tileMap.tileOffset.x + tileMap.offset.x, 
-                        tileMap.offset.y, 
-                        0
-                    ),
-                    new Vector3(
-                        x * tileMap.tileOffset.x + tileMap.offset.x, 
-                        tmxFile.height * tileMap.tileOffset.y + tileMap.offset.y, 
-                        0
-                    )
-                );
-            }
-
-            for (int y = 1; y < tmxFile.height; y++) {
-                Handles.DrawLine(
-                    new Vector3(
-                        tileMap.offset.x, 
-                        y * tileMap.tileOffset.y + tileMap.offset.y, 
-                        0
-                    ),
-                    new Vector3(
-                        tmxFile.width * tileMap.tileOffset.x + tileMap.offset.x, 
-                        y * tileMap.tileOffset.y + tileMap.offset.y, 
-                        0
-                    )
-                );   
-            }
-        }
     }
 
     Vector3 lastTilePos;
