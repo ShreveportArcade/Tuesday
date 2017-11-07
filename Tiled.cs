@@ -617,15 +617,15 @@ public class TileObject {
     [XmlAttribute("id")] public int id = 0;
     [XmlAttribute("name")] public string name;
     [XmlIgnore] public bool nameSpecified { get { return !string.IsNullOrEmpty(name); } set {} }
-
     [XmlAttribute("type")] public string type;
     [XmlIgnore] public bool typeSpecified { get { return !string.IsNullOrEmpty(type); } set {} }
-
     [XmlAttribute("gid")] public uint? gid;
     [XmlAttribute("x")] public float x = 0;
     [XmlAttribute("y")] public float y = 0;
     [XmlAttribute("width")] public float width = 0;
+    [XmlIgnore] public bool widthSpecified { get { return width > 0; } set {} }
     [XmlAttribute("height")] public float height = 0;
+    [XmlIgnore] public bool heightSpecified { get { return height > 0; } set {} }
     [XmlAttribute("rotation")] public float? rotation;
     [XmlAttribute("visible")] public int? visible;
 
