@@ -74,12 +74,9 @@ public class TMXFile {
     [XmlIgnore] public bool staggerIndexSpecified { get { return !string.IsNullOrEmpty(staggerIndex); } set {}}
     [XmlAttribute("backgroundcolor")] public string backgroundColor;
     [XmlIgnore] public bool backgroundColorSpecified { get { return !string.IsNullOrEmpty(backgroundColor); } set {}}
-    [XmlIgnore] public bool? _infinite;
-    [XmlAttribute("infinite")] public bool infinite {
-        get { return _infinite.HasValue && _infinite.Value; }
-        set { _infinite = value; }
-    }
-    [XmlIgnore] public bool infiniteSpecified { get { return _infinite.HasValue; } set {}}
+    [XmlAttribute("infinite")] public int infiniteInt = -1;
+    [XmlIgnore] public bool infinite { get { return infiniteInt > 0; } }
+    [XmlIgnore] public bool infiniteSpecified { get { return infiniteInt > -1; } set {}}
     [XmlAttribute("nextobjectid")] public int nextObjectID = 0;
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
@@ -513,7 +510,7 @@ public class TileData : Data {
         }
     }
     
-    [NonSerialized] private uint[] contentData;
+    [XmlIgnore][NonSerialized] private uint[] contentData;
     [XmlIgnore] public uint this[int x, int y] {
         get {
             if (dataStringSpecified) {
@@ -567,7 +564,9 @@ public class TileData : Data {
             dataString = Encode(contentData, width, height);
         }
         else {
-
+            foreach (Chunk chunk in chunks) {
+                chunk.dataString = Encode(chunk.contentData, chunk.width, chunk.height);
+            }
         }
     }
 
@@ -685,7 +684,7 @@ public class Chunk {
     [XmlAttribute("height")] public int height;
 
     [XmlText] public string dataString = "";
-    [NonSerialized] public uint[] contentData;
+    [XmlIgnore][NonSerialized] public uint[] contentData;
 }
 
 [System.Serializable]
