@@ -34,8 +34,37 @@ public class TMXFile {
     [XmlIgnore] public bool tiledVersionSpecified { get { return tiledVersion != null; } set { } }
     [XmlAttribute("orientation")] public string orientation = "orthogonal";
     [XmlAttribute("renderorder")] public string renderOrder = "right-down";
-    [XmlAttribute("width")] public int width = 0;
-    [XmlAttribute("height")] public int height = 0;
+
+    [XmlIgnore] public int _width = 0;
+    [XmlAttribute("width")] public int width {
+        get { 
+            if (infinite && layers != null) {
+                int max = 0;
+                for (int i = 0; i < layers.Length; i++) {
+                    if (layers[i].tileData.width > max) max = layers[i].tileData.width;
+                }
+                return max;
+            }
+            return _width;    
+        }
+        set { _width = value; }
+    }
+
+    [XmlIgnore] public int _height = 0;
+    [XmlAttribute("height")] public int height {
+        get { 
+            if (infinite && layers != null) {
+                int max = 0;
+                for (int i = 0; i < layers.Length; i++) {
+                    if (layers[i].tileData.height > max) max = layers[i].tileData.height;
+                }
+                return max;
+            }
+            return _height;    
+        }
+        set { _height = value; }
+    }
+
     [XmlAttribute("tilewidth")] public int tileWidth = 0;
     [XmlAttribute("tileheight")] public int tileHeight = 0;
     [XmlAttribute("hexsidelength")] public int? hexSideLength;
@@ -45,8 +74,12 @@ public class TMXFile {
     [XmlIgnore] public bool staggerIndexSpecified { get { return !string.IsNullOrEmpty(staggerIndex); } set {}}
     [XmlAttribute("backgroundcolor")] public string backgroundColor;
     [XmlIgnore] public bool backgroundColorSpecified { get { return !string.IsNullOrEmpty(backgroundColor); } set {}}
-    [XmlAttribute("infinite")] public bool? infinite;
-    [XmlIgnore] public bool infiniteSpecified { get { return infinite.HasValue; } set {}}
+    [XmlIgnore] public bool? _infinite;
+    [XmlAttribute("infinite")] public bool infinite {
+        get { return _infinite.HasValue && _infinite.Value; }
+        set { _infinite = value; }
+    }
+    [XmlIgnore] public bool infiniteSpecified { get { return _infinite.HasValue; } set {}}
     [XmlAttribute("nextobjectid")] public int nextObjectID = 0;
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
@@ -145,7 +178,7 @@ public class TMXFile {
     }
 
     public Tile GetTile (Layer layer, int x, int y) {
-        if (x < 0 || x >= width || y < 0 || y >= height) return null;
+        if (!infinite && (x < 0 || x >= width || y < 0 || y >= height)) return null;
         int tileID = layer.GetTileID(x, y);
         TileSet tileSet = GetTileSetByTileID(tileID);
         return tileSet.GetTile(tileID);
@@ -315,6 +348,8 @@ public class Layer {
     [XmlAttribute("visible")] public int? visible;
     [XmlAttribute("offsetx")] public int? offsetX;
     [XmlAttribute("offsety")] public int? offsetY;
+    [XmlAttribute("x")] public int x;
+    [XmlAttribute("y")] public int y;
     [XmlAttribute("width")] public int width;
     [XmlAttribute("height")] public int height;
 
@@ -326,8 +361,7 @@ public class Layer {
         get { return _tileData; }
         set {
             _tileData = value;
-            _tileData.width = width;
-            _tileData.height = height;
+            _tileData.Refresh(width, height);
         }
     }
     
@@ -429,7 +463,7 @@ public class Image {
     [XmlAttribute("height")] public int height = 0;
 
     [XmlElement("data", typeof(Data))] public Data data;
-    [XmlIgnore] public bool dataSpecified { get { return data != null && !string.IsNullOrEmpty(data.contents); } set {} }
+    [XmlIgnore] public bool dataSpecified { get { return data != null && !string.IsNullOrEmpty(data.dataString); } set {} }
 }
 
 [System.Serializable]
@@ -439,8 +473,8 @@ public class Data {
     [XmlAttribute("compression")] public string compression;
     [XmlIgnore] public bool compressionSpecified { get { return !string.IsNullOrEmpty(compression); } set{} }
 
-    [XmlText] public string contents = "";
-    [XmlIgnore] public bool contentsSpecified { get { return !chunksSpecified; } set {} }
+    [XmlText] public string dataString = "";
+    [XmlIgnore] public bool dataStringSpecified { get { return !chunksSpecified; } set {} }
 
     [XmlElement("chunk", typeof(Chunk))] public Chunk[] chunks;
     [XmlIgnore] public bool chunksSpecified { get { return chunks != null && chunks.Length > 0; } set {} }
@@ -448,15 +482,43 @@ public class Data {
 
 [System.Serializable]
 public class TileData : Data {
+    [XmlIgnore] public int x;
+    [XmlIgnore] public int y;
     [XmlIgnore] public int width;
     [XmlIgnore] public int height;
+
+    public void Refresh(int width, int height) {
+        if (dataStringSpecified) {
+            this.x = 0;
+            this.y = 0;
+            this.width = width;
+            this.height = height;
+        }
+        else {
+            int minX = int.MaxValue;
+            int minY = int.MaxValue;
+            int maxX = -int.MaxValue;
+            int maxY = -int.MaxValue;
+            for (int i = 0; i < chunks.Length; i++) {
+                Chunk c = chunks[i];
+                if (c.x > maxX) maxX = c.x;
+                if (c.x < minX) minX = c.x;
+                if (c.y > maxY) maxY = c.y;
+                if (c.y < minY) minY = c.y;                
+            }
+            this.x = minX;
+            this.y = minY;
+            this.width = maxX - minX + chunks[0].width;
+            this.height = maxY - minY + chunks[0].height;
+        }
+    }
     
     [NonSerialized] private uint[] contentData;
     [XmlIgnore] public uint this[int x, int y] {
         get {
-            if (contentsSpecified) {
+            if (dataStringSpecified) {
                 if (contentData == null || contentData.Length != width * height) {
-                    contentData = Decode(contents, width, height);
+                    contentData = Decode(dataString, width, height);
                 }
                 return contentData[x + y * width];
             }
@@ -464,7 +526,7 @@ public class TileData : Data {
                 for (int i = 0; i < chunks.Length; i++) {
                     Chunk c = chunks[i];
                     if (x >= c.x && x < c.x + c.width && y >= c.y && y < c.y + c.height) {
-                        if (c.contentData == null) c.contentData = Decode(c.contents, c.width, c.height);
+                        if (c.contentData == null) c.contentData = Decode(c.dataString, c.width, c.height);
                         return c.contentData[(x-c.x) + (y-c.y) * c.width];
                     }
                 }
@@ -472,25 +534,37 @@ public class TileData : Data {
             }
         }
         set {
-            if (contentsSpecified) contentData[x + y * width] = value;
+            if (dataStringSpecified) contentData[x + y * width] = value;
             else {
-                // set in chunk
+                for (int i = 0; i < chunks.Length; i++) {
+                    Chunk c = chunks[i];
+                    if (x >= c.x && x < c.x + c.width && y >= c.y && y < c.y + c.height) {
+                        if (c.contentData == null) c.contentData = Decode(c.dataString, c.width, c.height);
+                        c.contentData[(x-c.x) + (y-c.y) * c.width] = value;
+                        return;
+                    }
+                }
+                Chunk chunk = new Chunk();
+                chunk.width = chunks[0].width;
+                chunk.height = chunks[0].height;
+                chunk.x = (int)Math.Floor((double)x / (double)chunk.width) * chunk.width;
+                chunk.y = (int)Math.Floor((double)y / (double)chunk.height) * chunk.height;
+                chunk.contentData = new uint[chunk.width * chunk.height];
+                chunk.contentData[(x-chunk.x) + (y-chunk.y) * chunk.width] = value;
+                Array.Resize(ref chunks, chunks.Length+1);
+                chunks[chunks.Length-1] = chunk;
+                Refresh(width, height);
             }
         }
     }
 
     [XmlIgnore] public int Length {
-        get {
-            if (contentsSpecified) return width * height;
-            else {
-                return width * height; // should calculate from chunks
-            }
-        }
+        get { return width * height; }
     }
 
     public void Encode () {
-        if (contentsSpecified) {
-            contents = Encode(contentData, width, height);
+        if (dataStringSpecified) {
+            dataString = Encode(contentData, width, height);
         }
         else {
 
@@ -610,7 +684,7 @@ public class Chunk {
     [XmlAttribute("width")] public int width;
     [XmlAttribute("height")] public int height;
 
-    [XmlText] public string contents = "";
+    [XmlText] public string dataString = "";
     [NonSerialized] public uint[] contentData;
 }
 

@@ -188,6 +188,31 @@ public class TileMap : MonoBehaviour {
         }        
     }
 
+    public GameObject GetSubmeshObject(int layerIndex, int submeshIndex) {
+        GameObject[] submeshes = _layerSubmeshObjects[layerIndex];
+        int submeshCount = submeshes.Length;
+        if (submeshIndex < submeshCount && submeshes[submeshIndex] != null) return submeshes[submeshIndex];
+
+        System.Array.Resize(ref submeshes, submeshIndex+1);      
+        Layer layerData = tmxFile.layers[layerIndex];
+        for (int i = submeshCount; i <= submeshIndex+1; i++) {
+            GameObject meshObject = new GameObject(layerData.name + "_submesh" + submeshIndex);
+            meshObject.transform.SetParent(layers[layerIndex].transform);
+
+            meshObject.AddComponent<MeshRenderer>();
+            meshObject.AddComponent<MeshFilter>();
+            meshObject.AddComponent<PolygonCollider2D>();
+            SortingGroup sort = meshObject.AddComponent<SortingGroup>();
+            sort.sortingOrder = layerIndex;
+            sort.sortingLayerName = layerData.name;
+
+            submeshes[submeshIndex] = meshObject;
+            UpdateMesh(layerIndex, submeshIndex);
+            UpdatePolygonCollider(layerIndex, submeshIndex);
+        }
+        return submeshes[submeshIndex];
+    }
+
     public void ReloadMap () {
         for (int layerIndex = 0; layerIndex < tmxFile.layers.Length; layerIndex++) {
             for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
@@ -220,8 +245,8 @@ public class TileMap : MonoBehaviour {
         int vertCount = 0;
         int[] triIDsPerMat = new int[tmxFile.tileSets.Length];
         for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileData.Length); tileIndex++) {
-            int x = tileIndex % tmxFile.width;
-            int y = tileIndex / tmxFile.width;
+            int x = tileIndex % layerData.tileData.width + layerData.tileData.x;
+            int y = tileIndex / layerData.tileData.width + layerData.tileData.y;
             int tileID = layerData.GetTileID(x, y);
             TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
             if (tileSet == null || tileID < tileSet.firstGID) continue;
@@ -253,8 +278,8 @@ public class TileMap : MonoBehaviour {
         int vertIndex = 0;      
         int[] matTriIndices = new int[tmxFile.tileSets.Length];
         for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileData.Length); tileIndex++) {        
-            int x = tileIndex % tmxFile.width;
-            int y = tileIndex / tmxFile.width;
+            int x = tileIndex % layerData.tileData.width + layerData.tileData.x;
+            int y = tileIndex / layerData.tileData.width + layerData.tileData.y;
             int tileID = layerData.GetTileID(x, y);
             TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
             if (tileSet == null || tileID < tileSet.firstGID) continue;
@@ -380,7 +405,7 @@ public class TileMap : MonoBehaviour {
             vertIndex += 4;
         }
 
-        GameObject obj = layerSubmeshObjects[layerIndex][submeshIndex];
+        GameObject obj = GetSubmeshObject(layerIndex, submeshIndex);
         MeshFilter filter = obj.GetComponent<MeshFilter>();
         if (filter.sharedMesh == null) {
             filter.sharedMesh = new Mesh();
@@ -613,7 +638,7 @@ public class TileMap : MonoBehaviour {
     private int lastTileID = -1;
     public bool SetTile (int tileID, int layerIndex, int x, int y, bool updateMesh = true) {
         if (lastTileID == tileID && lastTileX == x && lastTileY == y) return true;
-        if (x < 0 || x >= tmxFile.width || y < 0 || y >= tmxFile.height) return false;
+        if (!tmxFile.infinite && (x < 0 || x >= tmxFile.width || y < 0 || y >= tmxFile.height)) return false;
 
         tmxFile.layers[layerIndex].SetTileID(tileID, x, y);
         lastTileX = x;
