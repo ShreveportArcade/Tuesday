@@ -45,6 +45,8 @@ public class TMXFile {
     [XmlIgnore] public bool staggerIndexSpecified { get { return !string.IsNullOrEmpty(staggerIndex); } set {}}
     [XmlAttribute("backgroundcolor")] public string backgroundColor;
     [XmlIgnore] public bool backgroundColorSpecified { get { return !string.IsNullOrEmpty(backgroundColor); } set {}}
+    [XmlAttribute("infinite")] public bool? infinite;
+    [XmlIgnore] public bool infiniteSpecified { get { return infinite.HasValue; } set {}}
     [XmlAttribute("nextobjectid")] public int nextObjectID = 0;
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
@@ -150,7 +152,7 @@ public class TMXFile {
     }
 
     public Tile GetTile (Layer layer, int index) {
-        int tileID = layer.tileIDs[index];
+        int tileID = layer.GetTileID(index);
         TileSet tileSet = GetTileSetByTileID(tileID);
         return tileSet.GetTile(tileID);
     }
@@ -324,156 +326,49 @@ public class Layer {
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
-    [XmlElement("data", typeof(Data))] public Data tileData;
+    
+    [XmlIgnore] public TileData _tileData;
+    [XmlElement("data", typeof(TileData))] public TileData tileData {
+        get { return _tileData; }
+        set {
+            _tileData = value;
+            _tileData.width = width;
+            _tileData.height = height;
+        }
+    }
     
     const uint FlippedHorizontallyFlag = 0x80000000;
     const uint FlippedVerticallyFlag = 0x40000000;
     const uint FlippedAntiDiagonallyFlag = 0x20000000;
     const uint RotatedHexagonal120Flag = 0x10000000;
 
-    [XmlIgnore] public uint[] tileFlags;
-    [XmlIgnore] public int[] _tileIDs;
-    public int[] tileIDs {
-        get {
-            if (tileFlags == null || tileFlags.Length != width * height) {
-                tileFlags = new uint[width * height];
-
-                if (tileData.encoding == "csv") {
-                    string[] tiles = tileData.contents.Split(',');
-                    for (int i = 0; i < tiles.Length; i++) {
-                        string id = tiles[i].Trim();
-                        if (string.IsNullOrEmpty(id)) tileFlags[i] = 0;
-                        else tileFlags[i] = uint.Parse(id);
-                    }
-                }
-                else if (tileData.encoding == "base64") {
-                    byte[] bytes = Convert.FromBase64String(tileData.contents);
-                    Stream stream = new MemoryStream(bytes, false);
-
-                    if (tileData.compression == "gzip") {
-                        stream = new GZipStream(stream, CompressionMode.Decompress);
-                    }
-                    else if (tileData.compression == "zlib") {
-                        stream = new MemoryStream(bytes, 2, bytes.Length-2, false);
-                        stream = new DeflateStream(stream, CompressionMode.Decompress);
-                    }
-                    
-                    using (BinaryReader binaryReader = new BinaryReader(stream)) {
-                        for (int j = 0; j < height; j++) {
-                            for (int i = 0; i < width; i++) {
-                                tileFlags[i + j * width] = binaryReader.ReadUInt32();
-                            }
-                        }
-                    }
-
-                    stream.Dispose();
-                }
-            }
-
-            if (_tileIDs == null || _tileIDs.Length != width * height) {
-                _tileIDs = new int[width * height];
-                for (int i = 0; i < _tileIDs.Length; i++) {
-                    uint id = tileFlags[i];
-                    id &= ~(FlippedHorizontallyFlag | FlippedVerticallyFlag | FlippedAntiDiagonallyFlag | RotatedHexagonal120Flag);
-                    _tileIDs[i] = (int)id;
-                }
-            }
-
-            return _tileIDs;
-        }
-    }
-
     public void SetTileID (int id, int x, int y, uint flags = 0) {
         int index = x + y * width;
-        tileIDs[index] = id;
-        tileFlags[index] = (uint)id | flags;
-    }
-
-    public void Encode () {
-        if (tileData.encoding == "csv") {
-            string csv = "";
-            for (int j = 0; j < height; j++) {
-                csv += "\n";
-                for (int i = 0; i < width; i++) {
-                    csv += tileFlags[i + j * width] + ",";
-                }
-            }
-            csv = csv.TrimEnd(',');
-            csv += "\n";
-            tileData.contents = csv;	
-        }
-        else if (tileData.encoding == "base64") {
-            MemoryStream stream = new MemoryStream();
-            using (BinaryWriter binaryWriter = new BinaryWriter(stream)){
-                for (int j = 0; j < height; j++) {
-                    for (int i = 0; i < width; i++) {
-                        binaryWriter.Write(tileFlags[i + j * width]);
-                    }
-                }
-            }
-
-            byte[] bytes = stream.ToArray();
-            if (tileData.compression == "gzip") {
-                using (MemoryStream compress = new MemoryStream()) {
-                    using (GZipStream gzip = new GZipStream(compress, CompressionMode.Compress)) {
-                        gzip.Write(bytes, 0, bytes.Length);
-                    }
-                    bytes = compress.ToArray();
-                }
-            }
-            else if (tileData.compression == "zlib") {
-                using (MemoryStream compress = new MemoryStream()) {
-                    using (DeflateStream zlib = new DeflateStream(compress, CompressionMode.Compress)) {
-                        zlib.Write(bytes, 0, bytes.Length);
-                    }					
-                    UInt32 a = 1;
-                    UInt32 b = 0;
-                    for (int i = 0; i < bytes.Length; i++) {
-                        a = (a + bytes[i]) % 65521;
-                        b = (b + a) % 65521;
-                    }
-                    UInt32 alder = (b << 16) | a;
-
-                    byte[] compressedBytes = compress.ToArray();
-                    int len = compressedBytes.Length;
-                    bytes = new byte[len+6];
-                    Array.ConstrainedCopy(compressedBytes, 0, bytes, 2, len);
-                    
-                    // first 2 bytes - zlib header for default compression
-                    bytes[0] = 0x78;
-                    bytes[1] = 0x9C;
-                    
-                    // last 4 bytes - alder32 checksum
-                    bytes[len+2] = (byte)((alder>>24) & 0xFF);
-                    bytes[len+3] = (byte)((alder>>16) & 0xFF);
-                    bytes[len+4] = (byte)((alder>>8) & 0xFF);
-                    bytes[len+5] = (byte)(alder & 0xFF);
-                }
-            }
-            
-            tileData.contents = Convert.ToBase64String(bytes);
-            stream.Dispose();
-        }
+        tileData[index] = (uint)id | flags;
     }
 
     public int GetTileID (int x, int y) {
-        return tileIDs[x + y * width];
+        return GetTileID(x + y * width);
+    }
+
+    public int GetTileID (int index) {
+        return (int)(tileData[index] & ~(FlippedHorizontallyFlag | FlippedVerticallyFlag | FlippedAntiDiagonallyFlag | RotatedHexagonal120Flag));
     }
 
     public bool FlippedHorizontally (int index) {
-        return (tileFlags[index] & FlippedHorizontallyFlag) == FlippedHorizontallyFlag;
+        return (tileData[index] & FlippedHorizontallyFlag) == FlippedHorizontallyFlag;
     }
 
     public bool FlippedVertically (int index) {
-        return (tileFlags[index] & FlippedVerticallyFlag) == FlippedVerticallyFlag;
+        return (tileData[index] & FlippedVerticallyFlag) == FlippedVerticallyFlag;
     }
 
     public bool FlippedAntiDiagonally (int index) {
-        return (tileFlags[index] & FlippedAntiDiagonallyFlag) == FlippedAntiDiagonallyFlag;
+        return (tileData[index] & FlippedAntiDiagonallyFlag) == FlippedAntiDiagonallyFlag;
     }
 
     public bool RotatedHexagonal120 (int index) {
-        return (tileFlags[index] & RotatedHexagonal120Flag) == RotatedHexagonal120Flag;
+        return (tileData[index] & RotatedHexagonal120Flag) == RotatedHexagonal120Flag;
     }
 
     public TilePoint GetTileLocation (int index) {
@@ -549,10 +444,7 @@ public class Image {
     [XmlAttribute("height")] public int height = 0;
 
     [XmlElement("data", typeof(Data))] public Data data;
-    [XmlIgnore] public bool dataSpecified { 
-        get { return data != null && !string.IsNullOrEmpty(data.contents); } 
-        set {} 
-    }
+    [XmlIgnore] public bool dataSpecified { get { return data != null && !string.IsNullOrEmpty(data.contents); } set {} }
 }
 
 [System.Serializable]
@@ -561,6 +453,170 @@ public class Data {
 
     [XmlAttribute("compression")] public string compression;
     [XmlIgnore] public bool compressionSpecified { get { return !string.IsNullOrEmpty(compression); } set{} }
+
+    [XmlText] public string contents = "";
+    [XmlIgnore] public bool contentsSpecified { get { return !chunksSpecified; } set {} }
+
+    [XmlElement("chunk", typeof(Chunk))] public Chunk[] chunks;
+    [XmlIgnore] public bool chunksSpecified { get { return chunks != null && chunks.Length > 0; } set {} }
+}
+
+[System.Serializable]
+public class TileData : Data {
+    [XmlIgnore] public int width;
+    [XmlIgnore] public int height;
+    
+    [XmlIgnore] public uint[] tileData;
+    [XmlIgnore] public uint this[int i] {
+        get {
+            if (contentsSpecified) {
+                if (tileData == null || tileData.Length != width * height) {
+                    tileData = Decode(contents, width, height);
+                }
+                return tileData[i];
+            }
+            else {
+                return 0;
+            }
+        }
+        set {
+            if (contentsSpecified) tileData[i] = value;
+            else {
+                // set in chunk
+            }
+        }
+    }
+
+    [XmlIgnore] public int Length {
+        get {
+            if (contentsSpecified) return width * height;
+            else {
+                return 0;
+            }
+        }
+    }
+
+    public void Encode () {
+        if (contentsSpecified) {
+            contents = Encode(tileData, width, height);
+        }
+        else {
+
+        }
+    }
+
+    public string Encode (uint[] data, int width, int height) {
+        string dataString = "";
+        if (encoding == "csv") {
+            string csv = "";
+            for (int j = 0; j < height; j++) {
+                csv += "\n";
+                for (int i = 0; i < width; i++) {
+                    csv += data[i + j * width] + ",";
+                }
+            }
+            csv = csv.TrimEnd(',');
+            csv += "\n";
+            dataString = csv;	
+        }
+        else if (encoding == "base64") {
+            MemoryStream stream = new MemoryStream();
+            using (BinaryWriter binaryWriter = new BinaryWriter(stream)){
+                for (int j = 0; j < height; j++) {
+                    for (int i = 0; i < width; i++) {
+                        binaryWriter.Write(data[i + j * width]);
+                    }
+                }
+            }
+
+            byte[] bytes = stream.ToArray();
+            if (compression == "gzip") {
+                using (MemoryStream compress = new MemoryStream()) {
+                    using (GZipStream gzip = new GZipStream(compress, CompressionMode.Compress)) {
+                        gzip.Write(bytes, 0, bytes.Length);
+                    }
+                    bytes = compress.ToArray();
+                }
+            }
+            else if (compression == "zlib") {
+                using (MemoryStream compress = new MemoryStream()) {
+                    using (DeflateStream zlib = new DeflateStream(compress, CompressionMode.Compress)) {
+                        zlib.Write(bytes, 0, bytes.Length);
+                    }					
+                    UInt32 a = 1;
+                    UInt32 b = 0;
+                    for (int i = 0; i < bytes.Length; i++) {
+                        a = (a + bytes[i]) % 65521;
+                        b = (b + a) % 65521;
+                    }
+                    UInt32 alder = (b << 16) | a;
+
+                    byte[] compressedBytes = compress.ToArray();
+                    int len = compressedBytes.Length;
+                    bytes = new byte[len+6];
+                    Array.ConstrainedCopy(compressedBytes, 0, bytes, 2, len);
+                    
+                    // first 2 bytes - zlib header for default compression
+                    bytes[0] = 0x78;
+                    bytes[1] = 0x9C;
+                    
+                    // last 4 bytes - alder32 checksum
+                    bytes[len+2] = (byte)((alder>>24) & 0xFF);
+                    bytes[len+3] = (byte)((alder>>16) & 0xFF);
+                    bytes[len+4] = (byte)((alder>>8) & 0xFF);
+                    bytes[len+5] = (byte)(alder & 0xFF);
+                }
+            }
+            
+            dataString = Convert.ToBase64String(bytes);
+            stream.Dispose();
+        }
+        return dataString;
+    }
+
+    public uint[] Decode (string dataString, int width, int height) {
+        uint[] data = new uint[width * height];
+
+        if (encoding == "csv") {
+            string[] tiles = contents.Split(',');
+            for (int i = 0; i < tiles.Length; i++) {
+                string id = tiles[i].Trim();
+                if (string.IsNullOrEmpty(id)) data[i] = 0;
+                else data[i] = uint.Parse(id);
+            }
+        }
+        else if (encoding == "base64") {
+            byte[] bytes = Convert.FromBase64String(contents);
+            Stream stream = new MemoryStream(bytes, false);
+
+            if (compression == "gzip") {
+                stream = new GZipStream(stream, CompressionMode.Decompress);
+            }
+            else if (compression == "zlib") {
+                stream = new MemoryStream(bytes, 2, bytes.Length-2, false);
+                stream = new DeflateStream(stream, CompressionMode.Decompress);
+            }
+            
+            using (BinaryReader binaryReader = new BinaryReader(stream)) {
+                for (int j = 0; j < height; j++) {
+                    for (int i = 0; i < width; i++) {
+                        data[i + j * width] = binaryReader.ReadUInt32();
+                    }
+                }
+            }
+
+            stream.Dispose();
+        }
+        return data;
+    }
+}
+
+[System.Serializable]
+public class Chunk {
+    [XmlAttribute("x")] public float x;
+    [XmlAttribute("y")] public float y;
+    [XmlAttribute("width")] public float width;
+    [XmlAttribute("height")] public float height;
 
     [XmlText] public string contents = "";
 }
@@ -578,10 +634,10 @@ public struct TilePoint {
 
 [System.Serializable]
 public struct TileRect {
-    public float x;
-    public float y;
-    public float width;
-    public float height;
+    [XmlAttribute("x")] public float x;
+    [XmlAttribute("y")] public float y;
+    [XmlAttribute("width")] public float width;
+    [XmlAttribute("height")] public float height;
 
     public float left { get { return x; } }
     public float right { get { return x + width; } }

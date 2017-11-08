@@ -27,6 +27,8 @@ namespace Tiled {
 [CustomEditor(typeof(TileMap))]
 public class TileMapEditor : Editor {
     
+    private static Color gridColor = new Color(1,1,1,0.1f);
+
     private TileMap tileMap {
         get { return (target as TileMap); }
     }
@@ -230,7 +232,9 @@ public class TileMapEditor : Editor {
     private static int paintType = 0;
     public override void OnInspectorGUI() {	
         editState = GUILayout.Toolbar(editState, new string[] {"Move", "Paint", "Erase", "Select"});
-            
+        
+        gridColor = EditorGUILayout.ColorField("Grid Color", gridColor);
+
         DefaultAsset asset = AssetDatabase.LoadAssetAtPath(path, typeof(DefaultAsset)) as DefaultAsset;
         asset = EditorGUILayout.ObjectField("TMX File", asset, typeof(DefaultAsset), false) as DefaultAsset;
         string assetPath = AssetDatabase.GetAssetPath(asset);
@@ -346,6 +350,7 @@ public class TileMapEditor : Editor {
     void OnSceneGUI () {
         Event e = Event.current;
         if (e == null) return;
+        if (e.type == EventType.Repaint || e.type == EventType.Layout) DrawGrid();
 
         #if UNITY_2017_1_OR_NEWER
         if (e.isKey && e.modifiers == EventModifiers.None && e.keyCode == KeyCode.F) {
@@ -374,7 +379,7 @@ public class TileMapEditor : Editor {
         else if (e.type == EventType.MouseUp) {
             if (editState == 3) SelectTiles();
             else {
-                tileMap.tmxFile.layers[selectedLayer].Encode();
+                tileMap.tmxFile.layers[selectedLayer].tileData.Encode();
                 tileMap.UpdatePolygonColliders(selectedLayer);
             }
             GUIUtility.hotControl = 0;
@@ -472,6 +477,56 @@ public class TileMapEditor : Editor {
         if (selectedTileIndices != null) {
             Event.current.Use();
         }
+    }
+
+    void DrawGrid () {
+        if (tmxFile == null || gridColor.a < 0.01f) return;
+
+        GL.PushMatrix();
+        GL.MultMatrix(tileMap.transform.localToWorldMatrix);
+
+        GL.Begin(GL.LINES);
+        mat.SetPass(0);
+        GL.Color(gridColor);
+                
+        if (tmxFile.orientation == "orthogonal") {
+            for (int x = 1; x < tmxFile.width; x++) {
+                GL.Vertex(
+                    new Vector3(
+                        x * tileMap.tileOffset.x + tileMap.offset.x, 
+                        tileMap.offset.y, 
+                        0
+                    )
+                );
+                GL.Vertex(
+                    new Vector3(
+                        x * tileMap.tileOffset.x + tileMap.offset.x, 
+                        tmxFile.height * tileMap.tileOffset.y + tileMap.offset.y, 
+                        0
+                    )
+                );
+            }
+
+            for (int y = 1; y < tmxFile.height; y++) {
+                GL.Vertex(
+                    new Vector3(
+                        tileMap.offset.x, 
+                        y * tileMap.tileOffset.y + tileMap.offset.y, 
+                        0
+                    )
+                );
+                GL.Vertex(
+                    new Vector3(
+                        tmxFile.width * tileMap.tileOffset.x + tileMap.offset.x, 
+                        y * tileMap.tileOffset.y + tileMap.offset.y, 
+                        0
+                    )
+                );   
+            }
+        }
+
+        GL.End();
+        GL.PopMatrix();
     }
 }
 }

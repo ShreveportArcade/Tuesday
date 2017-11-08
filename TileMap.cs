@@ -219,8 +219,8 @@ public class TileMap : MonoBehaviour {
 
         int vertCount = 0;
         int[] triIDsPerMat = new int[tmxFile.tileSets.Length];
-        for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileIDs.Length); tileIndex++) {
-            int tileID = layerData.tileIDs[tileIndex];
+        for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileData.Length); tileIndex++) {
+            int tileID = layerData.GetTileID(tileIndex);
             TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
             if (tileSet == null || tileID < tileSet.firstGID) continue;
 
@@ -250,8 +250,8 @@ public class TileMap : MonoBehaviour {
         Color white = Color.white;
         int vertIndex = 0;      
         int[] matTriIndices = new int[tmxFile.tileSets.Length];
-        for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileIDs.Length); tileIndex++) {        
-            int tileID = layerData.tileIDs[tileIndex];
+        for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileData.Length); tileIndex++) {        
+            int tileID = layerData.GetTileID(tileIndex);
             TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
             if (tileSet == null || tileID < tileSet.firstGID) continue;
 
