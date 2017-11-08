@@ -220,7 +220,9 @@ public class TileMap : MonoBehaviour {
         int vertCount = 0;
         int[] triIDsPerMat = new int[tmxFile.tileSets.Length];
         for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileData.Length); tileIndex++) {
-            int tileID = layerData.GetTileID(tileIndex);
+            int x = tileIndex % tmxFile.width;
+            int y = tileIndex / tmxFile.width;
+            int tileID = layerData.GetTileID(x, y);
             TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
             if (tileSet == null || tileID < tileSet.firstGID) continue;
 
@@ -251,7 +253,9 @@ public class TileMap : MonoBehaviour {
         int vertIndex = 0;      
         int[] matTriIndices = new int[tmxFile.tileSets.Length];
         for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileData.Length); tileIndex++) {        
-            int tileID = layerData.GetTileID(tileIndex);
+            int x = tileIndex % tmxFile.width;
+            int y = tileIndex / tmxFile.width;
+            int tileID = layerData.GetTileID(x, y);
             TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
             if (tileSet == null || tileID < tileSet.firstGID) continue;
 
@@ -268,26 +272,25 @@ public class TileMap : MonoBehaviour {
             
             TileRect uvRect = tileSet.GetTileUVs(tileID, uvInset);
 
-            bool flipX = layerData.FlippedHorizontally(tileIndex);
-            bool flipY = layerData.FlippedVertically(tileIndex);
-            bool flipAntiDiag = layerData.FlippedAntiDiagonally(tileIndex);
-            bool rotated120 = layerData.RotatedHexagonal120(tileIndex);
+            bool flipX = layerData.FlippedHorizontally(x, y);
+            bool flipY = layerData.FlippedVertically(x, y);
+            bool flipAntiDiag = layerData.FlippedAntiDiagonally(x, y);
+            bool rotated120 = layerData.RotatedHexagonal120(x, y);
 
-            TilePoint tileLocation = layerData.GetTileLocation(tileIndex);
-            Vector3 pos = new Vector3(offset.x + tileLocation.x * tileOffset.x, offset.y + tileLocation.y * tileOffset.y, 0);
+            Vector3 pos = new Vector3(offset.x + x * tileOffset.x, offset.y + y * tileOffset.y, 0);
             if (isHexMap || isStagMap) {
                 if (staggerX) {
-                    pos.x = tileLocation.x * tileOffset.z;
-                    if (tileLocation.x % 2 == staggerIndex) pos.y += tileOffset.w * 0.5f;
+                    pos.x = x * tileOffset.z;
+                    if (x % 2 == staggerIndex) pos.y += tileOffset.w * 0.5f;
                 }
                 else {
-                    pos.y = tileLocation.y * tileOffset.w;
-                    if (tileLocation.y % 2 == staggerIndex) pos.x += tileOffset.z * 0.5f;
+                    pos.y = y * tileOffset.w;
+                    if (y % 2 == staggerIndex) pos.x += tileOffset.z * 0.5f;
                 }
             }
             else if (isIsoMap) {
-                pos.x = (tileLocation.x * tileOffset.x  / 2) - (tileLocation.y * tileOffset.x  / 2);
-                pos.y = (tileLocation.y * tileOffset.y / 2) + (tileLocation.x * tileOffset.y / 2);
+                pos.x = (x * tileOffset.x  / 2) - (y * tileOffset.x  / 2);
+                pos.y = (y * tileOffset.y / 2) + (x * tileOffset.y / 2);
             }
 
             float widthMult = (float)tileSet.tileWidth / (float)tmxFile.tileWidth;

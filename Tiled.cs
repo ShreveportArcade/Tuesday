@@ -151,12 +151,6 @@ public class TMXFile {
         return tileSet.GetTile(tileID);
     }
 
-    public Tile GetTile (Layer layer, int index) {
-        int tileID = layer.GetTileID(index);
-        TileSet tileSet = GetTileSetByTileID(tileID);
-        return tileSet.GetTile(tileID);
-    }
-
     public Tile GetTile (TileSet tileSet, int tileID) {
         return tileSet.GetTile(tileID);
     }
@@ -343,36 +337,27 @@ public class Layer {
     const uint RotatedHexagonal120Flag = 0x10000000;
 
     public void SetTileID (int id, int x, int y, uint flags = 0) {
-        int index = x + y * width;
-        tileData[index] = (uint)id | flags;
+        tileData[x, y] = (uint)id | flags;
     }
 
     public int GetTileID (int x, int y) {
-        return GetTileID(x + y * width);
+        return (int)(tileData[x, y] & ~(FlippedHorizontallyFlag | FlippedVerticallyFlag | FlippedAntiDiagonallyFlag | RotatedHexagonal120Flag));
     }
 
-    public int GetTileID (int index) {
-        return (int)(tileData[index] & ~(FlippedHorizontallyFlag | FlippedVerticallyFlag | FlippedAntiDiagonallyFlag | RotatedHexagonal120Flag));
+    public bool FlippedHorizontally (int x, int y) {
+        return (tileData[x, y] & FlippedHorizontallyFlag) == FlippedHorizontallyFlag;
     }
 
-    public bool FlippedHorizontally (int index) {
-        return (tileData[index] & FlippedHorizontallyFlag) == FlippedHorizontallyFlag;
+    public bool FlippedVertically (int x, int y) {
+        return (tileData[x, y] & FlippedVerticallyFlag) == FlippedVerticallyFlag;
     }
 
-    public bool FlippedVertically (int index) {
-        return (tileData[index] & FlippedVerticallyFlag) == FlippedVerticallyFlag;
+    public bool FlippedAntiDiagonally (int x, int y) {
+        return (tileData[x, y] & FlippedAntiDiagonallyFlag) == FlippedAntiDiagonallyFlag;
     }
 
-    public bool FlippedAntiDiagonally (int index) {
-        return (tileData[index] & FlippedAntiDiagonallyFlag) == FlippedAntiDiagonallyFlag;
-    }
-
-    public bool RotatedHexagonal120 (int index) {
-        return (tileData[index] & RotatedHexagonal120Flag) == RotatedHexagonal120Flag;
-    }
-
-    public TilePoint GetTileLocation (int index) {
-        return new TilePoint(index % width, index / width);
+    public bool RotatedHexagonal120 (int x, int y) {
+        return (tileData[x, y] & RotatedHexagonal120Flag) == RotatedHexagonal120Flag;
     }
 }
 
@@ -466,21 +451,28 @@ public class TileData : Data {
     [XmlIgnore] public int width;
     [XmlIgnore] public int height;
     
-    [XmlIgnore] public uint[] tileData;
-    [XmlIgnore] public uint this[int i] {
+    [NonSerialized] private uint[] contentData;
+    [XmlIgnore] public uint this[int x, int y] {
         get {
             if (contentsSpecified) {
-                if (tileData == null || tileData.Length != width * height) {
-                    tileData = Decode(contents, width, height);
+                if (contentData == null || contentData.Length != width * height) {
+                    contentData = Decode(contents, width, height);
                 }
-                return tileData[i];
+                return contentData[x + y * width];
             }
             else {
+                for (int i = 0; i < chunks.Length; i++) {
+                    Chunk c = chunks[i];
+                    if (x >= c.x && x < c.x + c.width && y >= c.y && y < c.y + c.height) {
+                        if (c.contentData == null) c.contentData = Decode(c.contents, c.width, c.height);
+                        return c.contentData[(x-c.x) + (y-c.y) * c.width];
+                    }
+                }
                 return 0;
             }
         }
         set {
-            if (contentsSpecified) tileData[i] = value;
+            if (contentsSpecified) contentData[x + y * width] = value;
             else {
                 // set in chunk
             }
@@ -491,14 +483,14 @@ public class TileData : Data {
         get {
             if (contentsSpecified) return width * height;
             else {
-                return 0;
+                return width * height; // should calculate from chunks
             }
         }
     }
 
     public void Encode () {
         if (contentsSpecified) {
-            contents = Encode(tileData, width, height);
+            contents = Encode(contentData, width, height);
         }
         else {
 
@@ -517,7 +509,7 @@ public class TileData : Data {
             }
             csv = csv.TrimEnd(',');
             csv += "\n";
-            dataString = csv;	
+            dataString = csv;
         }
         else if (encoding == "base64") {
             MemoryStream stream = new MemoryStream();
@@ -542,7 +534,7 @@ public class TileData : Data {
                 using (MemoryStream compress = new MemoryStream()) {
                     using (DeflateStream zlib = new DeflateStream(compress, CompressionMode.Compress)) {
                         zlib.Write(bytes, 0, bytes.Length);
-                    }					
+                    }
                     UInt32 a = 1;
                     UInt32 b = 0;
                     for (int i = 0; i < bytes.Length; i++) {
@@ -578,7 +570,7 @@ public class TileData : Data {
         uint[] data = new uint[width * height];
 
         if (encoding == "csv") {
-            string[] tiles = contents.Split(',');
+            string[] tiles = dataString.Split(',');
             for (int i = 0; i < tiles.Length; i++) {
                 string id = tiles[i].Trim();
                 if (string.IsNullOrEmpty(id)) data[i] = 0;
@@ -586,7 +578,7 @@ public class TileData : Data {
             }
         }
         else if (encoding == "base64") {
-            byte[] bytes = Convert.FromBase64String(contents);
+            byte[] bytes = Convert.FromBase64String(dataString);
             Stream stream = new MemoryStream(bytes, false);
 
             if (compression == "gzip") {
@@ -613,12 +605,13 @@ public class TileData : Data {
 
 [System.Serializable]
 public class Chunk {
-    [XmlAttribute("x")] public float x;
-    [XmlAttribute("y")] public float y;
-    [XmlAttribute("width")] public float width;
-    [XmlAttribute("height")] public float height;
+    [XmlAttribute("x")] public int x;
+    [XmlAttribute("y")] public int y;
+    [XmlAttribute("width")] public int width;
+    [XmlAttribute("height")] public int height;
 
     [XmlText] public string contents = "";
+    [NonSerialized] public uint[] contentData;
 }
 
 [System.Serializable]
