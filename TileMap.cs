@@ -170,7 +170,7 @@ public class TileMap : MonoBehaviour {
         _layerSubmeshObjects[layerIndex] = new GameObject[meshesPerLayer];
         for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
             GameObject meshObject = layer;
-            if (meshesPerLayer > 1) {
+            if (meshesPerLayer > 1 || tmxFile.infinite) {
                 meshObject = new GameObject(layerData.name + "_submesh" + submeshIndex);
                 meshObject.transform.SetParent(layer.transform);
             }
@@ -193,9 +193,10 @@ public class TileMap : MonoBehaviour {
         int submeshCount = submeshes.Length;
         if (submeshIndex < submeshCount && submeshes[submeshIndex] != null) return submeshes[submeshIndex];
 
-        System.Array.Resize(ref submeshes, submeshIndex+1);      
+        System.Array.Resize(ref submeshes, submeshIndex+1); 
+        System.Array.Resize(ref _layerPaths[layerIndex], submeshIndex+1);     
         Layer layerData = tmxFile.layers[layerIndex];
-        for (int i = submeshCount; i <= submeshIndex+1; i++) {
+        for (int i = submeshCount; i <= submeshIndex; i++) {
             GameObject meshObject = new GameObject(layerData.name + "_submesh" + submeshIndex);
             meshObject.transform.SetParent(layers[layerIndex].transform);
 
@@ -207,10 +208,9 @@ public class TileMap : MonoBehaviour {
             sort.sortingLayerName = layerData.name;
 
             submeshes[submeshIndex] = meshObject;
-            UpdateMesh(layerIndex, submeshIndex);
-            UpdatePolygonCollider(layerIndex, submeshIndex);
         }
-        return submeshes[submeshIndex];
+        _layerSubmeshObjects[layerIndex] = submeshes;
+        return _layerSubmeshObjects[layerIndex][submeshIndex];
     }
 
     public void ReloadMap () {
@@ -640,13 +640,15 @@ public class TileMap : MonoBehaviour {
         if (lastTileID == tileID && lastTileX == x && lastTileY == y) return true;
         if (!tmxFile.infinite && (x < 0 || x >= tmxFile.width || y < 0 || y >= tmxFile.height)) return false;
 
-        tmxFile.layers[layerIndex].SetTileID(tileID, x, y);
+        Layer layer = tmxFile.layers[layerIndex];
+        layer.SetTileID(tileID, x, y);
         lastTileX = x;
         lastTileY = y;
         lastTileID = tileID;
 
         if (updateMesh) {
-            int index = x + y * tmxFile.width;
+            int index = x-layer.tileData.x + (y-layer.tileData.y) * tmxFile.width;
+            Debug.Log(index);
             int submeshIndex = index / 16250;
             UpdateMesh(layerIndex, submeshIndex);
         }

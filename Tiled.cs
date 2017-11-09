@@ -546,8 +546,10 @@ public class TileData : Data {
                 chunk.height = chunks[0].height;
                 chunk.x = (int)Math.Floor((double)x / (double)chunk.width) * chunk.width;
                 chunk.y = (int)Math.Floor((double)y / (double)chunk.height) * chunk.height;
+                
                 chunk.contentData = new uint[chunk.width * chunk.height];
-                chunk.contentData[(x-chunk.x) + (y-chunk.y) * chunk.width] = value;
+                int index = (x-chunk.x) + (y-chunk.y) * chunk.width;
+                chunk.contentData[index] = value;
                 Array.Resize(ref chunks, chunks.Length+1);
                 chunks[chunks.Length-1] = chunk;
                 Refresh(width, height);
