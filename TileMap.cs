@@ -198,8 +198,8 @@ public class TileMap : MonoBehaviour {
     }
 
     private IntPoint Vector2ToIntPoint (Vector2 p) {
-        int x = (int)(p.x * pixelsPerUnit);
-        int y = (int)(p.y * pixelsPerUnit);
+        int x = Mathf.RoundToInt(p.x * pixelsPerUnit);
+        int y = Mathf.RoundToInt(p.y * pixelsPerUnit);
         return new IntPoint(x, y);
     }
 
@@ -314,7 +314,23 @@ public class TileMap : MonoBehaviour {
             verts[vertIndex+3] = v[3];
 
             if (idToPhysics.ContainsKey(tileID)) {
-                Vector3[] phys = idToPhysics[tileID];
+                Vector3[] phys = new Vector3[idToPhysics[tileID].Length];
+                Vector3 off = new Vector3(tileOffset.x * 0.5f, tileOffset.y * 0.5f, 0);
+                for (int i = 0; i < phys.Length; i++) {
+                    phys[i] = idToPhysics[tileID][i] - off;
+                    if (flipAntiDiag) {
+                        phys[i] = Quaternion.AngleAxis(180, new Vector3(-1,1,0)) * phys[i];
+                        if (flipX && flipY) phys[i] = Quaternion.AngleAxis(180, Vector3.forward) * phys[i];
+                        else if (flipX) phys[i] = Quaternion.AngleAxis(180, Vector3.up) * phys[i];
+                        else if (flipY) phys[i] = Quaternion.AngleAxis(180, Vector3.right) * phys[i];
+                    }
+                    else {
+                        if (flipX) phys[i] = Quaternion.AngleAxis(180, Vector3.up) * phys[i];
+                        if (flipY) phys[i] = Quaternion.AngleAxis(180, Vector3.right) * phys[i];
+                    }
+                    phys[i] += off;
+                }
+                
                 IntPoint[] path = System.Array.ConvertAll(phys, (p) => Vector2ToIntPoint((Vector2)(p + pos)));
                 paths.Add(new List<IntPoint>(path));
             }
@@ -336,23 +352,18 @@ public class TileMap : MonoBehaviour {
                 new Vector2(right, bottom)
             };
 
-            if (tileOffset.x < 0 != flipX) {
-                uvArray = new Vector2[] {
-                    new Vector2(right, bottom),
-                    new Vector2(right, top),
-                    new Vector2(left, top),
-                    new Vector2(left, bottom)
-                };
-            }
-
-            if (tileOffset.y < 0 != flipY) {
-                uvArray = new Vector2[]{uvArray[1], uvArray[0], uvArray[3], uvArray[2]};
-            }
-
             if (flipAntiDiag && !isHexMap) {
                 Vector2 tmp = uvArray[0];
                 uvArray[0] = uvArray[2];
                 uvArray[2] = tmp;
+            }
+
+            if (tileOffset.x < 0 != flipX) {
+                uvArray = new Vector2[]{uvArray[3], uvArray[2], uvArray[1], uvArray[0]};
+            }
+
+            if (tileOffset.y < 0 != flipY) {
+                uvArray = new Vector2[]{uvArray[1], uvArray[0], uvArray[3], uvArray[2]};
             }
 
             uvs[vertIndex] = uvArray[0];
