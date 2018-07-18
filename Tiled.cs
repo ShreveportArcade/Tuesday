@@ -175,6 +175,7 @@ public class TMXFile {
         System.Random r = new System.Random(seed + Environment.TickCount);
         seed++;
         foreach (Tile tile in tileSet.tiles) {
+            if (tile.terrain == null || tile.terrain.Length == 0) continue;
             int matches = 0;
             for (int i = 0; i < terrain.Length; i++) {
                 if (terrain[i] == tile.terrain[i]) matches++;

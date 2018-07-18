@@ -151,6 +151,7 @@ public class TileMap : MonoBehaviour {
         if (layers != null) {
             physicsLayers = new Dictionary<string, int>();
             foreach (GameObject layer in layers) {
+                if (layer == null) continue;
                 physicsLayers[layer.name] = layer.layer;
                 DestroyImmediate(layer);
             }
