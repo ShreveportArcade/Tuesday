@@ -271,7 +271,7 @@ public class TileMapEditor : Editor {
         }
 
         EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Revert")) {
+        if (GUILayout.Button("Reload")) {
             tmxFile = TMXFile.Load(path);
             tileMap.Setup();
         }

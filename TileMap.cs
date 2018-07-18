@@ -147,8 +147,11 @@ public class TileMap : MonoBehaviour {
 
         tileOffset *= 1f / pixelsPerUnit;
 
+        Dictionary<string, int> physicsLayers = null;
         if (layers != null) {
+            physicsLayers = new Dictionary<string, int>();
             foreach (GameObject layer in layers) {
+                physicsLayers[layer.name] = layer.layer;
                 DestroyImmediate(layer);
             }
         }
@@ -157,6 +160,14 @@ public class TileMap : MonoBehaviour {
         _layerSubmeshObjects = new GameObject[tmxFile.layers.Length][];
         for (int i = 0; i < tmxFile.layers.Length; i++) {
             CreateTileLayer(i);
+        }
+
+        if (physicsLayers != null) {
+            foreach (GameObject layer in layers) {
+                if (physicsLayers.ContainsKey(layer.name)) {
+                    layer.layer = physicsLayers[layer.name];
+                }
+            }
         }
     }
 
