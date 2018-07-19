@@ -252,6 +252,9 @@ public class TileMapEditor : Editor {
         }
         
         if (tmxFile.tileSets != null) {
+            if (tileMap.tileSetMaterials.Length != tmxFile.tileSets.Length) {
+                tileMap.tileSetMaterials = TileMapEditor.GetMaterials(tmxFile, path);
+            }
             EditorGUILayout.LabelField("Tile Sets", EditorStyles.boldLabel);
             paintType = GUILayout.Toolbar(paintType, new string[] {"Tiles", "Terrains"});
             switch (paintType) {
