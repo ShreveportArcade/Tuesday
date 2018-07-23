@@ -84,8 +84,7 @@ public class TileMapEditor : Editor {
                 materialPath = materialPath.Replace(dataPath, "Assets");
                 mat = AssetDatabase.LoadAssetAtPath(materialPath, typeof(Material)) as Material;
                 if (mat == null) {
-                    mat = new Material(Shader.Find("Sprites/Default"));
-                    mat.EnableKeyword("PIXELSNAP_ON");
+                    mat = new Material(Shader.Find("Particles/Alpha Blended"));
                     mat.mainTexture = GetTileSetTexture(tileSet, path);
                     AssetDatabase.CreateAsset(mat, materialPath);
                 }
@@ -255,6 +254,15 @@ public class TileMapEditor : Editor {
             if (tileMap.tileSetMaterials.Length != tmxFile.tileSets.Length) {
                 tileMap.tileSetMaterials = TileMapEditor.GetMaterials(tmxFile, path);
             }
+            else {
+                foreach (Material mat in tileMap.tileSetMaterials) {
+                    if (mat == null) {
+                        tileMap.tileSetMaterials = TileMapEditor.GetMaterials(tmxFile, path);
+                        break;
+                    }
+                }
+            }
+            
             EditorGUILayout.LabelField("Tile Sets", EditorStyles.boldLabel);
             paintType = GUILayout.Toolbar(paintType, new string[] {"Tiles", "Terrains"});
             switch (paintType) {
@@ -275,6 +283,7 @@ public class TileMapEditor : Editor {
 
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Reload")) {
+
             tmxFile = TMXFile.Load(path);
             tileMap.Setup();
         }
