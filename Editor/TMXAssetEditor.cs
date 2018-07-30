@@ -21,6 +21,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System;
 using System.IO;
+using System.Reflection;
 
 namespace Tiled {
 [InitializeOnLoad]
@@ -77,20 +78,42 @@ class TMXAssetEditor : Editor {
         pixelsPerUnit = EditorGUILayout.IntField("Pixels / Unit: ", pixelsPerUnit);
     }
 
+    private static readonly Type hierarchyType;
     static TMXAssetEditor () {
+        Assembly editorAssembly = typeof(EditorWindow).Assembly;
+        hierarchyType = editorAssembly.GetType("UnityEditor.SceneHierarchyWindow");
+
+        EditorApplication.update += EditorUpdate;
         EditorApplication.hierarchyWindowItemOnGUI += HierarchyGUICallback;
         SceneView.onSceneGUIDelegate += SceneGUICallback;
     }
 
+    private static void EditorUpdate() {
+        EditorWindow window = EditorWindow.mouseOverWindow;
+        if (window && window.GetType() == hierarchyType) {
+            if (!window.wantsMouseMove) window.wantsMouseMove = true;
+        }   
+    }
+
+    static Transform dropTarget;
     private static void HierarchyGUICallback(int pID, Rect pRect) {
-        DragAndDropTMXFile();
+        Event e = Event.current;
+        if (e.type == EventType.DragUpdated) {
+            if (pRect.Contains(e.mousePosition)) {
+                UnityEngine.Object obj = EditorUtility.InstanceIDToObject(pID);
+                if (obj is GameObject) dropTarget = (obj as GameObject).transform;
+            }
+            else dropTarget = null;
+        }
+        
+        DragAndDropTMXFile(parent: dropTarget);
     }
 
     private static void SceneGUICallback (SceneView sceneView) {
         DragAndDropTMXFile(true);
     }
 
-    private static void DragAndDropTMXFile (bool isSceneView = false) {
+    private static void DragAndDropTMXFile (bool isSceneView = false, Transform parent = null) {
         EventType eventType = Event.current.type;
         if (eventType == EventType.DragUpdated || eventType == EventType.DragPerform) {
             DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
@@ -119,12 +142,12 @@ class TMXAssetEditor : Editor {
                             Plane plane = new Plane(Vector3.forward, tileMap.transform.position);
                             if (plane.Raycast(ray, out dist)) {
                                 map.transform.position = ray.GetPoint(dist);
-                                Event.current.Use();
                             }
                         }
-                        else {
-                            // place at origin relative to object dropped on in Hierarchy
-                        }
+                        
+                        if (parent != null) map.transform.SetParent(parent);
+
+                        Event.current.Use();
                         Selection.activeGameObject = map;
                         Undo.RegisterCreatedObjectUndo (map, "Created '" + name + "' from TMX file.");
                         foundTMX = true;

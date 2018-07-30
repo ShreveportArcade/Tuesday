@@ -44,12 +44,13 @@ public class TileMapEditor : Editor {
     void OnEnable () {
         Undo.undoRedoPerformed += UndoRedo;
     }
+    
     void OnDisable () {
         Undo.undoRedoPerformed -= UndoRedo;
     }
 
     void UndoRedo () {
-        tileMap.ReloadMap();
+        if (target != null) tileMap.ReloadMap();
     }   
 
     private static Material _mat;
