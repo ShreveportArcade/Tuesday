@@ -25,8 +25,6 @@ using ClipperLib;
 namespace Tiled {
 public class TileMap : MonoBehaviour {
 
-    [Tooltip("Fixes UV bleed from unpadded tilesets by insetting the corners of the tile.")] 
-    [Range(0, 0.01f)] public float uvInset = 0;
     public Vector2 pivot;
 
     [HideInInspector] public string tmxFilePath;
@@ -278,7 +276,7 @@ public class TileMap : MonoBehaviour {
                 tileSet.rows = (tileSet.image.width - 2 * tileSet.margin) / (tileSet.tileWidth + tileSet.spacing);
             }
             
-            TileRect uvRect = tileSet.GetTileUVs(tileID, uvInset);
+            TileRect uvRect = tileSet.GetTileUVs(tileID);
 
             bool flipX = layerData.FlippedHorizontally(tileIndex);
             bool flipY = layerData.FlippedVertically(tileIndex);

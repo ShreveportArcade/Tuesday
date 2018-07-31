@@ -288,7 +288,7 @@ public class TileSet {
     }
     
     // TODO: Cache UVs
-    public TileRect GetTileUVs (int tileGID, float inset = 0) {
+    public TileRect GetTileUVs (int tileGID) {
         TileRect uvs = new TileRect();
         int tileIndex = tileGID - firstGID;
         int i = tileIndex % columns;
@@ -303,11 +303,6 @@ public class TileSet {
         uvs.y /= (float)image.height;
         uvs.width /= (float)image.width;
         uvs.height /= (float)image.height;
-
-        uvs.x += inset;
-        uvs.y += inset;
-        uvs.width -= inset * 2;
-        uvs.height -= inset * 2;
 
         return uvs;
     }

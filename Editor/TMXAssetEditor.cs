@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2017 Nolan Baker
+Copyright (C) 2018 Nolan Baker
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
 documentation files (the "Software"), to deal in the Software without restriction, including without limitation 
@@ -49,13 +49,20 @@ class TMXAssetEditor : Editor {
         }
     }
 
+    private int spacing = -1;
+    private int margin = -1;
+
     private string path {
         get { return AssetDatabase.GetAssetPath(target); }
     }
 
-    private bool isValid {
+    private bool isTMX {
         get { return Path.GetExtension(path) == ".tmx"; }
     } 
+
+    private bool isTSX {
+        get { return Path.GetExtension(path) == ".tsx"; }
+    }
 
     private static Dictionary<string, TMXFile> tmxFiles = new Dictionary<string, TMXFile>();
     private TMXFile tmxFile {
@@ -65,17 +72,16 @@ class TMXAssetEditor : Editor {
             } 
             return tmxFiles[path];
         }
-    }   
+    }
 
-	public override void OnInspectorGUI() {
-        if (!isValid) {
-            base.OnInspectorGUI();
-            return;
+    private static Dictionary<string, TileSet> tileSets = new Dictionary<string, TileSet>();
+    private TileSet tileSet {
+        get {
+            if (!tileSets.ContainsKey(path)) {
+                tileSets[path] = TileSet.Load(path);
+            } 
+            return tileSets[path];
         }
-
-        GUI.enabled = true;
-
-        pixelsPerUnit = EditorGUILayout.IntField("Pixels / Unit: ", pixelsPerUnit);
     }
 
     private static readonly Type hierarchyType;
@@ -86,6 +92,32 @@ class TMXAssetEditor : Editor {
         EditorApplication.update += EditorUpdate;
         EditorApplication.hierarchyWindowItemOnGUI += HierarchyGUICallback;
         SceneView.onSceneGUIDelegate += SceneGUICallback;
+    }
+
+    public override void OnInspectorGUI() {
+        GUI.enabled = true;
+        if (isTMX) {
+            pixelsPerUnit = EditorGUILayout.IntField("Pixels / Unit: ", pixelsPerUnit);
+        }
+        else if (isTSX) {
+            if (spacing < 0 || margin < 0) {
+                spacing = tileSet.spacing;
+                margin = tileSet.margin;
+            }
+
+            bool padChange = (spacing != tileSet.spacing || margin != tileSet.margin);
+            GUI.backgroundColor = padChange ? Color.red : Color.white;
+            spacing = Mathf.Clamp(EditorGUILayout.IntField("Spacing", spacing), 0, 8);
+            margin = Mathf.Clamp(EditorGUILayout.IntField("Margin", margin), 0, 8);
+            GUI.backgroundColor = Color.white;
+            GUI.enabled = padChange;
+            if (GUILayout.Button("Update Texture Padding")) UpdateTexturePadding();
+            if (GUI.changed) {
+                Undo.FlushUndoRecordObjects();
+            }
+            GUI.enabled = false;
+        }
+        else base.OnInspectorGUI();
     }
 
     private static void EditorUpdate() {
@@ -159,6 +191,61 @@ class TMXAssetEditor : Editor {
                 }
             }
         }
+    }
+
+    private void UpdateTexturePadding () {
+        tileSets[path] = TileSet.Load(path); // DELETE ME
+        TileSet ts = tileSet;
+        Texture2D texture = TileMapEditor.GetTileSetTexture(ts, path);
+        string texturePath = AssetDatabase.GetAssetPath(texture);
+
+        TextureImporter importer = (TextureImporter)TextureImporter.GetAtPath(texturePath);
+        importer.isReadable = true;
+        AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceUpdate);
+
+        int inWidth = ts.tileWidth * ts.columns + ts.margin * 2 + ts.spacing * (ts.columns - 1);
+        int outWidth = ts.tileWidth * ts.columns + margin * 2 + spacing * (ts.columns - 1);
+        int outHeight = ts.tileHeight * ts.rows + margin * 2 + spacing * (ts.rows - 1);
+
+        Color[] inColors = texture.GetPixels();
+        Color[] outColors = new Color[outWidth * outHeight];
+
+        for (int column = 0; column < ts.columns; column++) {
+            for (int row = 0; row < ts.rows; row++) {
+                for (int i = 0; i < ts.tileWidth; i++) {
+                    for (int j = 0; j < ts.tileHeight; j++) {
+                        int inX = i + (ts.tileWidth + ts.spacing) * column + ts.margin;
+                        int inY = j + (ts.tileHeight + ts.spacing) * row + ts.margin;
+                        Color c = inColors[inY * inWidth + inX]; 
+
+                        int left = (i == 0) ? ((column==0) ? -margin : -spacing/2) : 0;
+                        int right = (i == ts.tileWidth-1) ? ((column==ts.columns-1) ? margin : spacing/2) : 0;
+                        int down = (j == 0) ? ((row==0) ? -margin : -spacing/2) : 0;
+                        int up = (j == ts.tileHeight-1) ? ((row==ts.rows-1) ? margin : spacing/2) : 0;
+                        for (int x = i + left; x <= i + right; x++) {
+                            for (int y = j + down; y <= j + up; y++) {
+                                int outX = x + (ts.tileWidth + spacing) * column + margin;
+                                int outY = y + (ts.tileHeight + spacing) * row + margin;                                
+                                outColors[outY * outWidth + outX] = c;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Texture2D t = new Texture2D(outWidth, outHeight);
+        t.SetPixels(outColors);
+        byte[] bytes = t.EncodeToPNG();
+        File.WriteAllBytes(texturePath, bytes);
+
+        AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceUpdate);
+
+        tileSet.margin = margin;
+        tileSet.spacing = spacing;
+        tileSet.image.width = outWidth;
+        tileSet.image.height = outHeight;
+        tileSet.Save(path);
     }
 }
 }
