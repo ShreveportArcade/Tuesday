@@ -4,6 +4,15 @@ Tuesday is a generic C# Tiled (.tmx) serializer and deserializer and a set of Un
 
 The goals of this project are full support of the TMX file format, feature parity with the standalone Tiled map editor, and minimal dependencies.
 
+
+## Installation
+
+[To add as a Unitypackage, download as from the itch.io page.](https://318arcade.itch.io/tuesday)
+
+To add as a Git submodule:
+`git submodule add git@github.com:ShreveportArcade/Tuesday.git Assets/Tuesday`
+
+
 ## Features
 
  * Drag and Drop TMX files into the Scene View or Hierarchy
