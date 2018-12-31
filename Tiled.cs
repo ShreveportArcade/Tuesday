@@ -38,7 +38,8 @@ public class TMXFile {
     [XmlAttribute("height")] public int height = 0;
     [XmlAttribute("tilewidth")] public int tileWidth = 0;
     [XmlAttribute("tileheight")] public int tileHeight = 0;
-    [XmlAttribute("hexsidelength")] public int? hexSideLength;
+    [XmlAttribute("hexsidelength")] public int hexSideLength;
+    [XmlIgnore] public bool hexSideLengthSpecified { get { return (hexSideLength > 0); } set {}}
     [XmlAttribute("staggeraxis")] public string staggerAxis;
     [XmlIgnore] public bool staggerAxisSpecified { get { return !string.IsNullOrEmpty(staggerAxis); } set {}}
     [XmlAttribute("staggerindex")] public string staggerIndex;
@@ -185,8 +186,7 @@ public class TMXFile {
                 bestMatch = tile;
             }
             else if (matches == mostMatches 
-                && tile.probability.HasValue 
-                && tile.probability.Value > r.NextDouble()) {
+                && tile.probability > r.NextDouble()) {
                 bestMatch = tile;
             }
         }
@@ -311,10 +311,14 @@ public class TileSet {
 [System.Serializable]
 public class Layer {
     [XmlAttribute("name")] public string name;
-    [XmlAttribute("opacity")] public float? opacity;
-    [XmlAttribute("visible")] public int? visible;
-    [XmlAttribute("offsetx")] public int? offsetX;
-    [XmlAttribute("offsety")] public int? offsetY;
+    [XmlAttribute("opacity")] public float opacity;
+    [XmlIgnore] public bool opacitySpecified { get { return opacity < 1; } set {}}
+    [XmlAttribute("visible")] public int visible;
+    [XmlIgnore] public bool visibleSpecified { get { return visible < 1; } set {}}
+    [XmlAttribute("offsetx")] public int offsetX;
+    [XmlIgnore] public bool offsetXSpecified { get { return offsetX != 0; } set {}}
+    [XmlAttribute("offsety")] public int offsetY;
+    [XmlIgnore] public bool offsetYSpecified { get { return offsetY != 0; } set {}}
     [XmlAttribute("width")] public int width;
     [XmlAttribute("height")] public int height;
 
@@ -516,8 +520,8 @@ public class Tile {
     }
     [XmlIgnore] public bool terrainStrSpecified { get { return !string.IsNullOrEmpty(terrainStr); } set {} }
     
-    [XmlAttribute("probability")] public float? probability;
-    [XmlIgnore] public bool probabilitySpecified { get { return probability != null; } set { } }
+    [XmlAttribute("probability")] public float probability = 0;
+    [XmlIgnore] public bool probabilitySpecified { get { return probability > 0; } set { } }
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
@@ -612,10 +616,14 @@ public class ObjectGroup {
     [XmlAttribute("color")] public string color;
     [XmlIgnore] public bool colorSpecified { get { return !string.IsNullOrEmpty(color); } set {} }
 
-    [XmlAttribute("opacity")] public float? opacity;
-    [XmlAttribute("visible")] public int? visible;
-    [XmlAttribute("offsetx")] public int? offsetX;
-    [XmlAttribute("offsety")] public int? offsetY;
+    [XmlAttribute("opacity")] public float opacity;
+    [XmlIgnore] public bool opacitySpecified { get { return opacity < 1; } set {}}
+    [XmlAttribute("visible")] public int visible;
+    [XmlIgnore] public bool visibleSpecified { get { return visible < 1; } set {}}
+    [XmlAttribute("offsetx")] public int offsetX;
+    [XmlIgnore] public bool offsetXSpecified { get { return offsetX != 0; } set {}}
+    [XmlAttribute("offsety")] public int offsetY;
+    [XmlIgnore] public bool offsetYSpecified { get { return offsetY != 0; } set {}}
     [XmlAttribute("draworder")] public string drawOrder;
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
@@ -630,16 +638,17 @@ public class TileObject {
     [XmlIgnore] public bool nameSpecified { get { return !string.IsNullOrEmpty(name); } set {} }
     [XmlAttribute("type")] public string type;
     [XmlIgnore] public bool typeSpecified { get { return !string.IsNullOrEmpty(type); } set {} }
-    [XmlAttribute("gid")] public uint? gid;
+    [XmlAttribute("gid")] public uint gid;
     [XmlAttribute("x")] public float x = 0;
     [XmlAttribute("y")] public float y = 0;
     [XmlAttribute("width")] public float width = 0;
     [XmlIgnore] public bool widthSpecified { get { return width > 0; } set {} }
     [XmlAttribute("height")] public float height = 0;
     [XmlIgnore] public bool heightSpecified { get { return height > 0; } set {} }
-    [XmlAttribute("rotation")] public float? rotation;
-    [XmlAttribute("visible")] public int? visible;
-
+    [XmlAttribute("rotation")] public float rotation;
+    [XmlIgnore] public bool rotationSpecified { get { return rotation != 0; } set { } }
+    [XmlAttribute("visible")] public int visible = 1;
+    [XmlIgnore] public bool visibleSpecified { get { return visible != 1; } set { } }
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
     [XmlElement("ellipse")] public string ellipse;
@@ -704,19 +713,19 @@ public class WangColor {
 public class WangTile {
     [XmlAttribute("tileid")] public int tileID = 0;
     [XmlAttribute("wangid")] public string _wangIDStr = "0x00000000";
-    [XmlIgnore] public UInt32? _wangID;
+    [XmlIgnore] public UInt32 _wangID = UInt32.MaxValue;
     [XmlIgnore] public UInt32 wangID {
         get { 
-            if (_wangID == null) {
+            if (_wangID < 0) {
                 _wangID = UInt32.Parse(
                     _wangIDStr.Replace("0x", ""), 
                     System.Globalization.NumberStyles.HexNumber
                 );
             }
-            return _wangID.Value;
+            return _wangID;
         }
         set { 
-            if (value != _wangID.Value) {
+            if (value != _wangID) {
                 _wangID = value;
                 _wangIDStr = "0x" + value.ToString("X"); 
             }

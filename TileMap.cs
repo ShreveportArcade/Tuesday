@@ -134,9 +134,9 @@ public class TileMap : MonoBehaviour {
             (1 - pivot.y) * tmxFile.tileHeight * tmxFile.height / pixelsPerUnit
         );
 
-        if (tmxFile.orientation == "hexagonal" && tmxFile.hexSideLength != null) {
-            if (tmxFile.staggerAxis == "x") tileOffset.z = tmxFile.tileWidth - tmxFile.hexSideLength.Value * 0.5f;
-            else tileOffset.w = -tmxFile.tileHeight + tmxFile.hexSideLength.Value * 0.5f;
+        if (tmxFile.orientation == "hexagonal" && tmxFile.hexSideLength > 0) {
+            if (tmxFile.staggerAxis == "x") tileOffset.z = tmxFile.tileWidth - tmxFile.hexSideLength * 0.5f;
+            else tileOffset.w = -tmxFile.tileHeight + tmxFile.hexSideLength * 0.5f;
         }
         else if (tmxFile.orientation == "staggered") {
             if (tmxFile.staggerAxis == "x") tileOffset.z -= tileOffset.x * 0.5f;
