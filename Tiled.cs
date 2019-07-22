@@ -197,6 +197,8 @@ public class TMXFile {
 [XmlRoot("tileset")]
 [System.Serializable]
 public class TileSet {
+    [XmlIgnore] public bool hasDocType = false;
+
     [XmlIgnore] public bool hasSource { get { return !string.IsNullOrEmpty(source); }}
 
     [XmlAttribute("firstgid")] public int firstGID;
@@ -257,7 +259,19 @@ public class TileSet {
         TextReader textReader = new StreamReader(path);
         TileSet tileSet = (TileSet)deserializer.Deserialize(textReader);
         textReader.Close();
-        
+
+        XmlTextReader xmlReader = new XmlTextReader(path);
+        bool hasDocType = false;
+        for (int i = 0; i < 3; i++) {
+            xmlReader.Read();
+            if (xmlReader.NodeType == XmlNodeType.DocumentType) {
+                hasDocType = true;
+                break;
+            }
+        }
+        tileSet.hasDocType = hasDocType;
+        xmlReader.Close();
+
         return tileSet;
     }
 
@@ -270,6 +284,7 @@ public class TileSet {
         xmlWriter.Formatting = Formatting.Indented;
         xmlWriter.Indentation = 1;
         xmlWriter.WriteStartDocument();
+        if (hasDocType) xmlWriter.WriteDocType("tileset", null, "http://mapeditor.org/dtd/1.0/map.dtd", null);
         XmlSerializerNamespaces nameSpaces = new XmlSerializerNamespaces();
         nameSpaces.Add("","");
         serializer.Serialize(xmlWriter, this, nameSpaces);
@@ -311,9 +326,9 @@ public class TileSet {
 [System.Serializable]
 public class Layer {
     [XmlAttribute("name")] public string name;
-    [XmlAttribute("opacity")] public float opacity;
+    [XmlAttribute("opacity")] public float opacity = 1;
     [XmlIgnore] public bool opacitySpecified { get { return opacity < 1; } set {}}
-    [XmlAttribute("visible")] public int visible;
+    [XmlAttribute("visible")] public int visible = 1;
     [XmlIgnore] public bool visibleSpecified { get { return visible < 1; } set {}}
     [XmlAttribute("offsetx")] public int offsetX;
     [XmlIgnore] public bool offsetXSpecified { get { return offsetX != 0; } set {}}
@@ -616,9 +631,9 @@ public class ObjectGroup {
     [XmlAttribute("color")] public string color;
     [XmlIgnore] public bool colorSpecified { get { return !string.IsNullOrEmpty(color); } set {} }
 
-    [XmlAttribute("opacity")] public float opacity;
+    [XmlAttribute("opacity")] public float opacity = 1;
     [XmlIgnore] public bool opacitySpecified { get { return opacity < 1; } set {}}
-    [XmlAttribute("visible")] public int visible;
+    [XmlAttribute("visible")] public int visible = 1;
     [XmlIgnore] public bool visibleSpecified { get { return visible < 1; } set {}}
     [XmlAttribute("offsetx")] public int offsetX;
     [XmlIgnore] public bool offsetXSpecified { get { return offsetX != 0; } set {}}

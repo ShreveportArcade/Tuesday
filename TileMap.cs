@@ -186,7 +186,6 @@ public class TileMap : MonoBehaviour {
             }
             meshObject.AddComponent<MeshRenderer>();
             meshObject.AddComponent<MeshFilter>();
-            meshObject.AddComponent<PolygonCollider2D>();
             SortingGroup sort = meshObject.AddComponent<SortingGroup>();
             sort.sortingOrder = layerIndex;
             sort.sortingLayerName = layerData.name;
@@ -460,8 +459,9 @@ public class TileMap : MonoBehaviour {
     public void UpdatePolygonCollider (int layerIndex, int submeshIndex) {
         if (layerPaths[layerIndex].Length <= submeshIndex) return;
         List<List<IntPoint>> paths = layerPaths[layerIndex][submeshIndex];
-        if (paths == null) return;
+        if (paths == null || paths.Count == 0) return;
         PolygonCollider2D poly = layerSubmeshObjects[layerIndex][submeshIndex].GetComponent<PolygonCollider2D>();
+        if (poly == null) poly = layerSubmeshObjects[layerIndex][submeshIndex].AddComponent<PolygonCollider2D>();
         poly.pathCount = paths.Count;
         for (int i = 0; i < paths.Count; i++) {
             Vector2[] path = System.Array.ConvertAll(paths[i].ToArray(), (p) => IntPointToVector2(p));
