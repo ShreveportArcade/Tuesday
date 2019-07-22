@@ -85,7 +85,7 @@ public class TileMapEditor : Editor {
                 materialPath = materialPath.Replace(dataPath, "Assets");
                 mat = AssetDatabase.LoadAssetAtPath(materialPath, typeof(Material)) as Material;
                 if (mat == null) {
-                    mat = new Material(Shader.Find("Particles/Standard Unlit"));
+                    mat = new Material(Shader.Find("Unlit/Transparent"));
                     mat.mainTexture = GetTileSetTexture(tileSet, path);
                     AssetDatabase.CreateAsset(mat, materialPath);
                 }
