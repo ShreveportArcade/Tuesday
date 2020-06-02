@@ -91,7 +91,7 @@ class TMXAssetEditor : Editor {
 
         EditorApplication.update += EditorUpdate;
         EditorApplication.hierarchyWindowItemOnGUI += HierarchyGUICallback;
-        SceneView.onSceneGUIDelegate += SceneGUICallback;
+        SceneView.duringSceneGui += SceneGUICallback;
     }
 
     public override void OnInspectorGUI() {
