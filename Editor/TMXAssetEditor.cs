@@ -121,6 +121,7 @@ class TMXAssetEditor : Editor {
     }
 
     private static void EditorUpdate() {
+        if (Application.isPlaying) return;
         EditorWindow window = EditorWindow.mouseOverWindow;
         if (window && window.GetType() == hierarchyType) {
             if (!window.wantsMouseMove) window.wantsMouseMove = true;
