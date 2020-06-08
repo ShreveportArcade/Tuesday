@@ -34,6 +34,7 @@ public class TileMap : MonoBehaviour {
     [HideInInspector] public Vector4 tileOffset;
     [HideInInspector] public Vector2 offset;
     [HideInInspector] public GameObject[] layers;
+    [HideInInspector] public GameObject[] objectGroups;
     [HideInInspector] public Material[] tileSetMaterials;
 
     public Bounds bounds {
@@ -168,6 +169,12 @@ public class TileMap : MonoBehaviour {
                 }
             }
         }
+
+        objectGroups = new GameObject[tmxFile.objectGroups.Length];
+        for (int i = 0; i < tmxFile.objectGroups.Length; i++) {
+            CreateObjectGroup(i);
+        }
+
     }
 
     public void CreateTileLayer (int layerIndex) {
@@ -195,6 +202,15 @@ public class TileMap : MonoBehaviour {
             UpdateMesh(layerIndex, submeshIndex);
             UpdatePolygonCollider(layerIndex, submeshIndex);
         }        
+    }
+
+    public void CreateObjectGroup (int groupIndex) {
+        ObjectGroup groupData = tmxFile.objectGroups[groupIndex];
+        GameObject group = new GameObject(groupData.name);
+        group.transform.SetParent(transform);
+        group.transform.localPosition = Vector3.zero;
+        objectGroups[groupIndex] = group;
+
     }
 
     public void ReloadMap () {
