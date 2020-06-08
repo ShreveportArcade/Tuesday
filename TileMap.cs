@@ -114,7 +114,6 @@ public class TileMap : MonoBehaviour {
         }
     }
 
-
     private int meshesPerLayer {
         get { return 1 + tmxFile.width * tmxFile.height / 16250; }
     }
@@ -170,6 +169,13 @@ public class TileMap : MonoBehaviour {
             }
         }
 
+        if (objectGroups != null) {
+            foreach (GameObject group in objectGroups) {
+                if (group == null) continue;
+                DestroyImmediate(group);
+            }
+        }
+
         objectGroups = new GameObject[tmxFile.objectGroups.Length];
         for (int i = 0; i < tmxFile.objectGroups.Length; i++) {
             CreateObjectGroup(i);
@@ -211,6 +217,20 @@ public class TileMap : MonoBehaviour {
         group.transform.localPosition = Vector3.zero;
         objectGroups[groupIndex] = group;
 
+        foreach (TileObject tileObject in groupData.objects) {
+            GameObject g = new GameObject(tileObject.name);
+            g.transform.SetParent(group.transform);
+            float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
+            g.transform.localPosition = new Vector3(tileObject.x, y, 0) / (float)pixelsPerUnit;
+            SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
+            TileSet tileSet = tmxFile.GetTileSetByTileID((int)tileObject.gid);
+            int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
+            Texture2D tex = tileSetMaterials[tileSetIndex].mainTexture as Texture2D;
+            TileRect r = tileSet.GetTileSpriteRect((int)tileObject.gid);
+            Rect rect = new Rect(r.x, r.y, r.width, r.height);
+            Vector2 pivot = Vector2.zero;
+            sprite.sprite = Sprite.Create(tex, rect, pivot, pixelsPerUnit, 0, SpriteMeshType.FullRect);
+        }
     }
 
     public void ReloadMap () {
