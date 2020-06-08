@@ -19,6 +19,7 @@ To add as a Git submodule:
  * External Tile Set support (TSX files)
  * CSV, Base64, GZIP, and zLib encoding/decoding
  * Collision geometry support
+ * Tiled Object support
  * Paint individual tiles in Unity
  * Paint Terrains in Unity
  * Export your changes back out as TMX/TSX files
@@ -26,7 +27,6 @@ To add as a Git submodule:
 
 ## Roadmap
  * Compartmentalize TileMapEditor code
- * Tiled Object support
  * Paint Wang Tiles
  * Template Group (TGX) support
  * feature parity with Tiled standalone
