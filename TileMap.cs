@@ -187,7 +187,8 @@ public class TileMap : MonoBehaviour {
         Layer layerData = tmxFile.layers[layerIndex];
         GameObject layer = new GameObject(layerData.name);
         layer.transform.SetParent(transform);
-        layer.transform.localPosition = Vector3.zero;
+        layer.transform.localPosition = new Vector3(layerData.offsetX, -layerData.offsetY, 0) / pixelsPerUnit;
+
         layers[layerIndex] = layer;
 
         _layerSubmeshObjects[layerIndex] = new GameObject[meshesPerLayer];
@@ -214,7 +215,7 @@ public class TileMap : MonoBehaviour {
         ObjectGroup groupData = tmxFile.objectGroups[groupIndex];
         GameObject group = new GameObject(groupData.name);
         group.transform.SetParent(transform);
-        group.transform.localPosition = Vector3.zero;
+        group.transform.localPosition = new Vector3(groupData.offsetX, -groupData.offsetY, 0) / pixelsPerUnit;
         objectGroups[groupIndex] = group;
 
         foreach (TileObject tileObject in groupData.objects) {
