@@ -218,18 +218,30 @@ public class TileMap : MonoBehaviour {
         objectGroups[groupIndex] = group;
 
         foreach (TileObject tileObject in groupData.objects) {
+            int tileID = (int)tileObject.gid;
             GameObject g = new GameObject(tileObject.name);
             g.transform.SetParent(group.transform);
             float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
-            g.transform.localPosition = new Vector3(tileObject.x, y, 0) / (float)pixelsPerUnit;
+            g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
+            g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
+            g.transform.localScale = new Vector3(tileObject.width, tileObject.height, pixelsPerUnit) / pixelsPerUnit;
+
             SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
-            TileSet tileSet = tmxFile.GetTileSetByTileID((int)tileObject.gid);
+            TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
             int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
             Texture2D tex = tileSetMaterials[tileSetIndex].mainTexture as Texture2D;
-            TileRect r = tileSet.GetTileSpriteRect((int)tileObject.gid);
+            TileRect r = tileSet.GetTileSpriteRect(tileID);
             Rect rect = new Rect(r.x, r.y, r.width, r.height);
             Vector2 pivot = Vector2.zero;
             sprite.sprite = Sprite.Create(tex, rect, pivot, pixelsPerUnit, 0, SpriteMeshType.FullRect);
+
+            if (idToPhysics.ContainsKey(tileID)) {
+                float yOff = tmxFile.tileHeight / pixelsPerUnit;
+                Vector2[] path = System.Array.ConvertAll(idToPhysics[tileID], (p) => new Vector2(p.x, p.y + yOff));
+                PolygonCollider2D poly = g.AddComponent<PolygonCollider2D>();
+                poly.pathCount = 1;
+                poly.SetPath(0, path);
+            }
         }
     }
 
