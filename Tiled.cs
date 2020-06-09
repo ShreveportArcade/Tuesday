@@ -192,6 +192,27 @@ public class TMXFile {
         }
         return bestMatch;
     }
+
+    const uint FlippedHorizontallyFlag = 0x80000000;
+    const uint FlippedVerticallyFlag = 0x40000000;
+    const uint FlippedAntiDiagonallyFlag = 0x20000000;
+    const uint RotatedHexagonal120Flag = 0x10000000;
+
+    public static bool FlippedHorizontally (uint gid) {
+        return (gid & FlippedHorizontallyFlag) == FlippedHorizontallyFlag;
+    }
+
+    public static bool FlippedVertically (uint gid) {
+        return (gid & FlippedVerticallyFlag) == FlippedVerticallyFlag;
+    }
+
+    public static bool FlippedAntiDiagonally (uint gid) {
+        return (gid & FlippedAntiDiagonallyFlag) == FlippedAntiDiagonallyFlag;
+    }
+
+    public static bool RotatedHexagonal120 (uint gid) {
+        return (gid & RotatedHexagonal120Flag) == RotatedHexagonal120Flag;
+    }
 }
 
 [XmlRoot("tileset")]
@@ -482,19 +503,19 @@ public class Layer {
     }
 
     public bool FlippedHorizontally (int index) {
-        return (tileFlags[index] & FlippedHorizontallyFlag) == FlippedHorizontallyFlag;
+        return TMXFile.FlippedHorizontally(tileFlags[index]);
     }
 
     public bool FlippedVertically (int index) {
-        return (tileFlags[index] & FlippedVerticallyFlag) == FlippedVerticallyFlag;
+        return TMXFile.FlippedVertically(tileFlags[index]);
     }
 
     public bool FlippedAntiDiagonally (int index) {
-        return (tileFlags[index] & FlippedAntiDiagonallyFlag) == FlippedAntiDiagonallyFlag;
+        return TMXFile.FlippedAntiDiagonally(tileFlags[index]);
     }
 
     public bool RotatedHexagonal120 (int index) {
-        return (tileFlags[index] & RotatedHexagonal120Flag) == RotatedHexagonal120Flag;
+        return TMXFile.RotatedHexagonal120(tileFlags[index]);
     }
 
     public TilePoint GetTileLocation (int index) {

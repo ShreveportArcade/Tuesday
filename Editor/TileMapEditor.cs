@@ -289,10 +289,12 @@ public class TileMapEditor : Editor {
             tileMap.Setup();
         }
         if (GUILayout.Button("Save")) {
+            UpdateObjectGroups();
             tmxFile.Save(path);
             AssetDatabase.ImportAsset(path);
         }
         if (GUILayout.Button("Save As")) {
+            UpdateObjectGroups();
             tmxFile.Save(
                 EditorUtility.SaveFilePanel(
                     "Save as TMX",
@@ -305,6 +307,10 @@ public class TileMapEditor : Editor {
             AssetDatabase.ImportAsset(path);
         }
         EditorGUILayout.EndHorizontal();
+    }
+
+    public void UpdateObjectGroups () {
+        
     }
 
     public override bool HasPreviewGUI() {

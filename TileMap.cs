@@ -36,6 +36,7 @@ public class TileMap : MonoBehaviour {
     [HideInInspector] public GameObject[] layers;
     [HideInInspector] public GameObject[] objectGroups;
     [HideInInspector] public Material[] tileSetMaterials;
+    [HideInInspector] public Sprite[] tileSetSprites;
 
     public Bounds bounds {
         get {
@@ -176,9 +177,11 @@ public class TileMap : MonoBehaviour {
             }
         }
 
-        objectGroups = new GameObject[tmxFile.objectGroups.Length];
-        for (int i = 0; i < tmxFile.objectGroups.Length; i++) {
-            CreateObjectGroup(i);
+        if (tmxFile.objectGroups != null) {
+            objectGroups = new GameObject[tmxFile.objectGroups.Length];
+            for (int i = 0; i < tmxFile.objectGroups.Length; i++) {
+                CreateObjectGroup(i);
+            }
         }
 
     }
@@ -218,6 +221,10 @@ public class TileMap : MonoBehaviour {
         group.transform.localPosition = new Vector3(groupData.offsetX, -groupData.offsetY, 0) / pixelsPerUnit;
         objectGroups[groupIndex] = group;
 
+        SortingGroup sort = group.AddComponent<SortingGroup>();
+        sort.sortingOrder = groupIndex;
+        sort.sortingLayerName = groupData.name;
+
         foreach (TileObject tileObject in groupData.objects) {
             int tileID = (int)tileObject.gid;
             GameObject g = new GameObject(tileObject.name);
@@ -228,9 +235,13 @@ public class TileMap : MonoBehaviour {
             g.transform.localScale = new Vector3(tileObject.width, tileObject.height, pixelsPerUnit) / pixelsPerUnit;
 
             SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
+            sprite.flipX = TMXFile.FlippedHorizontally(tileObject.gid);
+            sprite.flipY = TMXFile.FlippedVertically(tileObject.gid);
             TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
             int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
-            Texture2D tex = tileSetMaterials[tileSetIndex].mainTexture as Texture2D;
+            Material mat = tileSetMaterials[tileSetIndex];
+            if (mat == null) continue;
+            Texture2D tex = mat.mainTexture as Texture2D;
             TileRect r = tileSet.GetTileSpriteRect(tileID);
             Rect rect = new Rect(r.x, r.y, r.width, r.height);
             Vector2 pivot = Vector2.zero;
