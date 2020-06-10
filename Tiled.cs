@@ -694,7 +694,7 @@ public class TileObject {
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
     [XmlElement("ellipse")] public string ellipse;
-    [XmlIgnore] public bool ellipseSpecified { get { return ellipse != null; } set {} }
+    [XmlIgnore] public bool ellipseSpecified { get { return !string.IsNullOrEmpty(ellipse); } set {} }
     [XmlElement("polygon", typeof(Polygon))] public Polygon polygon;
     [XmlIgnore] public bool polygonSpecified { get { return polygon != null && !string.IsNullOrEmpty(polygon.points); } set {} }
     [XmlElement("polyline", typeof(Polygon))] public Polygon polyline;
