@@ -321,7 +321,18 @@ public class TileMap : MonoBehaviour {
         bool staggerX = tmxFile.staggerAxis == "x";
         int staggerIndex = (tmxFile.staggerAxis == "even") ? 0 : 1;
 
-        Color white = Color.white;
+        Color color = Color.white;
+        if (layerData.properties != null) {
+            foreach (Property prop in layerData.properties) {
+                if (prop.type == "color") {
+                    string colorStr = prop.val;
+                    if (colorStr.Length > 8) colorStr = "#" + colorStr.Substring(3) + colorStr.Substring(1, 2);
+                    ColorUtility.TryParseHtmlString(colorStr, out color); 
+                }
+            }
+        }
+        Debug.Log(color);
+
         int vertIndex = 0;      
         int[] matTriIndices = new int[tmxFile.tileSets.Length];
         for (int tileIndex = submeshIndex * 16250; tileIndex < Mathf.Min((submeshIndex+1) * 16250, layerData.tileIDs.Length); tileIndex++) {        
@@ -445,10 +456,10 @@ public class TileMap : MonoBehaviour {
             uvs[vertIndex+2] = uvArray[2];
             uvs[vertIndex+3] = uvArray[3];
 
-            colors[vertIndex] = white;
-            colors[vertIndex+1] = white;
-            colors[vertIndex+2] = white;
-            colors[vertIndex+3] = white;
+            colors[vertIndex] = color;
+            colors[vertIndex+1] = color;
+            colors[vertIndex+2] = color;
+            colors[vertIndex+3] = color;
 
             int matIndex = firstGIDToIndex[tileSet.firstGID];
             matTris[matIndex][matTriIndices[matIndex]] = vertIndex;
