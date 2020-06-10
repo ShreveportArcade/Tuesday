@@ -36,7 +36,7 @@ public class TileMap : MonoBehaviour {
     [HideInInspector] public GameObject[] layers;
     [HideInInspector] public GameObject[] objectGroups;
     [HideInInspector] public Material[] tileSetMaterials;
-    [HideInInspector] public Sprite[] tileSetSprites;
+    [HideInInspector] public Sprite[][] tileSetSprites;
 
     public Bounds bounds {
         get {
@@ -232,20 +232,25 @@ public class TileMap : MonoBehaviour {
             float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
             g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
             g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
-            g.transform.localScale = new Vector3(tileObject.width, tileObject.height, pixelsPerUnit) / pixelsPerUnit;
 
             SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
             sprite.flipX = TMXFile.FlippedHorizontally(tileObject.gid);
             sprite.flipY = TMXFile.FlippedVertically(tileObject.gid);
             TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
-            int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
-            Material mat = tileSetMaterials[tileSetIndex];
-            if (mat == null) continue;
-            Texture2D tex = mat.mainTexture as Texture2D;
-            TileRect r = tileSet.GetTileSpriteRect(tileID);
-            Rect rect = new Rect(r.x, r.y, r.width, r.height);
-            Vector2 pivot = Vector2.zero;
-            sprite.sprite = Sprite.Create(tex, rect, pivot, pixelsPerUnit, 0, SpriteMeshType.FullRect);
+            if (tileSet != null && tileSet.image != null && !string.IsNullOrEmpty(tileSet.image.source)) {
+                g.transform.localScale = new Vector3(tileObject.width, tileObject.height, pixelsPerUnit) / pixelsPerUnit;
+                int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
+                Material mat = tileSetMaterials[tileSetIndex];
+                Texture2D tex = mat.mainTexture as Texture2D;
+                TileRect r = tileSet.GetTileSpriteRect(tileID);
+                Rect rect = new Rect(r.x, r.y, r.width, r.height);
+                Vector2 pivot = Vector2.zero;
+                sprite.sprite = Sprite.Create(tex, rect, pivot, pixelsPerUnit, 0, SpriteMeshType.FullRect);
+            }
+            else {
+                int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
+                sprite.sprite = tileSetSprites[tileSetIndex][tileID-tileSet.firstGID];
+            }
 
             if (idToPhysics.ContainsKey(tileID)) {
                 float yOff = tmxFile.tileHeight / pixelsPerUnit;

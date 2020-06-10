@@ -97,35 +97,48 @@ public class TileMapEditor : Editor {
         return materials;
     }
 
+    public static Sprite[][] GetSprites (TMXFile tmxFile, string path) {
+        Sprite[][] tileSetSprites = new Sprite[tmxFile.tileSets.Length][];
+        for (int i = 0; i < tmxFile.tileSets.Length; i++) {
+            TileSet tileSet = tmxFile.tileSets[i];
+            if (tileSet != null && tileSet.image != null && !string.IsNullOrEmpty(tileSet.image.source)) continue;
+
+            List<Sprite> sprites = new List<Sprite>();
+            foreach (Tile tile in tileSet.tiles) {
+                if (tile.image == null || string.IsNullOrEmpty(tile.image.source)) continue;
+                string texturePath = Path.Combine(Path.GetDirectoryName(path), tile.image.source);
+                Texture2D tex = GetImageTexture(tile.image, texturePath);
+                Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(AssetDatabase.GetAssetPath(tex));
+                sprites.Add(sprite);
+            }
+            tileSetSprites[i] = sprites.ToArray();
+        }
+        return tileSetSprites;
+    }
+
     public static Texture2D GetTileSetTexture (TileSet tileSet, string path) {
         if (tileSet.image == null || tileSet.image.source == null) return null;
 
-        Texture2D tex = null;
-        if (tileSetTextures.ContainsKey(tileSet.image.source)) {
-            tex = tileSetTextures[tileSet.image.source];
+        string texturePath = tileSet.image.source;
+        if (tileSet.source == null) {
+            texturePath = Path.Combine(Path.GetDirectoryName(path), texturePath);
         }
         else {
-            string texturePath = tileSet.image.source;
-            if (tileSet.source == null) {
-                texturePath = Path.Combine(Path.GetDirectoryName(path), texturePath);
-            }
-            else {
-                string tileSetPath = Path.Combine(Path.GetDirectoryName(path), tileSet.source);
-                texturePath = Path.Combine(Path.GetDirectoryName(tileSetPath), texturePath);
-            }
-            texturePath = Path.GetFullPath(texturePath);
-            string dataPath = Path.GetFullPath(Application.dataPath);
-            texturePath = texturePath.Replace(dataPath, "Assets");
-            tex = AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D)) as Texture2D;
+            string tileSetPath = Path.Combine(Path.GetDirectoryName(path), tileSet.source);
+            texturePath = Path.Combine(Path.GetDirectoryName(tileSetPath), texturePath);
         }
+        return GetImageTexture(tileSet.image, texturePath);
+    }
 
-        if (tex == null) {
-            tex = EditorGUIUtility.FindTexture(Path.GetFileNameWithoutExtension(path));
-        }
+    public static Texture2D GetImageTexture (Image image, string texturePath) {
+        if (tileSetTextures.ContainsKey(image.source)) return tileSetTextures[image.source];
 
-        if (tex != null) {
-            tileSetTextures[tileSet.image.source] = tex;
-        }
+        texturePath = Path.GetFullPath(texturePath);
+        string dataPath = Path.GetFullPath(Application.dataPath);
+        texturePath = texturePath.Replace(dataPath, "Assets");
+        Texture2D tex = AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D)) as Texture2D;
+
+        if (tex != null) tileSetTextures[image.source] = tex;
 
         return tex;
     }
@@ -170,6 +183,15 @@ public class TileMapEditor : Editor {
 
     Rect tileRect;
     private void TileSetField (TileSet tileSet) {
+        if (tileSet != null && tileSet.image != null && !string.IsNullOrEmpty(tileSet.image.source)) TileSetTextureField(tileSet);
+        else TileSetSpriteCollectionField(tileSet);
+    }
+
+    private void TileSetSpriteCollectionField (TileSet tileSet) {
+
+    }
+
+    private void TileSetTextureField (TileSet tileSet) {
         int id = tileSet.firstGID;
 
         EditorGUIUtility.hierarchyMode = false;
@@ -254,14 +276,7 @@ public class TileMapEditor : Editor {
         if (tmxFile.tileSets != null) {
             if (tileMap.tileSetMaterials.Length != tmxFile.tileSets.Length) {
                 tileMap.tileSetMaterials = TileMapEditor.GetMaterials(tmxFile, path);
-            }
-            else {
-                foreach (Material mat in tileMap.tileSetMaterials) {
-                    if (mat == null) {
-                        tileMap.tileSetMaterials = TileMapEditor.GetMaterials(tmxFile, path);
-                        break;
-                    }
-                }
+                tileMap.tileSetSprites = TileMapEditor.GetSprites(tmxFile, path);
             }
             
             EditorGUILayout.LabelField("Tile Sets", EditorStyles.boldLabel);
@@ -284,8 +299,9 @@ public class TileMapEditor : Editor {
 
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Reload")) {
-
             tmxFile = TMXFile.Load(path);
+            tileMap.tileSetMaterials = TileMapEditor.GetMaterials(tmxFile, path);
+            tileMap.tileSetSprites = TileMapEditor.GetSprites(tmxFile, path);
             tileMap.Setup();
         }
         if (GUILayout.Button("Save")) {
