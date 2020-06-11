@@ -22,6 +22,11 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using ClipperLib;
 
+#if UNITY_EDITOR
+using System.IO;
+using UnityEditor;
+#endif
+
 namespace Tiled {
 public class TileMap : MonoBehaviour {
 
@@ -37,6 +42,7 @@ public class TileMap : MonoBehaviour {
     [HideInInspector] public GameObject[] objectGroups;
     [HideInInspector] public Material[] tileSetMaterials;
     [HideInInspector] public Sprite[][] tileSetSprites;
+    [HideInInspector] public GameObject[] prefabs;
 
     public Bounds bounds {
         get {
@@ -225,40 +231,66 @@ public class TileMap : MonoBehaviour {
         sort.sortingOrder = groupIndex;
         sort.sortingLayerName = groupData.name;
 
+        float w = tmxFile.tileWidth / pixelsPerUnit;
+        float h = tmxFile.tileHeight / pixelsPerUnit;
         foreach (TileObject tileObject in groupData.objects) {
-            int tileID = (int)tileObject.gid;
-            GameObject g = new GameObject(tileObject.name);
-            g.transform.SetParent(group.transform);
-            float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
-            g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
-            g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
+            bool isPrefab = tileObject.properties != null && System.Array.Exists(tileObject.properties, (p) => p.name == "prefab");
+            if (isPrefab) CreatePrefabTile(group, tileObject);
+            else CreateSpriteTile(group, tileObject);
+        }
+    }
 
-            SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
-            sprite.flipX = TMXFile.FlippedHorizontally(tileObject.gid);
-            sprite.flipY = TMXFile.FlippedVertically(tileObject.gid);
-            TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
-            if (tileSet != null && tileSet.image != null && !string.IsNullOrEmpty(tileSet.image.source)) {
-                g.transform.localScale = new Vector3(tileObject.width, tileObject.height, pixelsPerUnit) / pixelsPerUnit;
-                int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
-                Material mat = tileSetMaterials[tileSetIndex];
-                Texture2D tex = mat.mainTexture as Texture2D;
-                TileRect r = tileSet.GetTileSpriteRect(tileID);
-                Rect rect = new Rect(r.x, r.y, r.width, r.height);
-                Vector2 pivot = Vector2.zero;
-                sprite.sprite = Sprite.Create(tex, rect, pivot, pixelsPerUnit, 0, SpriteMeshType.FullRect);
-            }
-            else {
-                int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
-                sprite.sprite = tileSetSprites[tileSetIndex][tileID-tileSet.firstGID];
-            }
+    public void CreatePrefabTile (GameObject group, TileObject tileObject) {
+        int tileID = (int)tileObject.gid;
+        Property prop = System.Array.Find(tileObject.properties, (p) => p.name == "prefab");
 
-            if (idToPhysics.ContainsKey(tileID)) {
-                float yOff = tmxFile.tileHeight / pixelsPerUnit;
-                Vector2[] path = System.Array.ConvertAll(idToPhysics[tileID], (p) => new Vector2(p.x, p.y + yOff));
-                PolygonCollider2D poly = g.AddComponent<PolygonCollider2D>();
-                poly.pathCount = 1;
-                poly.SetPath(0, path);
-            }
+#if UNITY_EDITOR
+        string prefabPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(tmxFilePath), prop.val));
+        string dataPath = Path.GetFullPath(Application.dataPath);
+        prefabPath = prefabPath.Replace(dataPath, "Assets");
+        GameObject prefab = AssetDatabase.LoadAssetAtPath(prefabPath, typeof(GameObject)) as GameObject;
+        GameObject g = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+        g.transform.SetParent(group.transform);
+        float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
+        g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
+        g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
+
+#endif        
+    }
+
+    public void CreateSpriteTile (GameObject group, TileObject tileObject) {
+        int tileID = (int)tileObject.gid;
+        GameObject g = new GameObject(tileObject.name);
+        g.transform.SetParent(group.transform);
+        float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
+        g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
+        g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
+
+        SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
+        sprite.flipX = TMXFile.FlippedHorizontally(tileObject.gid);
+        sprite.flipY = TMXFile.FlippedVertically(tileObject.gid);
+        TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
+        if (tileSet != null && tileSet.image != null && !string.IsNullOrEmpty(tileSet.image.source)) {
+            g.transform.localScale = new Vector3(tileObject.width, tileObject.height, pixelsPerUnit) / pixelsPerUnit;
+            int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
+            Material mat = tileSetMaterials[tileSetIndex];
+            Texture2D tex = mat.mainTexture as Texture2D;
+            TileRect r = tileSet.GetTileSpriteRect(tileID);
+            Rect rect = new Rect(r.x, r.y, r.width, r.height);
+            Vector2 pivot = Vector2.zero;
+            sprite.sprite = Sprite.Create(tex, rect, pivot, pixelsPerUnit, 0, SpriteMeshType.FullRect);
+        }
+        else {
+            int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
+            sprite.sprite = tileSetSprites[tileSetIndex][tileID-tileSet.firstGID];
+        }
+
+        if (idToPhysics.ContainsKey(tileID)) {
+            float yOff = tmxFile.tileHeight / pixelsPerUnit;
+            Vector2[] path = System.Array.ConvertAll(idToPhysics[tileID], (p) => new Vector2(p.x, p.y + yOff));
+            PolygonCollider2D poly = g.AddComponent<PolygonCollider2D>();
+            poly.pathCount = 1;
+            poly.SetPath(0, path);
         }
     }
 
@@ -281,6 +313,17 @@ public class TileMap : MonoBehaviour {
         float x = (float)p.X / pixelsPerUnit;
         float y = (float)p.Y / pixelsPerUnit;
         return new Vector2(x, y);
+    }
+
+    public void UpdateLayerColor(int layerIndex) {
+        Layer layerData = tmxFile.layers[layerIndex];
+
+        for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
+            GameObject obj = layerSubmeshObjects[layerIndex][submeshIndex];
+            MeshFilter filter = obj.GetComponent<MeshFilter>();
+            Mesh mesh = filter.sharedMesh;
+            // filter.sharedMesh.colors = colors;
+        }
     }
 
     public void UpdateMesh(int layerIndex, int submeshIndex) {
@@ -322,16 +365,11 @@ public class TileMap : MonoBehaviour {
         int staggerIndex = (tmxFile.staggerAxis == "even") ? 0 : 1;
 
         Color color = Color.white;
-        if (layerData.properties != null) {
-            foreach (Property prop in layerData.properties) {
-                if (prop.type == "color") {
-                    string colorStr = prop.val;
-                    if (colorStr.Length > 8) colorStr = "#" + colorStr.Substring(3) + colorStr.Substring(1, 2);
-                    ColorUtility.TryParseHtmlString(colorStr, out color); 
-                }
-            }
+        if (layerData.tintColorSpecified) {
+            string colorStr = layerData.tintColor;
+            if (colorStr.Length > 8) colorStr = "#" + colorStr.Substring(3) + colorStr.Substring(1, 2);
+            ColorUtility.TryParseHtmlString(colorStr, out color); 
         }
-        Debug.Log(color);
 
         int vertIndex = 0;      
         int[] matTriIndices = new int[tmxFile.tileSets.Length];

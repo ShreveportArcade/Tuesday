@@ -12,6 +12,7 @@ The goals of this project are full support of the TMX file format, feature parit
 To add as a Git submodule:
 `git submodule add https://github.com/ShreveportArcade/Tuesday.git Assets/Tuesday`
 
+## Usage
 
 ## Features
 
@@ -19,14 +20,15 @@ To add as a Git submodule:
  * External Tile Set support (TSX files)
  * CSV, Base64, GZIP, and zLib encoding/decoding
  * Collision geometry support
+ * Tile layer tint support
  * Tiled Object support
  * Paint individual tiles in Unity
  * Paint Terrains in Unity
- * Export your changes back out as TMX/TSX files
+ * Prefab replacement
+ * Export your tile layer changes back out as TMX/TSX files
  * minimal component requirements
 
 ## Roadmap
- * Compartmentalize TileMapEditor code
+ * edit/export Tiled Objects
  * Paint Wang Tiles
  * Template Group (TGX) support
- * feature parity with Tiled standalone

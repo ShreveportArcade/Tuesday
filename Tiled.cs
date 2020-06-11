@@ -193,10 +193,10 @@ public class TMXFile {
         return bestMatch;
     }
 
-    const uint FlippedHorizontallyFlag = 0x80000000;
-    const uint FlippedVerticallyFlag = 0x40000000;
-    const uint FlippedAntiDiagonallyFlag = 0x20000000;
-    const uint RotatedHexagonal120Flag = 0x10000000;
+    public const uint FlippedHorizontallyFlag = 0x80000000;
+    public const uint FlippedVerticallyFlag = 0x40000000;
+    public const uint FlippedAntiDiagonallyFlag = 0x20000000;
+    public const uint RotatedHexagonal120Flag = 0x10000000;
 
     public static bool FlippedHorizontally (uint gid) {
         return (gid & FlippedHorizontallyFlag) == FlippedHorizontallyFlag;
@@ -363,15 +363,12 @@ public class Layer {
     [XmlIgnore] public bool offsetYSpecified { get { return offsetY != 0; } set {}}
     [XmlAttribute("width")] public int width;
     [XmlAttribute("height")] public int height;
+    [XmlAttribute("tintcolor")] public string tintColor;
+    [XmlIgnore] public bool tintColorSpecified { get { return !string.IsNullOrEmpty(tintColor); } set{} }
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
     [XmlElement("data", typeof(Data))] public Data tileData;
-    
-    const uint FlippedHorizontallyFlag = 0x80000000;
-    const uint FlippedVerticallyFlag = 0x40000000;
-    const uint FlippedAntiDiagonallyFlag = 0x20000000;
-    const uint RotatedHexagonal120Flag = 0x10000000;
 
     [XmlIgnore] public uint[] tileFlags;
     [XmlIgnore] public int[] _tileIDs;
@@ -416,7 +413,7 @@ public class Layer {
                 _tileIDs = new int[width * height];
                 for (int i = 0; i < _tileIDs.Length; i++) {
                     uint id = tileFlags[i];
-                    id &= ~(FlippedHorizontallyFlag | FlippedVerticallyFlag | FlippedAntiDiagonallyFlag | RotatedHexagonal120Flag);
+                    id &= ~(TMXFile.FlippedHorizontallyFlag | TMXFile.FlippedVerticallyFlag | TMXFile.FlippedAntiDiagonallyFlag | TMXFile.RotatedHexagonal120Flag);
                     _tileIDs[i] = (int)id;
                 }
             }
