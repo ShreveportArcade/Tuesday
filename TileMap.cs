@@ -126,11 +126,21 @@ public class TileMap : MonoBehaviour {
         get { return 1 + tmxFile.width * tmxFile.height / 16250; }
     }
 
-    public static Color TiledColor (string colorStr) {
+    public static Color TiledColorFromString (string colorStr) {
         Color color = Color.white;
         if (colorStr.Length > 8) colorStr = "#" + colorStr.Substring(3) + colorStr.Substring(1, 2);
         ColorUtility.TryParseHtmlString(colorStr, out color); 
         return color;
+    }
+
+    public static string TiledColorToStringARGB (Color color) {
+        string colorStr = ColorUtility.ToHtmlStringRGBA(color).ToLower();;
+        colorStr = "#" + colorStr.Substring(6, 2) + colorStr.Substring(0, 6);
+        return colorStr;
+    }
+
+    public static string TiledColorToStringRGB (Color color) {
+        return "#" + ColorUtility.ToHtmlStringRGB(color).ToLower();;
     }
 
     public void Setup (TMXFile tmxFile, string tmxFilePath, float pixelsPerUnit = -1) {
@@ -283,7 +293,7 @@ public class TileMap : MonoBehaviour {
                     info.SetValue(c, bool.Parse(prop.val));
                     break;
                 case "color":
-                    info.SetValue(c, TiledColor(prop.val));
+                    info.SetValue(c, TiledColorFromString(prop.val));
                     break;
                 default:
                     break;
@@ -351,12 +361,18 @@ public class TileMap : MonoBehaviour {
 
     public void UpdateLayerColor(int layerIndex) {
         Layer layerData = tmxFile.layers[layerIndex];
-
+        Color color = TiledColorFromString(layerData.tintColor);
         for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
             GameObject obj = layerSubmeshObjects[layerIndex][submeshIndex];
             MeshFilter filter = obj.GetComponent<MeshFilter>();
             Mesh mesh = filter.sharedMesh;
-            // filter.sharedMesh.colors = colors;
+            int len = mesh.colors.Length;
+            Color[] colors = new Color[len];
+            for (int i = 0; i < len; i++) {
+                colors[i] = color;
+            }
+            mesh.colors = colors;
+            filter.sharedMesh = mesh;
         }
     }
 
@@ -400,7 +416,7 @@ public class TileMap : MonoBehaviour {
 
         Color color = Color.white;
         if (layerData.tintColorSpecified) {
-            color = TiledColor(layerData.tintColor);
+            color = TiledColorFromString(layerData.tintColor);
         }
 
         int vertIndex = 0;      

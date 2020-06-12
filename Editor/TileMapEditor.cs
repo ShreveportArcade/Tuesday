@@ -268,8 +268,22 @@ public class TileMapEditor : Editor {
 
         if (tmxFile.layers != null) {
             EditorGUILayout.LabelField("Layers", EditorStyles.boldLabel);
+            EditorGUILayout.BeginHorizontal();
             string[] layerNames = Array.ConvertAll(tmxFile.layers, (layer) => layer.name);
             selectedLayer = GUILayout.SelectionGrid(selectedLayer, layerNames, 1);
+            EditorGUILayout.BeginVertical();
+            for (int i = 0; i < tmxFile.layers.Length; i++) {
+                Color c = TileMap.TiledColorFromString(tmxFile.layers[i].tintColor);
+                c = EditorGUILayout.ColorField(c);
+                string newColor = TileMap.TiledColorToStringARGB(c);
+                if (newColor != tmxFile.layers[i].tintColor) {
+                    tmxFile.layers[i].tintColor = newColor;
+                    tileMap.UpdateLayerColor(i);
+                }
+                
+            }
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.EndHorizontal();
             EditorGUILayout.Separator();
         }
         

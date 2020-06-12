@@ -664,6 +664,7 @@ public class ObjectGroup {
     [XmlAttribute("offsety")] public int offsetY;
     [XmlIgnore] public bool offsetYSpecified { get { return offsetY != 0; } set {}}
     [XmlAttribute("draworder")] public string drawOrder;
+    [XmlIgnore] public bool drawOrderSpecified { get { return !string.IsNullOrEmpty(drawOrder); } set {} }
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
