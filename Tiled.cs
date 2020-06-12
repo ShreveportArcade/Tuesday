@@ -51,8 +51,7 @@ public class TMXFile {
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
     [XmlElement("tileset", typeof(TileSet))] public TileSet[] tileSets;
-    [XmlElement("layer", typeof(Layer))] public Layer[] layers;
-    [XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup[] objectGroups;
+    [XmlElement("layer", typeof(TileLayer)), XmlElement("objectgroup", typeof(ObjectGroup))] public List<Layer> layers;
 
     public static TMXFile Load (string path) {
         XmlSerializer deserializer = new XmlSerializer(typeof(TMXFile));
@@ -138,19 +137,19 @@ public class TMXFile {
         return null;
     }
 
-    public void SetTile (Tile tile, Layer layer, int x, int y) {
+    public void SetTile (Tile tile, TileLayer layer, int x, int y) {
         TileSet tileSet = GetTileSetByTileID(tile.id);
         layer.SetTileID(tile.id - tileSet.firstGID, x, y);
     }
 
-    public Tile GetTile (Layer layer, int x, int y) {
+    public Tile GetTile (TileLayer layer, int x, int y) {
         if (x < 0 || x >= width || y < 0 || y >= height) return null;
         int tileID = layer.GetTileID(x, y);
         TileSet tileSet = GetTileSetByTileID(tileID);
         return tileSet.GetTile(tileID);
     }
 
-    public Tile GetTile (Layer layer, int index) {
+    public Tile GetTile (TileLayer layer, int index) {
         int tileID = layer.tileIDs[index];
         TileSet tileSet = GetTileSetByTileID(tileID);
         return tileSet.GetTile(tileID);
@@ -368,6 +367,10 @@ public class Layer {
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
+}
+
+[System.Serializable]
+public class TileLayer : Layer {
     [XmlElement("data", typeof(Data))] public Data tileData;
 
     [XmlIgnore] public uint[] tileFlags;
@@ -648,26 +651,11 @@ public class Frame {
 }
 
 [System.Serializable]
-public class ObjectGroup {
-    [XmlAttribute("name")] public string name;
-    [XmlIgnore] public bool nameSpecified { get { return !string.IsNullOrEmpty(name); } set {} }
-
+public class ObjectGroup : Layer {
     [XmlAttribute("color")] public string color;
     [XmlIgnore] public bool colorSpecified { get { return !string.IsNullOrEmpty(color); } set {} }
-
-    [XmlAttribute("opacity")] public float opacity = 1;
-    [XmlIgnore] public bool opacitySpecified { get { return opacity < 1; } set {}}
-    [XmlAttribute("visible")] public int visible = 1;
-    [XmlIgnore] public bool visibleSpecified { get { return visible < 1; } set {}}
-    [XmlAttribute("offsetx")] public int offsetX;
-    [XmlIgnore] public bool offsetXSpecified { get { return offsetX != 0; } set {}}
-    [XmlAttribute("offsety")] public int offsetY;
-    [XmlIgnore] public bool offsetYSpecified { get { return offsetY != 0; } set {}}
     [XmlAttribute("draworder")] public string drawOrder;
     [XmlIgnore] public bool drawOrderSpecified { get { return !string.IsNullOrEmpty(drawOrder); } set {} }
-
-    [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
-    [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
     [XmlElement("object", typeof(TileObject))] public TileObject[] objects;
 }
 

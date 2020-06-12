@@ -269,20 +269,23 @@ public class TileMapEditor : Editor {
         if (tmxFile.layers != null) {
             EditorGUILayout.LabelField("Layers", EditorStyles.boldLabel);
             EditorGUILayout.BeginHorizontal();
-            string[] layerNames = Array.ConvertAll(tmxFile.layers, (layer) => layer.name);
-            selectedLayer = GUILayout.SelectionGrid(selectedLayer, layerNames, 1);
-            EditorGUILayout.BeginVertical();
-            for (int i = 0; i < tmxFile.layers.Length; i++) {
-                Color c = TileMap.TiledColorFromString(tmxFile.layers[i].tintColor);
-                c = EditorGUILayout.ColorField(c);
-                string newColor = TileMap.TiledColorToStringARGB(c);
-                if (newColor != tmxFile.layers[i].tintColor) {
-                    tmxFile.layers[i].tintColor = newColor;
-                    tileMap.UpdateLayerColor(i);
-                }
-                
-            }
-            EditorGUILayout.EndVertical();
+                string[] layerNames = Array.ConvertAll(tmxFile.layers.ToArray(), (layer) => layer.name);
+                Array.Reverse(layerNames);
+                int s = tmxFile.layers.Count - 1 - selectedLayer;
+                s = GUILayout.SelectionGrid(s, layerNames, 1);
+                selectedLayer = tmxFile.layers.Count - 1 - s;
+                EditorGUILayout.BeginVertical();
+                    for (int i = tmxFile.layers.Count-1; i >= 0; i--) {
+                        Layer layer = tmxFile.layers[i];
+                        Color c = TileMap.TiledColorFromString(layer.tintColor);
+                        c = EditorGUILayout.ColorField(c);
+                        string newColor = TileMap.TiledColorToStringARGB(c);
+                        if (newColor != layer.tintColor) {
+                            layer.tintColor = newColor;
+                            tileMap.UpdateLayerColor(i);
+                        }
+                    }
+                EditorGUILayout.EndVertical();
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.Separator();
         }
@@ -393,6 +396,11 @@ public class TileMapEditor : Editor {
     Vector3 selectionEnd;
     int[] selectedTileIndices = null;
     void OnSceneGUI () {
+        if (tileMap.tmxFile.layers[selectedLayer] is ObjectGroup) {
+            Debug.Log("OBJECT GROUP");
+            return;
+        }
+
         Event e = Event.current;
         if (e == null) return;
 
@@ -423,14 +431,13 @@ public class TileMapEditor : Editor {
         else if (e.type == EventType.MouseUp) {
             if (editState == 3) SelectTiles();
             else {
-                tileMap.tmxFile.layers[selectedLayer].Encode();
+                TileLayer layer = tileMap.tmxFile.layers[selectedLayer] as TileLayer;
+                layer.Encode();
                 tileMap.UpdatePolygonColliders(selectedLayer);
             }
             GUIUtility.hotControl = 0;
             Undo.FlushUndoRecordObjects();
         }
-
-        
     }
 
     Vector3 MouseToWorldPoint () {

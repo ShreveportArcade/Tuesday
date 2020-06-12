@@ -40,7 +40,6 @@ public class TileMap : MonoBehaviour {
     [HideInInspector] public Vector4 tileOffset;
     [HideInInspector] public Vector2 offset;
     [HideInInspector] public GameObject[] layers;
-    [HideInInspector] public GameObject[] objectGroups;
     [HideInInspector] public Material[] tileSetMaterials;
     [HideInInspector] public Sprite[][] tileSetSprites;
     [HideInInspector] public GameObject[] prefabs;
@@ -128,6 +127,7 @@ public class TileMap : MonoBehaviour {
 
     public static Color TiledColorFromString (string colorStr) {
         Color color = Color.white;
+        if (colorStr == null) return color;
         if (colorStr.Length > 8) colorStr = "#" + colorStr.Substring(3) + colorStr.Substring(1, 2);
         ColorUtility.TryParseHtmlString(colorStr, out color); 
         return color;
@@ -180,38 +180,28 @@ public class TileMap : MonoBehaviour {
             }
         }
 
-        layers = new GameObject[tmxFile.layers.Length];
-        _layerSubmeshObjects = new GameObject[tmxFile.layers.Length][];
-        for (int i = 0; i < tmxFile.layers.Length; i++) {
-            CreateTileLayer(i);
+        layers = new GameObject[tmxFile.layers.Count];
+        _layerSubmeshObjects = new GameObject[tmxFile.layers.Count][];
+        for (int i = 0; i < tmxFile.layers.Count; i++) {
+            Layer layer = tmxFile.layers[i];
+            if (layer is TileLayer) CreateTileLayer(i);
+            else if (layer is ObjectGroup) CreateObjectGroup(i);
         }
 
         if (physicsLayers != null) {
             foreach (GameObject layer in layers) {
+                if (layer == null) continue;
                 if (physicsLayers.ContainsKey(layer.name)) {
                     layer.layer = physicsLayers[layer.name];
                 }
             }
         }
-
-        if (objectGroups != null) {
-            foreach (GameObject group in objectGroups) {
-                if (group == null) continue;
-                DestroyImmediate(group);
-            }
-        }
-
-        if (tmxFile.objectGroups != null) {
-            objectGroups = new GameObject[tmxFile.objectGroups.Length];
-            for (int i = 0; i < tmxFile.objectGroups.Length; i++) {
-                CreateObjectGroup(i);
-            }
-        }
-
     }
 
     public void CreateTileLayer (int layerIndex) {
-        Layer layerData = tmxFile.layers[layerIndex];
+        if (!(tmxFile.layers[layerIndex] is TileLayer)) return;
+
+        TileLayer layerData = tmxFile.layers[layerIndex] as TileLayer;
         GameObject layer = new GameObject(layerData.name);
         layer.transform.SetParent(transform);
         layer.transform.localPosition = new Vector3(layerData.offsetX, -layerData.offsetY, 0) / pixelsPerUnit;
@@ -238,15 +228,16 @@ public class TileMap : MonoBehaviour {
         }        
     }
 
-    public void CreateObjectGroup (int groupIndex) {
-        ObjectGroup groupData = tmxFile.objectGroups[groupIndex];
+    public void CreateObjectGroup (int layerIndex) {
+        if (!(tmxFile.layers[layerIndex] is ObjectGroup)) return;
+        ObjectGroup groupData = tmxFile.layers[layerIndex] as ObjectGroup;
         GameObject group = new GameObject(groupData.name);
         group.transform.SetParent(transform);
         group.transform.localPosition = new Vector3(groupData.offsetX, -groupData.offsetY, 0) / pixelsPerUnit;
-        objectGroups[groupIndex] = group;
+        layers[layerIndex] = group;
 
         SortingGroup sort = group.AddComponent<SortingGroup>();
-        sort.sortingOrder = groupIndex;
+        sort.sortingOrder = layerIndex;
         sort.sortingLayerName = groupData.name;
 
         float w = tmxFile.tileWidth / pixelsPerUnit;
@@ -339,7 +330,7 @@ public class TileMap : MonoBehaviour {
     }
 
     public void ReloadMap () {
-        for (int layerIndex = 0; layerIndex < tmxFile.layers.Length; layerIndex++) {
+        for (int layerIndex = 0; layerIndex < tmxFile.layers.Count; layerIndex++) {
             for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
                 UpdateMesh(layerIndex, submeshIndex);
             }
@@ -360,8 +351,9 @@ public class TileMap : MonoBehaviour {
     }
 
     public void UpdateLayerColor(int layerIndex) {
-        Layer layerData = tmxFile.layers[layerIndex];
-        Color color = TiledColorFromString(layerData.tintColor);
+        if (!(tmxFile.layers[layerIndex] is TileLayer)) return;
+
+        Color color = TiledColorFromString(tmxFile.layers[layerIndex].tintColor);
         for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
             GameObject obj = layerSubmeshObjects[layerIndex][submeshIndex];
             MeshFilter filter = obj.GetComponent<MeshFilter>();
@@ -377,7 +369,9 @@ public class TileMap : MonoBehaviour {
     }
 
     public void UpdateMesh(int layerIndex, int submeshIndex) {
-        Layer layerData = tmxFile.layers[layerIndex];
+        if (!(tmxFile.layers[layerIndex] is TileLayer)) return;
+
+        TileLayer layerData = tmxFile.layers[layerIndex] as TileLayer;
 
         Dictionary<int, int> firstGIDToIndex = new Dictionary<int, int>();
         for (int i = 0; i < tmxFile.tileSets.Length; i++) {
@@ -667,9 +661,11 @@ public class TileMap : MonoBehaviour {
     }
 
     public bool SetTerrain (int tileID, int layerIndex, Vector3 pos, bool updateMesh = true) {
+        if (tmxFile.layers[layerIndex] is ObjectGroup) return false;
+
         int x = Mathf.FloorToInt((pos.x - offset.x) / tileOffset.x);
         int y = Mathf.FloorToInt((pos.y - offset.y) / tileOffset.y);
-        Layer layer = tmxFile.layers[layerIndex];
+        TileLayer layer = tmxFile.layers[layerIndex] as TileLayer;
         TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
         int gid = tileSet.firstGID;
         List<int> changedSubmeshes = new List<int>();
@@ -792,10 +788,12 @@ public class TileMap : MonoBehaviour {
     private int lastTileY = -1;
     private int lastTileID = -1;
     public bool SetTile (int tileID, int layerIndex, int x, int y, bool updateMesh = true) {
+        if (tmxFile.layers[layerIndex] is ObjectGroup) return false;
         if (lastTileID == tileID && lastTileX == x && lastTileY == y) return true;
         if (x < 0 || x >= tmxFile.width || y < 0 || y >= tmxFile.height) return false;
 
-        tmxFile.layers[layerIndex].SetTileID(tileID, x, y);
+        TileLayer layer = tmxFile.layers[layerIndex] as TileLayer;
+        layer.SetTileID(tileID, x, y);
         lastTileX = x;
         lastTileY = y;
         lastTileID = tileID;
