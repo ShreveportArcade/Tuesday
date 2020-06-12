@@ -12,7 +12,9 @@ The goals of this project are full support of the TMX file format, feature parit
 To add as a Git submodule:
 `git submodule add https://github.com/ShreveportArcade/Tuesday.git Assets/Tuesday`
 
-## Usage
+## Prefab Replacement
+
+Tiled objects can be replaced with prefabs by adding a custom file property called "prefab" that points to a prefab in your Unity project. Prefab overrides can be set with custom properties named "ClassName.fieldName". For example, you can set the gravity scale of a prefab's Rigidbody2D by adding a float property called "Rigidbody2D.gravityScale".
 
 ## Features
 

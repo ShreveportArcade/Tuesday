@@ -24,6 +24,7 @@ using ClipperLib;
 
 #if UNITY_EDITOR
 using System.IO;
+using System.Reflection;
 using UnityEditor;
 #endif
 
@@ -123,6 +124,13 @@ public class TileMap : MonoBehaviour {
 
     private int meshesPerLayer {
         get { return 1 + tmxFile.width * tmxFile.height / 16250; }
+    }
+
+    public static Color TiledColor (string colorStr) {
+        Color color = Color.white;
+        if (colorStr.Length > 8) colorStr = "#" + colorStr.Substring(3) + colorStr.Substring(1, 2);
+        ColorUtility.TryParseHtmlString(colorStr, out color); 
+        return color;
     }
 
     public void Setup (TMXFile tmxFile, string tmxFilePath, float pixelsPerUnit = -1) {
@@ -242,10 +250,10 @@ public class TileMap : MonoBehaviour {
 
     public void CreatePrefabTile (GameObject group, TileObject tileObject) {
         int tileID = (int)tileObject.gid;
-        Property prop = System.Array.Find(tileObject.properties, (p) => p.name == "prefab");
+        Property prefabProp = System.Array.Find(tileObject.properties, (p) => p.name == "prefab");
 
 #if UNITY_EDITOR
-        string prefabPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(tmxFilePath), prop.val));
+        string prefabPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(tmxFilePath), prefabProp.val));
         string dataPath = Path.GetFullPath(Application.dataPath);
         prefabPath = prefabPath.Replace(dataPath, "Assets");
         GameObject prefab = AssetDatabase.LoadAssetAtPath(prefabPath, typeof(GameObject)) as GameObject;
@@ -255,6 +263,32 @@ public class TileMap : MonoBehaviour {
         g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
         g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
 
+        foreach (Property prop in tileObject.properties) {
+            if (!prop.name.Contains(".")) continue;
+            string[] classVar = prop.name.Split('.');
+            Component c = g.GetComponent(classVar[0]);
+            System.Type type = c.GetType();
+            FieldInfo info = type.GetField(classVar[1], BindingFlags.Public | BindingFlags.Instance);
+            switch (prop.type) {
+                case "string":
+                    info.SetValue(c, prop.val);
+                    break;
+                case "float":
+                    info.SetValue(c, float.Parse(prop.val));
+                    break;
+                case "int":
+                    info.SetValue(c, int.Parse(prop.val));
+                    break;
+                case "bool":
+                    info.SetValue(c, bool.Parse(prop.val));
+                    break;
+                case "color":
+                    info.SetValue(c, TiledColor(prop.val));
+                    break;
+                default:
+                    break;
+            }
+        }
 #endif        
     }
 
@@ -366,9 +400,7 @@ public class TileMap : MonoBehaviour {
 
         Color color = Color.white;
         if (layerData.tintColorSpecified) {
-            string colorStr = layerData.tintColor;
-            if (colorStr.Length > 8) colorStr = "#" + colorStr.Substring(3) + colorStr.Substring(1, 2);
-            ColorUtility.TryParseHtmlString(colorStr, out color); 
+            color = TiledColor(layerData.tintColor);
         }
 
         int vertIndex = 0;      
