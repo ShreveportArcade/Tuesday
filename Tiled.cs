@@ -50,8 +50,13 @@ public class TMXFile {
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
+    
     [XmlElement("tileset", typeof(TileSet))] public TileSet[] tileSets;
-    [XmlElement("layer", typeof(TileLayer)), XmlElement("objectgroup", typeof(ObjectGroup))] public List<Layer> layers;
+
+    [XmlElement("layer", typeof(TileLayer)),
+     XmlElement("objectgroup", typeof(ObjectGroup)),
+     XmlElement("imagelayer", typeof(ImageLayer)),
+     XmlElement("group", typeof(GroupLayer))] public List<Layer> layers;
 
     public static TMXFile Load (string path) {
         XmlSerializer deserializer = new XmlSerializer(typeof(TMXFile));
@@ -377,7 +382,10 @@ public class Layer {
 
 [System.Serializable]
 public class GroupLayer : Layer {
-    [XmlElement("layer", typeof(TileLayer)), XmlElement("objectgroup", typeof(ObjectGroup))] public List<Layer> layers;
+    [XmlElement("layer", typeof(TileLayer)),
+     XmlElement("objectgroup", typeof(ObjectGroup)),
+     XmlElement("imagelayer", typeof(ImageLayer)),
+     XmlElement("group", typeof(GroupLayer))] public List<Layer> layers;
 }
 
 [System.Serializable]

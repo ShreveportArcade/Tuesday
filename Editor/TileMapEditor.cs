@@ -56,7 +56,10 @@ public class TileMapEditor : Editor {
     }
 
     void UndoRedo () {
-        if (target != null) tileMap.ReloadMap();
+        if (target != null) {
+            tileMap.ReloadMap();
+            treeView.Reload();
+        }
     }   
 
     private static Material _mat;
@@ -67,7 +70,6 @@ public class TileMapEditor : Editor {
         }
     }
 
-    private static Dictionary<int, bool> tileSetFoldoutStates = new Dictionary<int, bool>();
     private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
     private static Dictionary<string, Material> tileSetMaterials = new Dictionary<string, Material>();
     public static Material[] GetMaterials (TMXFile tmxFile, string path) {
@@ -198,64 +200,54 @@ public class TileMapEditor : Editor {
     }
 
     private void TileSetTextureField (TileSet tileSet) {
-        int id = tileSet.firstGID;
-
-        EditorGUIUtility.hierarchyMode = false;
-        Rect r = GUILayoutUtility.GetRect(Screen.width - 40, EditorGUIUtility.singleLineHeight);
-        float w = r.width;
-        r.width = 20;
-        bool show = !tileSetFoldoutStates.ContainsKey(id) || tileSetFoldoutStates[id];
-        tileSetFoldoutStates[id] = EditorGUI.Foldout(r, show, tileSet.name);
-        
+        int id = tileSet.firstGID;        
         if (selectedTileSet == null) tileRect = new Rect(-1,-1,0,0);
 
-        if (tileSetFoldoutStates[tileSet.firstGID]) {
-            Texture2D currentTexture = GetTileSetTexture(tileSet, path);
-            Texture2D tex = EditorGUILayout.ObjectField(currentTexture, typeof(Texture2D), false) as Texture2D;
-            if (currentTexture != tex) {
-                Uri textureURI = new Uri("/" + AssetDatabase.GetAssetPath(tex));
-                Uri tmxFileURI = new Uri("/" + Path.GetDirectoryName(path));
-                tileSet.image.source = "../" + tmxFileURI.MakeRelativeUri(textureURI);
-            }
+        Texture2D currentTexture = GetTileSetTexture(tileSet, path);
+        Texture2D tex = EditorGUILayout.ObjectField(currentTexture, typeof(Texture2D), false) as Texture2D;
+        if (currentTexture != tex) {
+            Uri textureURI = new Uri("/" + AssetDatabase.GetAssetPath(tex));
+            Uri tmxFileURI = new Uri("/" + Path.GetDirectoryName(path));
+            tileSet.image.source = "../" + tmxFileURI.MakeRelativeUri(textureURI);
+        }
 
-            if (tex != null) {
-                float x = Screen.width - 40;
-                float y = tex.height * x / (float)tex.width;
-                if (x > tex.width) {
-                    x = tex.width;
-                    y = tex.height;
-                }
-                r = GUILayoutUtility.GetRect(x, y);
-                r.width = r.height * (float)tex.width / (float)tex.height;
-                r.height = r.width * (float)tex.height / (float)tex.width;
-                r.x = (Screen.width - r.width) * 0.5f;
-                EditorGUI.DrawPreviewTexture(r, tex, mat);
+        if (tex == null) return;
+        
+        float x = Screen.width - 40;
+        float y = tex.height * x / (float)tex.width;
+        if (x > tex.width) {
+            x = tex.width;
+            y = tex.height;
+        }
+        Rect r = GUILayoutUtility.GetRect(x, y);
+        r.width = r.height * (float)tex.width / (float)tex.height;
+        r.height = r.width * (float)tex.height / (float)tex.width;
+        r.x = (Screen.width - r.width) * 0.5f;
+        EditorGUI.DrawPreviewTexture(r, tex, mat);
 
-                if (selectedTileSet != null && selectedTileSet == tileSet && selectedTileIndex > 0) {
-                    TileRect uvTileRect = selectedTileSet.GetTileUVs(selectedTileIndex);
-                    tileRect = r;
-                    tileRect.x += uvTileRect.x * r.width;
-                    tileRect.y += (1 - (uvTileRect.y + uvTileRect.height)) * r.height;
-                    tileRect.width *= uvTileRect.width;
-                    tileRect.height *= uvTileRect.height;
-                }
+        if (selectedTileSet != null && selectedTileSet == tileSet && selectedTileIndex > 0) {
+            TileRect uvTileRect = selectedTileSet.GetTileUVs(selectedTileIndex);
+            tileRect = r;
+            tileRect.x += uvTileRect.x * r.width;
+            tileRect.y += (1 - (uvTileRect.y + uvTileRect.height)) * r.height;
+            tileRect.width *= uvTileRect.width;
+            tileRect.height *= uvTileRect.height;
+        }
 
-                Handles.DrawSolidRectangleWithOutline(tileRect, Color.clear, Color.white);
+        Handles.DrawSolidRectangleWithOutline(tileRect, Color.clear, Color.white);
 
-                if (Event.current.type == EventType.MouseDown && 
-                    Event.current.button == 0 && 
-                    r.Contains(Event.current.mousePosition)) {
-                    selectedTileSet = tileSet;
-                    selectedTileIndex = GetTileIndex(tileSet, r, Event.current.mousePosition);
-                    Event.current.Use();
-                }
-            }
-            EditorGUILayout.Space();
+        if (Event.current.type == EventType.MouseDown && 
+            Event.current.button == 0 && 
+            r.Contains(Event.current.mousePosition)) {
+            selectedTileSet = tileSet;
+            selectedTileIndex = GetTileIndex(tileSet, r, Event.current.mousePosition);
+            Event.current.Use();
         }
     }
 
     private static int editState = 0;
     private static int paintType = 0;
+    private static int selectedTileSetIndex = 0;
     public override void OnInspectorGUI() {	
         editState = GUILayout.Toolbar(editState, new string[] {"Move", "Paint", "Erase", "Select"});
             
@@ -268,34 +260,12 @@ public class TileMapEditor : Editor {
             tmxFile = TMXFile.Load(assetPath);
             tileMap.Setup();
         }
+        tileMap.pivot = EditorGUILayout.Vector2Field("Pivot", tileMap.pivot);
         
-        base.OnInspectorGUI();
+        // base.OnInspectorGUI();
         
         DrawLayers();
-        
-        if (tmxFile.tileSets != null) {
-            if (tileMap.tileSetMaterials.Length != tmxFile.tileSets.Length) {
-                tileMap.tileSetMaterials = TileMapEditor.GetMaterials(tmxFile, path);
-                tileMap.tileSetSprites = TileMapEditor.GetSprites(tmxFile, path);
-            }
-            
-            EditorGUILayout.LabelField("Tile Sets", EditorStyles.boldLabel);
-            paintType = GUILayout.Toolbar(paintType, new string[] {"Tiles", "Terrains"});
-            switch (paintType) {
-                case 0:
-                    foreach (TileSet tileSet in tmxFile.tileSets) {
-                        TileSetField(tileSet);
-                    }
-                    break;
-                case 1:
-                    string[] terrainNames = Array.ConvertAll(terrains, (terrain) => terrain.name);
-                    selectedTerrainIndex = GUILayout.SelectionGrid(selectedTerrainIndex, terrainNames, 1);
-                    break;
-                default:
-                    break;
-            }
-            EditorGUILayout.Separator();
-        }
+        DrawTileSets();
 
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Reload")) {
@@ -303,6 +273,7 @@ public class TileMapEditor : Editor {
             tileMap.tileSetMaterials = TileMapEditor.GetMaterials(tmxFile, path);
             tileMap.tileSetSprites = TileMapEditor.GetSprites(tmxFile, path);
             tileMap.Setup();
+            treeView.Reload();
         }
         if (GUILayout.Button("Save")) {
             tmxFile.Save(path);
@@ -324,33 +295,63 @@ public class TileMapEditor : Editor {
     }
 
     public void DrawLayers () {
-        Rect r = GUILayoutUtility.GetRect(Screen.width, EditorGUIUtility.singleLineHeight * 10);
-        treeView.OnGUI(r);
         EditorGUILayout.Separator();
+        EditorGUILayout.LabelField("Layers", EditorStyles.boldLabel);
+        Rect r = GUILayoutUtility.GetRect(Screen.width, EditorGUIUtility.singleLineHeight * 5);
+        treeView.OnGUI(r);
+        // EditorGUILayout.Separator();
 
-        if (tmxFile.layers != null) {
-            EditorGUILayout.LabelField("Layers", EditorStyles.boldLabel);
-            EditorGUILayout.BeginHorizontal();
-                string[] layerNames = Array.ConvertAll(tmxFile.layers.ToArray(), (layer) => layer.name);
-                Array.Reverse(layerNames);
-                int s = tmxFile.layers.Count - 1 - selectedLayer;
-                s = GUILayout.SelectionGrid(s, layerNames, 1);
-                selectedLayer = tmxFile.layers.Count - 1 - s;
-                EditorGUILayout.BeginVertical();
-                    for (int i = tmxFile.layers.Count-1; i >= 0; i--) {
-                        Layer layer = tmxFile.layers[i];
-                        Color c = TileMap.TiledColorFromString(layer.tintColor);
-                        c = EditorGUILayout.ColorField(c);
-                        string newColor = TileMap.TiledColorToString(c);
-                        if (newColor != layer.tintColor) {
-                            layer.tintColor = newColor;
-                            tileMap.UpdateLayerColor(i);
-                        }
-                    }
-                EditorGUILayout.EndVertical();
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.Separator();
+        // if (tmxFile.layers != null) {
+        //     EditorGUILayout.LabelField("Layers", EditorStyles.boldLabel);
+        //     EditorGUILayout.BeginHorizontal();
+        //         string[] layerNames = Array.ConvertAll(tmxFile.layers.ToArray(), (layer) => layer.name);
+        //         Array.Reverse(layerNames);
+        //         int s = tmxFile.layers.Count - 1 - selectedLayer;
+        //         s = GUILayout.SelectionGrid(s, layerNames, 1);
+        //         selectedLayer = tmxFile.layers.Count - 1 - s;
+        //         EditorGUILayout.BeginVertical();
+        //             for (int i = tmxFile.layers.Count-1; i >= 0; i--) {
+        //                 Layer layer = tmxFile.layers[i];
+        //                 Color c = TileMap.TiledColorFromString(layer.tintColor);
+        //                 c = EditorGUILayout.ColorField(c);
+        //                 string newColor = TileMap.TiledColorToString(c);
+        //                 if (newColor != layer.tintColor) {
+        //                     layer.tintColor = newColor;
+        //                     tileMap.UpdateLayerColor(i);
+        //                 }
+        //             }
+        //         EditorGUILayout.EndVertical();
+        //     EditorGUILayout.EndHorizontal();
+        //     EditorGUILayout.Separator();
+        // }
+    }
+
+    void DrawTileSets () {
+        if (tmxFile.tileSets == null) return;
+    
+        if (tileMap.tileSetMaterials.Length != tmxFile.tileSets.Length) {
+            tileMap.tileSetMaterials = TileMapEditor.GetMaterials(tmxFile, path);
+            tileMap.tileSetSprites = TileMapEditor.GetSprites(tmxFile, path);
         }
+        
+        EditorGUILayout.LabelField("Tile Sets", EditorStyles.boldLabel);
+        string[] tilesSetNames = Array.ConvertAll(tmxFile.tileSets, (t) => t.name);
+        selectedTileSetIndex = GUILayout.Toolbar(selectedTileSetIndex, tilesSetNames);
+
+        switch (paintType) {
+            case 0:
+                TileSetField(tmxFile.tileSets[selectedTileSetIndex]);
+                break;
+            case 1:
+                string[] terrainNames = Array.ConvertAll(terrains, (terrain) => terrain.name);
+                selectedTerrainIndex = GUILayout.SelectionGrid(selectedTerrainIndex, terrainNames, 1);
+                break;
+            default:
+                break;
+        }
+
+        paintType = GUILayout.Toolbar(paintType, new string[] {"Tiles", "Terrains"});
+        EditorGUILayout.Separator();
     }
 
     public override bool HasPreviewGUI() {
@@ -403,8 +404,7 @@ public class TileMapEditor : Editor {
     Vector3 selectionEnd;
     int[] selectedTileIndices = null;
     void OnSceneGUI () {
-        if (tileMap.tmxFile.layers[selectedLayer] is ObjectGroup) {
-            Debug.Log("OBJECT GROUP");
+        if (tileMap.tmxFile.layers == null || tileMap.tmxFile.layers[selectedLayer] is ObjectGroup) {
             return;
         }
 
@@ -548,6 +548,10 @@ class TileMapTreeView : TreeView {
     static Texture2D invisibleIcon = EditorGUIUtility.IconContent("VisibilityOff").image as Texture2D;
     static Texture2D lockedIcon = EditorGUIUtility.IconContent("IN LockButton on").image as Texture2D;
     static Texture2D unlockedIcon = EditorGUIUtility.IconContent("IN LockButton").image as Texture2D;
+    static Texture2D tileLayerIcon = EditorGUIUtility.IconContent("Tilemap Icon").image as Texture2D;
+    static Texture2D objectGroupIcon = EditorGUIUtility.IconContent("GameObject Icon").image as Texture2D;
+    static Texture2D imageLayerIcon = EditorGUIUtility.IconContent("RawImage Icon").image as Texture2D;
+    static Texture2D groupLayerIcon = EditorGUIUtility.IconContent("Folder Icon").image as Texture2D;
 
     int id = 1;
     TileMap tileMap;
@@ -557,15 +561,12 @@ class TileMapTreeView : TreeView {
     }
 
     void AddLayerItem (TileMapTreeViewItem parent, Layer layer) {
-        if (layer.id == 0) layer.id = id;
-        else if (layer.id >= id) id = layer.id+1;
-        TileMapTreeViewItem item = new TileMapTreeViewItem {id = layer.id, displayName = layer.name, layer = layer};
+        TileMapTreeViewItem item = new TileMapTreeViewItem {id = id++, displayName = layer.name, layer = layer};
         parent.AddChild(item);
         if (layer is GroupLayer) {
             GroupLayer group = layer as GroupLayer;
             for (int i = group.layers.Count-1; i >= 0; i--) {
-                Layer l = tileMap.tmxFile.layers[i];
-                AddLayerItem(item, l);
+                AddLayerItem(item, group.layers[i]);
             }
         }
     }
@@ -573,8 +574,7 @@ class TileMapTreeView : TreeView {
     protected override TreeViewItem BuildRoot () {
         TileMapTreeViewItem root = new TileMapTreeViewItem {id = 0, depth = -1, displayName = "TileMap"};
         for (int i = tileMap.tmxFile.layers.Count-1; i >= 0; i--) {
-            Layer layer = tileMap.tmxFile.layers[i];
-            AddLayerItem(root, layer);
+            AddLayerItem(root, tileMap.tmxFile.layers[i]);
         }            
         SetupDepthsFromParentsAndChildren(root);   
         return root;
@@ -584,8 +584,15 @@ class TileMapTreeView : TreeView {
         TileMapTreeViewItem item = args.item as TileMapTreeViewItem;
         Layer l = item.layer;
         Rect r = args.rowRect;
-        r.width -= EditorGUIUtility.singleLineHeight * 2;
-        GUI.Label(r, l.name);
+        float indent = GetContentIndent(args.item);
+        r.x += indent;
+        r.width -= EditorGUIUtility.singleLineHeight * 2 + indent;
+        GUIContent c = new GUIContent(l.name);
+        if (l is TileLayer) c.image = tileLayerIcon;
+        else if (l is ObjectGroup) c.image = objectGroupIcon;
+        else if (l is ImageLayer) c.image = imageLayerIcon;
+        else if (l is GroupLayer) c.image = groupLayerIcon;
+        GUI.Label(r, c);
 
         GUIStyle visStyle = new GUIStyle(GUI.skin.toggle);
         visStyle.normal.background = invisibleIcon;
@@ -594,14 +601,14 @@ class TileMapTreeView : TreeView {
         r.width = EditorGUIUtility.singleLineHeight;
         l.visible = GUI.Toggle(r, l.visible, "", visStyle);  
 
-        Color c = GUI.color;
+        Color color = GUI.color;
         GUI.color = Color.black;
         GUIStyle lockStyle = new GUIStyle(GUI.skin.toggle);
         lockStyle.normal.background = unlockedIcon;
         lockStyle.onNormal.background = lockedIcon;  
         r.x += r.width;
         l.locked = GUI.Toggle(r, l.locked, "", lockStyle);  
-        GUI.color = c;
+        GUI.color = color;
     }
 }
 }
