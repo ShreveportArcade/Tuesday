@@ -625,10 +625,22 @@ public class TileMap : MonoBehaviour {
         }
     }
 
+    public void UpdatePolygonColliders (TileLayer tileLayer) {
+
+    }
+
     public void UpdatePolygonColliders (int layerIndex) {
         for (int submeshIndex = 0; submeshIndex < layers.Length; submeshIndex++) {
             UpdatePolygonCollider(layerIndex, submeshIndex);
         }
+    }
+
+    public bool SetTile (int tileID, TileLayer layer, Vector3 pos, bool updateMesh = true) {
+        return false;
+    }
+
+    public bool SetTiles (int tileID, TileLayer layer, Vector3 start, Vector3 end, bool updateMesh = true) {
+        return false;
     }
 
     public bool SetTile (int tileID, int layerIndex, Vector3 pos, bool updateMesh = true) {
@@ -658,6 +670,10 @@ public class TileMap : MonoBehaviour {
             foreach (int submeshIndex in changedSubmeshes) UpdateMesh(layerIndex, submeshIndex);
         }
         return tileSet;
+    }
+
+    public bool SetTerrain (int tileID, TileLayer layer, Vector3 pos, bool updateMesh = true) {
+        return false;
     }
 
     public bool SetTerrain (int tileID, int layerIndex, Vector3 pos, bool updateMesh = true) {

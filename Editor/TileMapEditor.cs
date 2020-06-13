@@ -162,7 +162,7 @@ public class TileMapEditor : Editor {
         return i;
     }
 
-    private static int selectedLayer = 0;
+    private static Layer selectedLayer;
     private static int selectedTerrainIndex = 0;
     private Terrain[] _terrains;
     private Terrain[] terrains {
@@ -404,9 +404,7 @@ public class TileMapEditor : Editor {
     Vector3 selectionEnd;
     int[] selectedTileIndices = null;
     void OnSceneGUI () {
-        if (tileMap.tmxFile.layers == null || tileMap.tmxFile.layers[selectedLayer] is ObjectGroup) {
-            return;
-        }
+        if (tileMap.tmxFile.layers == null || !(selectedLayer is TileLayer)) return;
 
         Event e = Event.current;
         if (e == null) return;
@@ -438,9 +436,9 @@ public class TileMapEditor : Editor {
         else if (e.type == EventType.MouseUp) {
             if (editState == 3) SelectTiles();
             else {
-                TileLayer layer = tileMap.tmxFile.layers[selectedLayer] as TileLayer;
-                layer.Encode();
-                tileMap.UpdatePolygonColliders(selectedLayer);
+                TileLayer tileLayer = selectedLayer as TileLayer;
+                tileLayer.Encode();
+                tileMap.UpdatePolygonColliders(tileLayer);
             }
             GUIUtility.hotControl = 0;
             Undo.FlushUndoRecordObjects();
@@ -489,16 +487,17 @@ public class TileMapEditor : Editor {
             Vector3 p = ray.GetPoint(dist) - tileMap.transform.position;
             lastTilePos = drag ? tilePos : p;
             tilePos = p;
+            TileLayer tileLayer = selectedLayer as TileLayer;
             switch (paintType) {
                 case 0:
-                    if ((!drag && tileMap.SetTile(tileIndex, selectedLayer, tilePos)) || 
-                        (drag && tileMap.SetTiles(tileIndex, selectedLayer, lastTilePos, tilePos))) {
+                    if ((!drag && tileMap.SetTile(tileIndex, tileLayer, tilePos)) || 
+                        (drag && tileMap.SetTiles(tileIndex, tileLayer, lastTilePos, tilePos))) {
                         Event.current.Use();
                         EditorUtility.SetDirty(target);
                     }
                     break;
                 case 1:
-                    if (selectedTerrain != null && tileMap.SetTerrain(selectedTerrain.tile, selectedLayer, tilePos)) {
+                    if (selectedTerrain != null && tileMap.SetTerrain(selectedTerrain.tile, tileLayer, tilePos)) {
                         Event.current.Use();
                         EditorUtility.SetDirty(target);
                     }
@@ -536,79 +535,91 @@ public class TileMapEditor : Editor {
             Event.current.Use();
         }
     }
-}
 
-class TileMapTreeViewItem : TreeViewItem {
-    public Layer layer;
-}
-
-class TileMapTreeView : TreeView {
-
-    static Texture2D visibleIcon = EditorGUIUtility.IconContent("VisibilityOn").image as Texture2D;
-    static Texture2D invisibleIcon = EditorGUIUtility.IconContent("VisibilityOff").image as Texture2D;
-    static Texture2D lockedIcon = EditorGUIUtility.IconContent("IN LockButton on").image as Texture2D;
-    static Texture2D unlockedIcon = EditorGUIUtility.IconContent("IN LockButton").image as Texture2D;
-    static Texture2D tileLayerIcon = EditorGUIUtility.IconContent("Tilemap Icon").image as Texture2D;
-    static Texture2D objectGroupIcon = EditorGUIUtility.IconContent("GameObject Icon").image as Texture2D;
-    static Texture2D imageLayerIcon = EditorGUIUtility.IconContent("RawImage Icon").image as Texture2D;
-    static Texture2D groupLayerIcon = EditorGUIUtility.IconContent("Folder Icon").image as Texture2D;
-
-    int id = 1;
-    TileMap tileMap;
-    public TileMapTreeView(TileMap tileMap, TreeViewState treeViewState) : base(treeViewState) {
-        this.tileMap = tileMap;
-        Reload();
+    class TileMapTreeViewItem : TreeViewItem {
+        public Layer layer;
     }
 
-    void AddLayerItem (TileMapTreeViewItem parent, Layer layer) {
-        TileMapTreeViewItem item = new TileMapTreeViewItem {id = id++, displayName = layer.name, layer = layer};
-        parent.AddChild(item);
-        if (layer is GroupLayer) {
-            GroupLayer group = layer as GroupLayer;
-            for (int i = group.layers.Count-1; i >= 0; i--) {
-                AddLayerItem(item, group.layers[i]);
+    class TileMapTreeView : TreeView {
+
+        static Texture2D visibleIcon = EditorGUIUtility.IconContent("VisibilityOn").image as Texture2D;
+        static Texture2D invisibleIcon = EditorGUIUtility.IconContent("VisibilityOff").image as Texture2D;
+        static Texture2D lockedIcon = EditorGUIUtility.IconContent("IN LockButton on").image as Texture2D;
+        static Texture2D unlockedIcon = EditorGUIUtility.IconContent("IN LockButton").image as Texture2D;
+        static Texture2D tileLayerIcon = EditorGUIUtility.IconContent("Tilemap Icon").image as Texture2D;
+        static Texture2D objectGroupIcon = EditorGUIUtility.IconContent("GameObject Icon").image as Texture2D;
+        static Texture2D imageLayerIcon = EditorGUIUtility.IconContent("RawImage Icon").image as Texture2D;
+        static Texture2D groupLayerIcon = EditorGUIUtility.IconContent("Folder Icon").image as Texture2D;
+
+        int id = 1;
+        TileMap tileMap;
+        TileMapTreeViewItem root;
+
+        public TileMapTreeView(TileMap tileMap, TreeViewState treeViewState) : base(treeViewState) {
+            this.tileMap = tileMap;
+            Reload();
+        }
+
+        void AddLayerItem (TileMapTreeViewItem parent, Layer layer) {
+            TileMapTreeViewItem item = new TileMapTreeViewItem {id = id++, displayName = layer.name, layer = layer};
+            parent.AddChild(item);
+            if (layer is GroupLayer) {
+                GroupLayer group = layer as GroupLayer;
+                for (int i = group.layers.Count-1; i >= 0; i--) {
+                    AddLayerItem(item, group.layers[i]);
+                }
             }
         }
-    }
-        
-    protected override TreeViewItem BuildRoot () {
-        TileMapTreeViewItem root = new TileMapTreeViewItem {id = 0, depth = -1, displayName = "TileMap"};
-        for (int i = tileMap.tmxFile.layers.Count-1; i >= 0; i--) {
-            AddLayerItem(root, tileMap.tmxFile.layers[i]);
-        }            
-        SetupDepthsFromParentsAndChildren(root);   
-        return root;
-    }
+            
+        protected override TreeViewItem BuildRoot () {
+            root = new TileMapTreeViewItem {id = 0, depth = -1, displayName = "TileMap"};
+            for (int i = tileMap.tmxFile.layers.Count-1; i >= 0; i--) {
+                AddLayerItem(root, tileMap.tmxFile.layers[i]);
+            }            
+            SetupDepthsFromParentsAndChildren(root);   
+            return root;
+        }
 
-    protected override void RowGUI (RowGUIArgs args) {
-        TileMapTreeViewItem item = args.item as TileMapTreeViewItem;
-        Layer l = item.layer;
-        Rect r = args.rowRect;
-        float indent = GetContentIndent(args.item);
-        r.x += indent;
-        r.width -= EditorGUIUtility.singleLineHeight * 2 + indent;
-        GUIContent c = new GUIContent(l.name);
-        if (l is TileLayer) c.image = tileLayerIcon;
-        else if (l is ObjectGroup) c.image = objectGroupIcon;
-        else if (l is ImageLayer) c.image = imageLayerIcon;
-        else if (l is GroupLayer) c.image = groupLayerIcon;
-        GUI.Label(r, c);
+        protected override void SelectionChanged(IList<int> selectedIds) {
+            if (selectedIds.Count == 0) return;
+            int id = selectedIds[0];
+            TileMapTreeViewItem item = FindItem(id, root) as TileMapTreeViewItem; 
+            if (item != null && item.layer != null) {
+                Debug.Log(item.layer.name);
+                selectedLayer = item.layer;
+            }
+        }
 
-        GUIStyle visStyle = new GUIStyle(GUI.skin.toggle);
-        visStyle.normal.background = invisibleIcon;
-        visStyle.onNormal.background = visibleIcon;
-        r.x += r.width;
-        r.width = EditorGUIUtility.singleLineHeight;
-        l.visible = GUI.Toggle(r, l.visible, "", visStyle);  
+        protected override void RowGUI (RowGUIArgs args) {
+            TileMapTreeViewItem item = args.item as TileMapTreeViewItem;
+            Layer l = item.layer;
+            Rect r = args.rowRect;
+            float indent = GetContentIndent(args.item);
+            r.x += indent;
+            r.width -= EditorGUIUtility.singleLineHeight * 2 + indent;
+            GUIContent c = new GUIContent(l.name);
+            if (l is TileLayer) c.image = tileLayerIcon;
+            else if (l is ObjectGroup) c.image = objectGroupIcon;
+            else if (l is ImageLayer) c.image = imageLayerIcon;
+            else if (l is GroupLayer) c.image = groupLayerIcon;
+            GUI.Label(r, c);
 
-        Color color = GUI.color;
-        GUI.color = Color.black;
-        GUIStyle lockStyle = new GUIStyle(GUI.skin.toggle);
-        lockStyle.normal.background = unlockedIcon;
-        lockStyle.onNormal.background = lockedIcon;  
-        r.x += r.width;
-        l.locked = GUI.Toggle(r, l.locked, "", lockStyle);  
-        GUI.color = color;
+            GUIStyle visStyle = new GUIStyle(GUI.skin.toggle);
+            visStyle.normal.background = invisibleIcon;
+            visStyle.onNormal.background = visibleIcon;
+            r.x += r.width;
+            r.width = EditorGUIUtility.singleLineHeight;
+            l.visible = GUI.Toggle(r, l.visible, "", visStyle);  
+
+            Color color = GUI.color;
+            GUI.color = Color.black;
+            GUIStyle lockStyle = new GUIStyle(GUI.skin.toggle);
+            lockStyle.normal.background = unlockedIcon;
+            lockStyle.onNormal.background = lockedIcon;  
+            r.x += r.width;
+            l.locked = GUI.Toggle(r, l.locked, "", lockStyle);  
+            GUI.color = color;
+        }
     }
 }
 }
