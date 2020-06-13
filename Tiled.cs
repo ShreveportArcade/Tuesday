@@ -351,11 +351,17 @@ public class TileSet {
 
 [System.Serializable]
 public class Layer {
+    [XmlAttribute("id")] public int id;
+    [XmlIgnore] public bool idSpecified { get { return id != 0; } set {}}
     [XmlAttribute("name")] public string name;
     [XmlAttribute("opacity")] public float opacity = 1;
     [XmlIgnore] public bool opacitySpecified { get { return opacity < 1; } set {}}
-    [XmlAttribute("visible")] public int visible = 1;
-    [XmlIgnore] public bool visibleSpecified { get { return visible < 1; } set {}}
+    [XmlAttribute("visible")] public int visibleInt = 1;
+    [XmlIgnore] public bool visible { get { return visibleInt == 1; } set { visibleInt = value ? 1 : 0; }}
+    [XmlIgnore] public bool visibleIntSpecified { get { return visibleInt == 0; } set {}}
+    [XmlAttribute("locked")] public int lockedInt = 1;
+    [XmlIgnore] public bool locked { get { return lockedInt == 1; } set { lockedInt = value ? 1 : 0; }}
+    [XmlIgnore] public bool lockedIntSpecified { get { return lockedInt == 0; } set {}}
     [XmlAttribute("offsetx")] public int offsetX;
     [XmlIgnore] public bool offsetXSpecified { get { return offsetX != 0; } set {}}
     [XmlAttribute("offsety")] public int offsetY;
@@ -367,6 +373,25 @@ public class Layer {
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
+}
+
+[System.Serializable]
+public class GroupLayer : Layer {
+    [XmlElement("layer", typeof(TileLayer)), XmlElement("objectgroup", typeof(ObjectGroup))] public List<Layer> layers;
+}
+
+[System.Serializable]
+public class ImageLayer : Layer {
+    [XmlElement("image", typeof(Image))] public Image image;
+}
+
+[System.Serializable]
+public class ObjectGroup : Layer {
+    [XmlAttribute("color")] public string color;
+    [XmlIgnore] public bool colorSpecified { get { return !string.IsNullOrEmpty(color); } set {} }
+    [XmlAttribute("draworder")] public string drawOrder;
+    [XmlIgnore] public bool drawOrderSpecified { get { return !string.IsNullOrEmpty(drawOrder); } set {} }
+    [XmlElement("object", typeof(TileObject))] public TileObject[] objects;
 }
 
 [System.Serializable]
@@ -651,15 +676,6 @@ public class Frame {
 }
 
 [System.Serializable]
-public class ObjectGroup : Layer {
-    [XmlAttribute("color")] public string color;
-    [XmlIgnore] public bool colorSpecified { get { return !string.IsNullOrEmpty(color); } set {} }
-    [XmlAttribute("draworder")] public string drawOrder;
-    [XmlIgnore] public bool drawOrderSpecified { get { return !string.IsNullOrEmpty(drawOrder); } set {} }
-    [XmlElement("object", typeof(TileObject))] public TileObject[] objects;
-}
-
-[System.Serializable]
 public class TileObject {
     [XmlAttribute("id")] public int id = 0;
     [XmlAttribute("name")] public string name;
@@ -705,20 +721,6 @@ public class Polygon {
     }
 
 }
-
-[System.Serializable]
-public class ImageLayer {
-    [XmlAttribute("name")] public string name = "";
-    [XmlAttribute("offsetx")] public int offsetX = 0;
-    [XmlAttribute("offsety")] public int offsetY = 0;
-    [XmlAttribute("opacity")] public float opacity = 1;
-    [XmlAttribute("visible")] public int visible = 1;
-
-    [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
-    [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
-    [XmlElement("image", typeof(Image))] public Image image;
-}
-
 
 [System.Serializable]
 public class WangSet {
