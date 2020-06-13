@@ -22,6 +22,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
+using UnityEditor.IMGUI.Controls;
 
 namespace Tiled {
 [CustomEditor(typeof(TileMap))]
@@ -41,8 +42,13 @@ public class TileMapEditor : Editor {
         set { tileMap.tmxFilePath = value; }
     }
 
+    [SerializeField] TreeViewState treeViewState;
+    TileMapTreeView treeView;
+
     void OnEnable () {
         Undo.undoRedoPerformed += UndoRedo;
+        if (treeViewState == null) treeViewState = new TreeViewState ();
+        treeView = new TileMapTreeView(tileMap, treeViewState);
     }
     
     void OnDisable () {
@@ -264,31 +270,8 @@ public class TileMapEditor : Editor {
         }
         
         base.OnInspectorGUI();
-        EditorGUILayout.Separator();
-
-        if (tmxFile.layers != null) {
-            EditorGUILayout.LabelField("Layers", EditorStyles.boldLabel);
-            EditorGUILayout.BeginHorizontal();
-                string[] layerNames = Array.ConvertAll(tmxFile.layers.ToArray(), (layer) => layer.name);
-                Array.Reverse(layerNames);
-                int s = tmxFile.layers.Count - 1 - selectedLayer;
-                s = GUILayout.SelectionGrid(s, layerNames, 1);
-                selectedLayer = tmxFile.layers.Count - 1 - s;
-                EditorGUILayout.BeginVertical();
-                    for (int i = tmxFile.layers.Count-1; i >= 0; i--) {
-                        Layer layer = tmxFile.layers[i];
-                        Color c = TileMap.TiledColorFromString(layer.tintColor);
-                        c = EditorGUILayout.ColorField(c);
-                        string newColor = TileMap.TiledColorToStringARGB(c);
-                        if (newColor != layer.tintColor) {
-                            layer.tintColor = newColor;
-                            tileMap.UpdateLayerColor(i);
-                        }
-                    }
-                EditorGUILayout.EndVertical();
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.Separator();
-        }
+        
+        DrawLayers();
         
         if (tmxFile.tileSets != null) {
             if (tileMap.tileSetMaterials.Length != tmxFile.tileSets.Length) {
@@ -322,12 +305,10 @@ public class TileMapEditor : Editor {
             tileMap.Setup();
         }
         if (GUILayout.Button("Save")) {
-            UpdateObjectGroups();
             tmxFile.Save(path);
             AssetDatabase.ImportAsset(path);
         }
         if (GUILayout.Button("Save As")) {
-            UpdateObjectGroups();
             tmxFile.Save(
                 EditorUtility.SaveFilePanel(
                     "Save as TMX",
@@ -342,8 +323,34 @@ public class TileMapEditor : Editor {
         EditorGUILayout.EndHorizontal();
     }
 
-    public void UpdateObjectGroups () {
-        
+    public void DrawLayers () {
+        Rect r = GUILayoutUtility.GetRect(Screen.width, EditorGUIUtility.singleLineHeight * 10);
+        treeView.OnGUI(r);
+        EditorGUILayout.Separator();
+
+        if (tmxFile.layers != null) {
+            EditorGUILayout.LabelField("Layers", EditorStyles.boldLabel);
+            EditorGUILayout.BeginHorizontal();
+                string[] layerNames = Array.ConvertAll(tmxFile.layers.ToArray(), (layer) => layer.name);
+                Array.Reverse(layerNames);
+                int s = tmxFile.layers.Count - 1 - selectedLayer;
+                s = GUILayout.SelectionGrid(s, layerNames, 1);
+                selectedLayer = tmxFile.layers.Count - 1 - s;
+                EditorGUILayout.BeginVertical();
+                    for (int i = tmxFile.layers.Count-1; i >= 0; i--) {
+                        Layer layer = tmxFile.layers[i];
+                        Color c = TileMap.TiledColorFromString(layer.tintColor);
+                        c = EditorGUILayout.ColorField(c);
+                        string newColor = TileMap.TiledColorToString(c);
+                        if (newColor != layer.tintColor) {
+                            layer.tintColor = newColor;
+                            tileMap.UpdateLayerColor(i);
+                        }
+                    }
+                EditorGUILayout.EndVertical();
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.Separator();
+        }
     }
 
     public override bool HasPreviewGUI() {
@@ -528,6 +535,73 @@ public class TileMapEditor : Editor {
         if (selectedTileIndices != null) {
             Event.current.Use();
         }
+    }
+}
+
+class TileMapTreeViewItem : TreeViewItem {
+    public Layer layer;
+}
+
+class TileMapTreeView : TreeView {
+
+    static Texture2D visibleIcon = EditorGUIUtility.IconContent("VisibilityOn").image as Texture2D;
+    static Texture2D invisibleIcon = EditorGUIUtility.IconContent("VisibilityOff").image as Texture2D;
+    static Texture2D lockedIcon = EditorGUIUtility.IconContent("IN LockButton on").image as Texture2D;
+    static Texture2D unlockedIcon = EditorGUIUtility.IconContent("IN LockButton").image as Texture2D;
+
+    int id = 1;
+    TileMap tileMap;
+    public TileMapTreeView(TileMap tileMap, TreeViewState treeViewState) : base(treeViewState) {
+        this.tileMap = tileMap;
+        Reload();
+    }
+
+    void AddLayerItem (TileMapTreeViewItem parent, Layer layer) {
+        if (layer.id == 0) layer.id = id;
+        else if (layer.id >= id) id = layer.id+1;
+        TileMapTreeViewItem item = new TileMapTreeViewItem {id = layer.id, displayName = layer.name, layer = layer};
+        parent.AddChild(item);
+        if (layer is GroupLayer) {
+            GroupLayer group = layer as GroupLayer;
+            for (int i = group.layers.Count-1; i >= 0; i--) {
+                Layer l = tileMap.tmxFile.layers[i];
+                AddLayerItem(item, l);
+            }
+        }
+    }
+        
+    protected override TreeViewItem BuildRoot () {
+        TileMapTreeViewItem root = new TileMapTreeViewItem {id = 0, depth = -1, displayName = "TileMap"};
+        for (int i = tileMap.tmxFile.layers.Count-1; i >= 0; i--) {
+            Layer layer = tileMap.tmxFile.layers[i];
+            AddLayerItem(root, layer);
+        }            
+        SetupDepthsFromParentsAndChildren(root);   
+        return root;
+    }
+
+    protected override void RowGUI (RowGUIArgs args) {
+        TileMapTreeViewItem item = args.item as TileMapTreeViewItem;
+        Layer l = item.layer;
+        Rect r = args.rowRect;
+        r.width -= EditorGUIUtility.singleLineHeight * 2;
+        GUI.Label(r, l.name);
+
+        GUIStyle visStyle = new GUIStyle(GUI.skin.toggle);
+        visStyle.normal.background = invisibleIcon;
+        visStyle.onNormal.background = visibleIcon;
+        r.x += r.width;
+        r.width = EditorGUIUtility.singleLineHeight;
+        l.visible = GUI.Toggle(r, l.visible, "", visStyle);  
+
+        Color c = GUI.color;
+        GUI.color = Color.black;
+        GUIStyle lockStyle = new GUIStyle(GUI.skin.toggle);
+        lockStyle.normal.background = unlockedIcon;
+        lockStyle.onNormal.background = lockedIcon;  
+        r.x += r.width;
+        l.locked = GUI.Toggle(r, l.locked, "", lockStyle);  
+        GUI.color = c;
     }
 }
 }

@@ -133,14 +133,12 @@ public class TileMap : MonoBehaviour {
         return color;
     }
 
-    public static string TiledColorToStringARGB (Color color) {
+    public static string TiledColorToString (Color color) {
+        if (color == Color.white) return null;
+        if (color.a == 1) return "#" + ColorUtility.ToHtmlStringRGB(color).ToLower();
         string colorStr = ColorUtility.ToHtmlStringRGBA(color).ToLower();;
         colorStr = "#" + colorStr.Substring(6, 2) + colorStr.Substring(0, 6);
         return colorStr;
-    }
-
-    public static string TiledColorToStringRGB (Color color) {
-        return "#" + ColorUtility.ToHtmlStringRGB(color).ToLower();;
     }
 
     public void Setup (TMXFile tmxFile, string tmxFilePath, float pixelsPerUnit = -1) {
@@ -353,7 +351,9 @@ public class TileMap : MonoBehaviour {
     public void UpdateLayerColor(int layerIndex) {
         if (!(tmxFile.layers[layerIndex] is TileLayer)) return;
 
-        Color color = TiledColorFromString(tmxFile.layers[layerIndex].tintColor);
+        Layer layer = tmxFile.layers[layerIndex];
+        Color color = TiledColorFromString(layer.tintColor);
+        color.a *= layer.opacity;
         for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
             GameObject obj = layerSubmeshObjects[layerIndex][submeshIndex];
             MeshFilter filter = obj.GetComponent<MeshFilter>();
