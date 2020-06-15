@@ -53,18 +53,26 @@ public class TMXFile {
     
     [XmlElement("tileset", typeof(TileSet))] public TileSet[] tileSets;
 
-    [XmlElement("layer", typeof(TileLayer)),
-     XmlElement("objectgroup", typeof(ObjectGroup)),
-     XmlElement("imagelayer", typeof(ImageLayer)),
-     XmlElement("group", typeof(GroupLayer))] public List<Layer> layers;
+    [XmlElement("layer", typeof(TileLayer))]
+    [XmlElement("objectgroup", typeof(ObjectGroup))]
+    [XmlElement("imagelayer", typeof(ImageLayer))]
+    [XmlElement("group", typeof(GroupLayer))]
+    public List<Layer> layers;
 
     public static TMXFile Load (string path) {
-        XmlSerializer deserializer = new XmlSerializer(typeof(TMXFile));
-        TextReader textReader = new StreamReader(path);
-        TMXFile map = (TMXFile)deserializer.Deserialize(textReader);
-        textReader.Close();
-
         XmlTextReader xmlReader = new XmlTextReader(path);
+        return Load(xmlReader, path);
+    }
+
+    public static TMXFile Load (string text, string path) {
+        TextReader textReader = new StringReader(text);
+        XmlTextReader xmlReader = new XmlTextReader(textReader);
+        return Load(xmlReader, path);
+    }
+    public static TMXFile Load (XmlTextReader xmlReader, string path) {
+        XmlSerializer deserializer = new XmlSerializer(typeof(TMXFile));
+        TMXFile map = (TMXFile)deserializer.Deserialize(xmlReader);
+
         bool hasDocType = false;
         for (int i = 0; i < 3; i++) {
             xmlReader.Read();
@@ -98,10 +106,10 @@ public class TMXFile {
         return map;
     }
 
-    public void Save (string path) {
+    public string Save () {
         XmlSerializer serializer = new XmlSerializer(typeof(TMXFile));
-        TextWriter textWriter = new StreamWriter(path);
-        XmlTextWriter xmlWriter = new XmlTextWriter(textWriter);
+        StringWriter stringWriter = new StringWriter();
+        XmlTextWriter xmlWriter = new XmlTextWriter(stringWriter);
         xmlWriter.Formatting = Formatting.Indented;
         xmlWriter.Indentation = 1;
         xmlWriter.WriteStartDocument(); // Why is C# writing "UTF-8" as lowercase?
@@ -110,7 +118,13 @@ public class TMXFile {
         nameSpaces.Add("","");
         serializer.Serialize(xmlWriter, this, nameSpaces);
         xmlWriter.Close();
-        textWriter.Close();
+        string s = stringWriter.ToString();
+        stringWriter.Close();
+        return s;
+    }
+
+    public void Save (string path) {
+        File.WriteAllText(path, Save());
 
         for (int i = 0; i < tileSets.Length; i++) {
             TileSet tileSet = tileSets[i];
@@ -355,7 +369,11 @@ public class TileSet {
 }
 
 [System.Serializable]
-public class Layer {
+[XmlInclude(typeof(TileLayer))]
+[XmlInclude(typeof(ObjectGroup))]
+[XmlInclude(typeof(ImageLayer))]
+[XmlInclude(typeof(GroupLayer))]
+public abstract class Layer {
     [XmlAttribute("id")] public int id;
     [XmlIgnore] public bool idSpecified { get { return id != 0; } set {}}
     [XmlAttribute("name")] public string name;
@@ -382,10 +400,11 @@ public class Layer {
 
 [System.Serializable]
 public class GroupLayer : Layer {
-    [XmlElement("layer", typeof(TileLayer)),
-     XmlElement("objectgroup", typeof(ObjectGroup)),
-     XmlElement("imagelayer", typeof(ImageLayer)),
-     XmlElement("group", typeof(GroupLayer))] public List<Layer> layers;
+    [XmlElement("layer", typeof(TileLayer))]
+    [XmlElement("objectgroup", typeof(ObjectGroup))]
+    [XmlElement("imagelayer", typeof(ImageLayer))]
+    [XmlElement("group", typeof(GroupLayer))]
+    public List<Layer> layers;
 }
 
 [System.Serializable]
@@ -674,6 +693,7 @@ public class Terrain {
 public class Property {
     [XmlAttribute("name")] public string name = "";
     [XmlAttribute("type")] public string type = "";
+    [XmlIgnore] public bool typeSpecified { get { return !string.IsNullOrEmpty(type); } set {} }
     [XmlAttribute("value")] public string val = "";
 }
 

@@ -29,20 +29,33 @@ using UnityEditor;
 #endif
 
 namespace Tiled {
-public class TileMap : MonoBehaviour {
+public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
 
     public Vector2 pivot;
 
-    [HideInInspector] public string tmxFilePath;
-    public TMXFile tmxFile;
+    public string tmxFilePath;
+    public string tmxFileString;
+    private TMXFile _tmxFile;
+    public TMXFile tmxFile {
+        get { return _tmxFile; }
+        set { _tmxFile = value; }
+    }
 
-    [HideInInspector] public float pixelsPerUnit = -1;
-    [HideInInspector] public Vector4 tileOffset;
-    [HideInInspector] public Vector2 offset;
-    [HideInInspector] public GameObject[] layers;
-    [HideInInspector] public Material[] tileSetMaterials;
-    [HideInInspector] public Sprite[][] tileSetSprites;
-    [HideInInspector] public GameObject[] prefabs;
+    public float pixelsPerUnit = -1;
+    public Vector4 tileOffset;
+    public Vector2 offset;
+    public GameObject[] layers;
+    public Material[] tileSetMaterials;
+    public Sprite[][] tileSetSprites;
+    public GameObject[] prefabs;
+
+    public void OnBeforeSerialize() {
+        tmxFileString = tmxFile.Save();
+    }
+
+    public void OnAfterDeserialize() {
+        tmxFile = TMXFile.Load(tmxFileString, tmxFilePath);
+    }
 
     public Bounds bounds {
         get {
@@ -181,7 +194,7 @@ public class TileMap : MonoBehaviour {
         layers = new GameObject[tmxFile.layers.Count];
         _layerSubmeshObjects = new GameObject[tmxFile.layers.Count][];
         for (int i = 0; i < tmxFile.layers.Count; i++) {
-            Layer layer = tmxFile.layers[i];
+            Layer layer = tmxFile.layers[i] as Layer;
             if (layer is TileLayer) CreateTileLayer(i);
             else if (layer is ObjectGroup) CreateObjectGroup(i);
         }
@@ -194,6 +207,8 @@ public class TileMap : MonoBehaviour {
                 }
             }
         }
+
+        UpdateVisible();
     }
 
     public void CreateTileLayer (int layerIndex) {
@@ -268,10 +283,8 @@ public class TileMap : MonoBehaviour {
             Component c = g.GetComponent(classVar[0]);
             System.Type type = c.GetType();
             FieldInfo info = type.GetField(classVar[1], BindingFlags.Public | BindingFlags.Instance);
+            if (info == null) continue;
             switch (prop.type) {
-                case "string":
-                    info.SetValue(c, prop.val);
-                    break;
                 case "float":
                     info.SetValue(c, float.Parse(prop.val));
                     break;
@@ -285,6 +298,7 @@ public class TileMap : MonoBehaviour {
                     info.SetValue(c, TiledColorFromString(prop.val));
                     break;
                 default:
+                    info.SetValue(c, prop.val);
                     break;
             }
         }
@@ -348,10 +362,18 @@ public class TileMap : MonoBehaviour {
         return new Vector2(x, y);
     }
 
+    public void UpdateVisible () {
+        for (int i = 0; i < layers.Length; i++) {
+            GameObject g = layers[i];
+            Layer layer = tmxFile.layers[i] as Layer;
+            if (g) g.SetActive(layer.visible);
+        }
+    }
+
     public void UpdateLayerColor(int layerIndex) {
         if (!(tmxFile.layers[layerIndex] is TileLayer)) return;
 
-        Layer layer = tmxFile.layers[layerIndex];
+        Layer layer = tmxFile.layers[layerIndex] as Layer;
         Color color = TiledColorFromString(layer.tintColor);
         color.a *= layer.opacity;
         for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
@@ -500,10 +522,10 @@ public class TileMap : MonoBehaviour {
                 paths.Add(new List<IntPoint>(path));
             }
 
-            norms[vertIndex] = Vector3.forward;
-            norms[vertIndex+1] = Vector3.forward;
-            norms[vertIndex+2] = Vector3.forward;
-            norms[vertIndex+3] = Vector3.forward;
+            norms[vertIndex] = Vector3.back;
+            norms[vertIndex+1] = Vector3.back;
+            norms[vertIndex+2] = Vector3.back;
+            norms[vertIndex+3] = Vector3.back;
 
             float left = uvRect.left;
             float right = uvRect.right;
@@ -585,7 +607,6 @@ public class TileMap : MonoBehaviour {
         }
 
         filter.sharedMesh.RecalculateBounds();
-
 
         paths = Clipper.SimplifyPolygons(paths, PolyFillType.pftNonZero);
         paths = RemoveColinnearAndDoubles(paths);
