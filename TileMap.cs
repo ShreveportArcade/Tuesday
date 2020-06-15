@@ -420,10 +420,10 @@ public class TileMap : MonoBehaviour {
                 paths.Add(new List<IntPoint>(path));
             }
 
-            norms[vertIndex] = Vector3.forward;
-            norms[vertIndex+1] = Vector3.forward;
-            norms[vertIndex+2] = Vector3.forward;
-            norms[vertIndex+3] = Vector3.forward;
+            norms[vertIndex] = Vector3.back;
+            norms[vertIndex+1] = Vector3.back;
+            norms[vertIndex+2] = Vector3.back;
+            norms[vertIndex+3] = Vector3.back;
 
             float left = uvRect.left;
             float right = uvRect.right;
