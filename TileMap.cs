@@ -54,6 +54,7 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
     }
 
     public void OnAfterDeserialize() {
+        if (string.IsNullOrEmpty(tmxFileString)) return;
         tmxFile = TMXFile.Load(tmxFileString, tmxFilePath);
     }
 
