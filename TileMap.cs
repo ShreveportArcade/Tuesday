@@ -50,6 +50,7 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
     public GameObject[] prefabs;
 
     public void OnBeforeSerialize() {
+        if (tmxFile == null) return;
         tmxFileString = tmxFile.Save();
     }
 
@@ -217,6 +218,7 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
 
         TileLayer layerData = tmxFile.layers[layerIndex] as TileLayer;
         GameObject layer = new GameObject(layerData.name);
+        SetProperties(layer, layerData.properties);
         layer.transform.SetParent(transform);
         layer.transform.localPosition = new Vector3(layerData.offsetX, -layerData.offsetY, 0) / pixelsPerUnit;
 
@@ -231,10 +233,6 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
             }
             meshObject.AddComponent<MeshRenderer>();
             meshObject.AddComponent<MeshFilter>();
-            SortingGroup sort = meshObject.AddComponent<SortingGroup>();
-            sort.sortingOrder = layerIndex;
-            sort.sortingLayerName = layerData.name;
-
             _layerSubmeshObjects[layerIndex][submeshIndex] = meshObject;
 
             UpdateMesh(layerIndex, submeshIndex);
@@ -246,13 +244,10 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         if (!(tmxFile.layers[layerIndex] is ObjectGroup)) return;
         ObjectGroup groupData = tmxFile.layers[layerIndex] as ObjectGroup;
         GameObject group = new GameObject(groupData.name);
+        SetProperties(group, groupData.properties);
         group.transform.SetParent(transform);
         group.transform.localPosition = new Vector3(groupData.offsetX, -groupData.offsetY, 0) / pixelsPerUnit;
         layers[layerIndex] = group;
-
-        SortingGroup sort = group.AddComponent<SortingGroup>();
-        sort.sortingOrder = layerIndex;
-        sort.sortingLayerName = groupData.name;
 
         float w = tmxFile.tileWidth / pixelsPerUnit;
         float h = tmxFile.tileHeight / pixelsPerUnit;
@@ -277,33 +272,63 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
         g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
         g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
+        SetProperties(g, tileObject.properties);
+#endif        
+    }
 
-        foreach (Property prop in tileObject.properties) {
+    public void SetProperties (GameObject g, Property[] props) {
+        if (props == null) return;
+        foreach (Property prop in props) {
             if (!prop.name.Contains(".")) continue;
             string[] classVar = prop.name.Split('.');
-            Component c = g.GetComponent(classVar[0]);
-            System.Type type = c.GetType();
-            FieldInfo info = type.GetField(classVar[1], BindingFlags.Public | BindingFlags.Instance);
-            if (info == null) continue;
-            switch (prop.type) {
-                case "float":
-                    info.SetValue(c, float.Parse(prop.val));
-                    break;
-                case "int":
-                    info.SetValue(c, int.Parse(prop.val));
-                    break;
-                case "bool":
-                    info.SetValue(c, bool.Parse(prop.val));
-                    break;
-                case "color":
-                    info.SetValue(c, TiledColorFromString(prop.val));
-                    break;
-                default:
-                    info.SetValue(c, prop.val);
-                    break;
+            System.Type type = System.Type.GetType(classVar[0]);
+            if (type == null) type = System.Type.GetType("UnityEngine.Rendering."+classVar[0]+",UnityEngine");
+            if (type == null) continue;
+            Component c = g.GetComponent(type);
+            if (c == null) c = g.AddComponent(type);
+            FieldInfo fieldInfo = type.GetField(classVar[1], BindingFlags.Public | BindingFlags.Instance);
+            if (fieldInfo != null) {
+                switch (prop.type) {
+                    case "float":
+                        fieldInfo.SetValue(c, float.Parse(prop.val));
+                        break;
+                    case "int":
+                        fieldInfo.SetValue(c, int.Parse(prop.val));
+                        break;
+                    case "bool":
+                        fieldInfo.SetValue(c, bool.Parse(prop.val));
+                        break;
+                    case "color":
+                        fieldInfo.SetValue(c, TiledColorFromString(prop.val));
+                        break;
+                    default:
+                        fieldInfo.SetValue(c, prop.val);
+                        break;
+                }
+                continue;
+            }
+            PropertyInfo propInfo = type.GetProperty(classVar[1], BindingFlags.Public | BindingFlags.Instance);
+            if (propInfo != null) {
+                switch (prop.type) {
+                    case "float":
+                        propInfo.SetValue(c, float.Parse(prop.val));
+                        break;
+                    case "int":
+                        propInfo.SetValue(c, int.Parse(prop.val));
+                        break;
+                    case "bool":
+                        propInfo.SetValue(c, bool.Parse(prop.val));
+                        break;
+                    case "color":
+                        propInfo.SetValue(c, TiledColorFromString(prop.val));
+                        break;
+                    default:
+                        propInfo.SetValue(c, prop.val);
+                        break;
+                }
+                continue;
             }
         }
-#endif        
     }
 
     public void CreateSpriteTile (GameObject group, TileObject tileObject) {
@@ -340,6 +365,8 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
             poly.pathCount = 1;
             poly.SetPath(0, path);
         }
+
+        SetProperties(g, tileObject.properties);
     }
 
     public void ReloadMap () {

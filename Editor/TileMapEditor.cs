@@ -411,7 +411,7 @@ public class TileMapEditor : Editor {
     Vector3 selectionEnd;
     int[] selectedTileIndices = null;
     void OnSceneGUI () {
-        if (tileMap.tmxFile.layers == null || !(selectedLayer is TileLayer)) return;
+        if (tileMap == null || tileMap.tmxFile == null || tileMap.tmxFile.layers == null || !(selectedLayer is TileLayer)) return;
 
         Event e = Event.current;
         if (e == null) return;
@@ -592,7 +592,7 @@ public class TileMapEditor : Editor {
             int id = selectedIds[0];
             TileMapTreeViewItem item = FindItem(id, root) as TileMapTreeViewItem; 
             if (item != null && item.layer != null) {
-                Debug.Log(item.layer.name);
+                // Debug.Log(item.layer.name);
                 selectedLayer = item.layer;
             }
         }

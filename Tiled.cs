@@ -69,7 +69,7 @@ public class TMXFile {
         XmlTextReader xmlReader = new XmlTextReader(textReader);
         return Load(xmlReader, path);
     }
-    public static TMXFile Load (XmlTextReader xmlReader, string path) {
+    public static TMXFile Load (XmlTextReader xmlReader, string path) {        
         XmlSerializer deserializer = new XmlSerializer(typeof(TMXFile));
         TMXFile map = (TMXFile)deserializer.Deserialize(xmlReader);
 
@@ -83,6 +83,8 @@ public class TMXFile {
         }
         map.hasDocType = hasDocType;
         xmlReader.Close();
+
+        if (map.tileSets == null) return map;
 
         for (int i = 0; i < map.tileSets.Length; i++) {
             TileSet tileSet = map.tileSets[i];
@@ -318,7 +320,7 @@ public class TileSet {
         string source = this.source;
         this.source = null;
         XmlSerializer serializer = new XmlSerializer(typeof(TileSet));
-        TextWriter textWriter = new StreamWriter(path);
+        TextWriter textWriter = new StreamWriter(path, false, System.Text.Encoding.UTF8);
         XmlTextWriter xmlWriter = new XmlTextWriter(textWriter);
         xmlWriter.Formatting = Formatting.Indented;
         xmlWriter.Indentation = 1;
