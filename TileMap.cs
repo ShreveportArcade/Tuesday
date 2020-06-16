@@ -38,7 +38,10 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
     private TMXFile _tmxFile;
     public TMXFile tmxFile {
         get { return _tmxFile; }
-        set { _tmxFile = value; }
+        set { 
+            _tmxFile = value;
+            if (_tmxFile != null) tmxFileString = tmxFile.Save();
+        }
     }
 
     public float pixelsPerUnit = -1;
@@ -273,6 +276,7 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
         g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
         SetProperties(g, tileObject.properties);
+        g.SetActive(tileObject.visible);
 #endif        
     }
 

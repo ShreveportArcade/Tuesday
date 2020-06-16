@@ -114,7 +114,7 @@ public class TMXFile {
         XmlTextWriter xmlWriter = new XmlTextWriter(stringWriter);
         xmlWriter.Formatting = Formatting.Indented;
         xmlWriter.Indentation = 1;
-        xmlWriter.WriteStartDocument(); // Why is C# writing "UTF-8" as lowercase?
+        xmlWriter.WriteRaw("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
         if (hasDocType) xmlWriter.WriteDocType("map", null, "http://mapeditor.org/dtd/1.0/map.dtd", null);
         XmlSerializerNamespaces nameSpaces = new XmlSerializerNamespaces();
         nameSpaces.Add("","");
@@ -721,8 +721,9 @@ public class TileObject {
     [XmlIgnore] public bool heightSpecified { get { return height > 0; } set {} }
     [XmlAttribute("rotation")] public float rotation;
     [XmlIgnore] public bool rotationSpecified { get { return rotation != 0; } set { } }
-    [XmlAttribute("visible")] public int visible = 1;
-    [XmlIgnore] public bool visibleSpecified { get { return visible != 1; } set { } }
+    [XmlAttribute("visible")] public int visibleInt = 1;
+    [XmlIgnore] public bool visible { get { return visibleInt == 1; } set { visibleInt = value ? 1 : 0; }}
+    [XmlIgnore] public bool visibleIntSpecified { get { return visibleInt == 0; } set {}}
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
     [XmlElement("ellipse")] public string ellipse;
