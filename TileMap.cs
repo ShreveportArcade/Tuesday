@@ -47,7 +47,8 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
     public float pixelsPerUnit = -1;
     public Vector4 tileOffset;
     public Vector2 offset;
-    public GameObject[] layers;
+    public List<int> layerIDs;
+    public List<GameObject> layers;
     public Material[] tileSetMaterials;
     public Sprite[][] tileSetSprites;
     public GameObject[] prefabs;
@@ -62,6 +63,28 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         tmxFile = TMXFile.Load(tmxFileString, tmxFilePath);
     }
 
+    public int GetLayerIndexFromID (int id) {
+        return layerIDs.FindIndex(layerID => layerID == id );
+    }
+
+    public GameObject GetLayerFromID (int id) {
+        return layers[GetLayerIndexFromID(id)];
+    }
+
+    public Layer GetLayerDataFromID (int id) {
+        return GetLayerDataFromID(id, tmxFile.layers);
+    }
+
+    public Layer GetLayerDataFromID (int id, List<Layer> layers) {
+        foreach (Layer layer in layers) {
+            if (layer.id == id) return layer;
+            else if (layer is GroupLayer) {
+                return GetLayerDataFromID(id, (layer as GroupLayer).layers);
+            }
+        }
+        return null;
+    }
+
     public Bounds bounds {
         get {
             MeshRenderer[] renderers = GetComponentsInChildren<MeshRenderer>();
@@ -74,32 +97,8 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         }
     }
 
-    private GameObject[][] _layerSubmeshObjects;
-    private GameObject[][] layerSubmeshObjects {
-        get {
-            if (_layerSubmeshObjects == null) {
-                _layerSubmeshObjects = new GameObject[layers.Length][];
-                for (int layerIndex = 0; layerIndex < layers.Length; layerIndex++) {
-                    MeshRenderer[] renderers = layers[layerIndex].GetComponentsInChildren<MeshRenderer>();
-                    _layerSubmeshObjects[layerIndex] = System.Array.ConvertAll(renderers, (r) => r.gameObject);
-                }
-            }
-            return _layerSubmeshObjects;
-        }
-    }
-
-    private List<List<IntPoint>>[][] _layerPaths;
-    private List<List<IntPoint>>[][] layerPaths {
-        get {
-            if (_layerPaths == null) {
-                _layerPaths = new List<List<IntPoint>>[layers.Length][];
-                for (int layerIndex = 0; layerIndex < layers.Length; layerIndex++) {
-                    _layerPaths[layerIndex] = new List<List<IntPoint>>[meshesPerLayer];
-                }
-            }
-            return _layerPaths;
-        }
-    }
+    private List<GameObject[]> layerSubmeshObjects;
+    private List<List<List<IntPoint>>[]> layerPaths;
 
     Dictionary<int, Vector3[]> _idToPhysics;
     Dictionary<int, Vector3[]> idToPhysics {
@@ -196,13 +195,11 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
             }
         }
 
-        layers = new GameObject[tmxFile.layers.Count];
-        _layerSubmeshObjects = new GameObject[tmxFile.layers.Count][];
-        for (int i = 0; i < tmxFile.layers.Count; i++) {
-            Layer layer = tmxFile.layers[i] as Layer;
-            if (layer is TileLayer) CreateTileLayer(i);
-            else if (layer is ObjectGroup) CreateObjectGroup(i);
-        }
+        layers = new List<GameObject>();
+        layerIDs = new List<int>();
+        layerSubmeshObjects = new List<GameObject[]>();
+        layerPaths = new List<List<List<IntPoint>>[]>();
+        CreateLayers(tmxFile.layers, transform);
 
         if (physicsLayers != null) {
             foreach (GameObject layer in layers) {
@@ -216,18 +213,30 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         UpdateVisible();
     }
 
-    public void CreateTileLayer (int layerIndex) {
-        if (!(tmxFile.layers[layerIndex] is TileLayer)) return;
+    public void CreateLayers (List<Layer> layers, Transform parent) {
+        foreach (Layer layerData in layers) {
+            layerIDs.Add(layerData.id);
 
-        TileLayer layerData = tmxFile.layers[layerIndex] as TileLayer;
-        GameObject layer = new GameObject(layerData.name);
-        SetProperties(layer, layerData.properties);
-        layer.transform.SetParent(transform);
-        layer.transform.localPosition = new Vector3(layerData.offsetX, -layerData.offsetY, 0) / pixelsPerUnit;
+            GameObject layer = new GameObject(layerData.name);
+            this.layers.Add(layer);
+            SetProperties(layer, layerData.properties);
+            layer.transform.SetParent(parent);
+            layer.transform.localPosition = new Vector3(layerData.offsetX, -layerData.offsetY, 0) / pixelsPerUnit;
+            
+            GameObject[] submeshObjects = new GameObject[meshesPerLayer];
+            layerSubmeshObjects.Add(submeshObjects);
 
-        layers[layerIndex] = layer;
+            List<List<IntPoint>>[] layerPath = new List<List<IntPoint>>[meshesPerLayer];
+            layerPaths.Add(layerPath);
 
-        _layerSubmeshObjects[layerIndex] = new GameObject[meshesPerLayer];
+            if (layerData is TileLayer) CreateTileLayer(layerData as TileLayer, layer);
+            else if (layerData is ObjectGroup) CreateObjectGroup(layerData as ObjectGroup, layer);
+            else if (layerData is GroupLayer) CreateLayers((layerData as GroupLayer).layers, layer.transform);
+        }
+    }
+
+    public void CreateTileLayer (TileLayer layerData, GameObject layer) {
+        GameObject[] submeshObjects = layerSubmeshObjects[GetLayerIndexFromID(layerData.id)];
         for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
             GameObject meshObject = layer;
             if (meshesPerLayer > 1) {
@@ -236,22 +245,14 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
             }
             meshObject.AddComponent<MeshRenderer>();
             meshObject.AddComponent<MeshFilter>();
-            _layerSubmeshObjects[layerIndex][submeshIndex] = meshObject;
+            submeshObjects[submeshIndex] = meshObject;
 
-            UpdateMesh(layerIndex, submeshIndex);
-            UpdatePolygonCollider(layerIndex, submeshIndex);
+            UpdateMesh(layerData, submeshIndex);
+            UpdatePolygonCollider(layerData, submeshIndex);
         }        
     }
 
-    public void CreateObjectGroup (int layerIndex) {
-        if (!(tmxFile.layers[layerIndex] is ObjectGroup)) return;
-        ObjectGroup groupData = tmxFile.layers[layerIndex] as ObjectGroup;
-        GameObject group = new GameObject(groupData.name);
-        SetProperties(group, groupData.properties);
-        group.transform.SetParent(transform);
-        group.transform.localPosition = new Vector3(groupData.offsetX, -groupData.offsetY, 0) / pixelsPerUnit;
-        layers[layerIndex] = group;
-
+    public void CreateObjectGroup (ObjectGroup groupData, GameObject group) {
         float w = tmxFile.tileWidth / pixelsPerUnit;
         float h = tmxFile.tileHeight / pixelsPerUnit;
         foreach (TileObject tileObject in groupData.objects) {
@@ -374,11 +375,14 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
     }
 
     public void ReloadMap () {
-        for (int layerIndex = 0; layerIndex < tmxFile.layers.Count; layerIndex++) {
+        foreach (int id in layerIDs) {
+            Layer layerData = GetLayerDataFromID(id);
+            if (!(layerData is TileLayer)) continue;
+            TileLayer tileLayer = layerData as TileLayer;
             for (int submeshIndex = 0; submeshIndex < meshesPerLayer; submeshIndex++) {
-                UpdateMesh(layerIndex, submeshIndex);
+                UpdateMesh(tileLayer, submeshIndex);
             }
-            UpdatePolygonColliders(layerIndex);
+            UpdatePolygonColliders(tileLayer);
         }
     }
 
@@ -395,9 +399,9 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
     }
 
     public void UpdateVisible () {
-        for (int i = 0; i < layers.Length; i++) {
+        for (int i = 0; i < layers.Count; i++) {
             GameObject g = layers[i];
-            Layer layer = tmxFile.layers[i] as Layer;
+            Layer layer = GetLayerDataFromID(layerIDs[i]);
             if (g) g.SetActive(layer.visible);
         }
     }
@@ -422,11 +426,7 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         }
     }
 
-    public void UpdateMesh(int layerIndex, int submeshIndex) {
-        if (!(tmxFile.layers[layerIndex] is TileLayer)) return;
-
-        TileLayer layerData = tmxFile.layers[layerIndex] as TileLayer;
-
+    public void UpdateMesh(TileLayer layerData, int submeshIndex) {
         Dictionary<int, int> firstGIDToIndex = new Dictionary<int, int>();
         for (int i = 0; i < tmxFile.tileSets.Length; i++) {
             firstGIDToIndex[tmxFile.tileSets[i].firstGID] = i;
@@ -607,6 +607,7 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
             vertIndex += 4;
         }
 
+        int layerIndex = GetLayerIndexFromID(layerData.id);
         GameObject obj = layerSubmeshObjects[layerIndex][submeshIndex];
         MeshFilter filter = obj.GetComponent<MeshFilter>();
         if (filter.sharedMesh == null) {
@@ -665,7 +666,8 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         return paths;
     }
 
-    public void UpdatePolygonCollider (int layerIndex, int submeshIndex) {
+    public void UpdatePolygonCollider (Layer layerData, int submeshIndex) {
+        int layerIndex = GetLayerIndexFromID(layerData.id);
         if (layerPaths[layerIndex].Length <= submeshIndex) return;
         List<List<IntPoint>> paths = layerPaths[layerIndex][submeshIndex];
         if (paths == null || paths.Count == 0) return;
@@ -679,30 +681,20 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
     }
 
     public void UpdatePolygonColliders (TileLayer tileLayer) {
-
-    }
-
-    public void UpdatePolygonColliders (int layerIndex) {
-        for (int submeshIndex = 0; submeshIndex < layers.Length; submeshIndex++) {
-            UpdatePolygonCollider(layerIndex, submeshIndex);
+        for (int submeshIndex = 0; submeshIndex < layers.Count; submeshIndex++) {
+            UpdatePolygonCollider(tileLayer, submeshIndex);
         }
     }
 
     public bool SetTile (int tileID, TileLayer layer, Vector3 pos, bool updateMesh = true) {
-        return false;
-    }
-
-    public bool SetTiles (int tileID, TileLayer layer, Vector3 start, Vector3 end, bool updateMesh = true) {
-        return false;
-    }
-
-    public bool SetTile (int tileID, int layerIndex, Vector3 pos, bool updateMesh = true) {
+        int layerIndex = GetLayerIndexFromID(layer.id);
         int x = Mathf.FloorToInt((pos.x - offset.x) / tileOffset.x);
         int y = Mathf.FloorToInt((pos.y - offset.y) / tileOffset.y);
         return SetTile(tileID, layerIndex, x, y, updateMesh);
     }
 
-    public bool SetTiles (int tileID, int layerIndex, Vector3 start, Vector3 end, bool updateMesh = true) {
+    public bool SetTiles (int tileID, TileLayer layer, Vector3 start, Vector3 end, bool updateMesh = true) {
+        int layerIndex = GetLayerIndexFromID(layer.id);
         bool tileSet = false;
         float d = 0.5f * Mathf.Clamp01(tileOffset.magnitude / Vector3.Distance(start, end));
         List<int> changedSubmeshes = new List<int>();
@@ -720,7 +712,7 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
             }
         }
         if (updateMesh) {
-            foreach (int submeshIndex in changedSubmeshes) UpdateMesh(layerIndex, submeshIndex);
+            foreach (int submeshIndex in changedSubmeshes) UpdateMesh(layer, submeshIndex);
         }
         return tileSet;
     }
@@ -848,7 +840,7 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         }
 
         if (updateMesh) {
-            foreach (int submeshIndex in changedSubmeshes) UpdateMesh(layerIndex, submeshIndex);
+            foreach (int submeshIndex in changedSubmeshes) UpdateMesh(layer, submeshIndex);
         }
         return true;
     }
@@ -870,7 +862,7 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         if (updateMesh) {
             int index = x + y * tmxFile.width;
             int submeshIndex = index / 16250;
-            UpdateMesh(layerIndex, submeshIndex);
+            UpdateMesh(layer, submeshIndex);
         }
         return true;
     }
