@@ -49,14 +49,14 @@ class TileMapPaintTool : EditorTool {
         }
     }
 
-    static GUIContent _toolbarIcon;
+    static GUIContent paintIcon;
     public override GUIContent toolbarIcon {
         get {
-            if (_toolbarIcon == null) {
-                _toolbarIcon = EditorGUIUtility.IconContent("Grid.PaintTool");
-                _toolbarIcon.tooltip = "Draw tiles.";
+            if (paintIcon == null) {
+                paintIcon = EditorGUIUtility.IconContent("Grid.PaintTool");
+                paintIcon.tooltip = "Draw tiles.";
             }
-            return _toolbarIcon;
+            return paintIcon;
         }
     }
 
@@ -68,7 +68,7 @@ class TileMapPaintTool : EditorTool {
         EditorTools.activeToolChanged -= ActiveToolDidChange;
     }
 
-    void ActiveToolDidChange() {
+    public virtual void ActiveToolDidChange() {
         if (!EditorTools.IsActiveTool(this)) return;
     }
 
@@ -80,12 +80,6 @@ class TileMapPaintTool : EditorTool {
         if (!(TileMapEditor.selectedLayer is TileLayer)) return;
         Event e = Event.current;
         if (e == null) return;
-
-        // if (e.isKey && e.modifiers == EventModifiers.None && e.keyCode == KeyCode.F) {
-        //     SceneView.lastActiveSceneView.Frame(tileMap.bounds, false);
-        //     e.Use();
-        //     return;
-        // }
 
         Undo.RecordObject(target, "Draw/Erase Tiles");
 
@@ -106,18 +100,19 @@ class TileMapPaintTool : EditorTool {
         }
     }
 
-    Vector3 lastTilePos;
-    Vector3 tilePos;
-    void DrawTile (bool drag) {
+    public virtual int GetTileIndex () {
         int tileIndex = TileMapEditor.selectedTileIndex;
         if (TileMapEditor.selectedTileSet == null) { 
             TileMapEditor.selectedTileSet = tmxFile.tileSets[0];
             tileIndex = TileMapEditor.selectedTileSet.firstGID;
         }
+        return tileIndex;
+    }
 
-        // if (editState == 2) {
-        //     tileIndex = TileMapEditor.selectedTileSet.firstGID - 1;
-        // }
+    Vector3 lastTilePos;
+    Vector3 tilePos;
+    void DrawTile (bool drag) {
+        int tileIndex = GetTileIndex();
 
         Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
         float dist = 0;

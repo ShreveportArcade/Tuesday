@@ -6,35 +6,25 @@ using UnityEditor.EditorTools;
 
 namespace Tiled {
 [EditorTool("Erase Tiles", typeof(TileMap))]
-class TileMapEraseTool : EditorTool {
+class TileMapEraseTool : TileMapPaintTool {
 
-    static GUIContent _toolbarIcon;
+    static GUIContent eraseIcon;
     public override GUIContent toolbarIcon {
         get {
-            if (_toolbarIcon == null) {
-                _toolbarIcon = EditorGUIUtility.IconContent("Grid.EraserTool");
-                _toolbarIcon.tooltip = "Erase tiles.";
+            if (eraseIcon == null) {
+                eraseIcon = EditorGUIUtility.IconContent("Grid.EraserTool");
+                eraseIcon.tooltip = "Erase tiles.";
             }
-            return _toolbarIcon;
+            return eraseIcon;
         }
     }
 
-    void OnEnable() {
-        EditorTools.activeToolChanged += ActiveToolDidChange;
-    }
-
-    void OnDisable() {
-        EditorTools.activeToolChanged -= ActiveToolDidChange;
-    }
-
-    void ActiveToolDidChange() {
-        if (!EditorTools.IsActiveTool(this)) return;
+    public override int GetTileIndex() {
+        return TileMapEditor.selectedTileSet.firstGID - 1;
     }
 
     public override void OnToolGUI(EditorWindow window) {
-        Event e = Event.current;
-
-        
+        base.OnToolGUI(window);
     }
 }
 }

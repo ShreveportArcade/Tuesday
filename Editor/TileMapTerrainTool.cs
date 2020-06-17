@@ -6,35 +6,23 @@ using UnityEditor.EditorTools;
 
 namespace Tiled {
 [EditorTool("Draw Terrain Tiles", typeof(TileMap))]
-class TileMapTerrainTool : EditorTool {
+class TileMapTerrainTool : TileMapPaintTool {
 
-    static GUIContent _toolbarIcon;
+    static GUIContent terrainIcon;
     public override GUIContent toolbarIcon {
         get {
-            if (_toolbarIcon == null) {
-                _toolbarIcon = EditorGUIUtility.IconContent("TerrainInspector.TerrainToolSculpt");
-                _toolbarIcon.tooltip = "Draw terrain.";
+            if (terrainIcon == null) {
+                terrainIcon = EditorGUIUtility.IconContent("TerrainInspector.TerrainToolSculpt");
+                terrainIcon.tooltip = "Draw terrain.";
             }
-            return _toolbarIcon;
+            return terrainIcon;
         }
     }
 
-    void OnEnable() {
-        EditorTools.activeToolChanged += ActiveToolDidChange;
-    }
-
-    void OnDisable() {
-        EditorTools.activeToolChanged -= ActiveToolDidChange;
-    }
-
-    void ActiveToolDidChange() {
+    public override void ActiveToolDidChange() {
         if (!EditorTools.IsActiveTool(this)) return;
-    }
 
-    public override void OnToolGUI(EditorWindow window) {
-        Event e = Event.current;
-
-        
+        TileMapEditor.paintType = 1;
     }
 }
 }
