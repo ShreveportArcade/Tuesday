@@ -8,6 +8,47 @@ namespace Tiled {
 [EditorTool("Paint Tiles", typeof(TileMap))]
 class TileMapPaintTool : EditorTool {
 
+    private TileMap tileMap {
+        get { return (target as TileMap); }
+    }
+
+    private TMXFile tmxFile {
+        get { return tileMap.tmxFile; }
+        set { tileMap.tmxFile = value; }
+    }
+
+    private string path {
+        get { return tileMap.tmxFilePath; }
+        set { tileMap.tmxFilePath = value; }
+    }
+
+    private Terrain[] _terrains;
+    public Terrain[] terrains {
+        get {
+            if (_terrains == null || _terrains.Length == 0) {
+                List<Terrain> terrainList = new List<Terrain>();
+                foreach (TileSet tileSet in tmxFile.tileSets) {
+                    if (tileSet.terrainTypes == null) continue;
+                    foreach (Terrain terrain in tileSet.terrainTypes) {
+                        terrainList.Add(terrain);
+                    }
+                }
+                _terrains = terrainList.ToArray();
+            }
+            return _terrains;
+        }
+    }
+
+    public Terrain selectedTerrain {
+        get {
+            if (TileMapEditor.selectedTerrainIndex >= 0 
+            && TileMapEditor.selectedTerrainIndex < terrains.Length) {
+                return terrains[TileMapEditor.selectedTerrainIndex];
+            }
+            return null;
+        }
+    }
+
     static GUIContent _toolbarIcon;
     public override GUIContent toolbarIcon {
         get {
@@ -31,10 +72,79 @@ class TileMapPaintTool : EditorTool {
         if (!EditorTools.IsActiveTool(this)) return;
     }
 
-    public override void OnToolGUI(EditorWindow window) {
-        Event e = Event.current;
+    public override bool IsAvailable() {
+        return TileMapEditor.selectedLayer is TileLayer;
+    }
 
-        
+    public override void OnToolGUI(EditorWindow window) {
+        if (!(TileMapEditor.selectedLayer is TileLayer)) return;
+        Event e = Event.current;
+        if (e == null) return;
+
+        // if (e.isKey && e.modifiers == EventModifiers.None && e.keyCode == KeyCode.F) {
+        //     SceneView.lastActiveSceneView.Frame(tileMap.bounds, false);
+        //     e.Use();
+        //     return;
+        // }
+
+        Undo.RecordObject(target, "Draw/Erase Tiles");
+
+        if (e.type == EventType.MouseDown) {
+            GUIUtility.hotControl = GUIUtility.GetControlID(FocusType.Passive);
+            DrawTile(false);
+        }
+        else if (e.type == EventType.MouseDrag) {
+            DrawTile(true);
+        }
+        else if (e.type == EventType.MouseUp) {
+            TileLayer tileLayer = TileMapEditor.selectedLayer as TileLayer;
+            tileLayer.Encode();
+            tileMap.UpdatePolygonColliders(tileLayer);
+
+            GUIUtility.hotControl = 0;
+            Undo.FlushUndoRecordObjects();
+        }
+    }
+
+    Vector3 lastTilePos;
+    Vector3 tilePos;
+    void DrawTile (bool drag) {
+        int tileIndex = TileMapEditor.selectedTileIndex;
+        if (TileMapEditor.selectedTileSet == null) { 
+            TileMapEditor.selectedTileSet = tmxFile.tileSets[0];
+            tileIndex = TileMapEditor.selectedTileSet.firstGID;
+        }
+
+        // if (editState == 2) {
+        //     tileIndex = TileMapEditor.selectedTileSet.firstGID - 1;
+        // }
+
+        Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+        float dist = 0;
+        Plane plane = new Plane(Vector3.forward, tileMap.transform.position);
+        if (plane.Raycast(ray, out dist)) {
+            Vector3 p = ray.GetPoint(dist) - tileMap.transform.position;
+            lastTilePos = drag ? tilePos : p;
+            tilePos = p;
+            TileLayer tileLayer = TileMapEditor.selectedLayer as TileLayer;
+            switch (TileMapEditor.paintType) {
+                case 0:
+                    if ((!drag && tileMap.SetTile(tileIndex, tileLayer, tilePos)) || 
+                        (drag && tileMap.SetTiles(tileIndex, tileLayer, lastTilePos, tilePos))) {
+                        Event.current.Use();
+                        EditorUtility.SetDirty(target);
+                    }
+                    break;
+                case 1:
+                    if (selectedTerrain != null && tileMap.SetTerrain(selectedTerrain.tile, tileLayer, tilePos)) {
+                        Event.current.Use();
+                        EditorUtility.SetDirty(target);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 }
 }

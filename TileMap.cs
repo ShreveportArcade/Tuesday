@@ -97,8 +97,33 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         }
     }
 
-    private List<GameObject[]> layerSubmeshObjects;
-    private List<List<List<IntPoint>>[]> layerPaths;
+
+    private List<GameObject[]> _layerSubmeshObjects;
+    public List<GameObject[]> layerSubmeshObjects {
+        get {
+            if (_layerSubmeshObjects == null) {
+                _layerSubmeshObjects = new List<GameObject[]>();
+                for (int layerIndex = 0; layerIndex < layers.Count; layerIndex++) {
+                    int id = layerIDs[layerIndex];
+                    Layer layerData = GetLayerDataFromID(id);
+                    if (layerData is TileLayer) {
+                        MeshRenderer[] renderers = layers[layerIndex].GetComponentsInChildren<MeshRenderer>();
+                        GameObject[] submeshes = System.Array.ConvertAll(renderers, (r) => r.gameObject);
+                        _layerSubmeshObjects.Add(submeshes);
+                    }
+                    else {
+                        _layerSubmeshObjects.Add(null);
+                    }
+                }
+            }
+            return _layerSubmeshObjects;
+        }
+        set {
+            _layerSubmeshObjects = value;
+        }
+    }
+
+    public List<List<List<IntPoint>>[]> layerPaths;
 
     Dictionary<int, Vector3[]> _idToPhysics;
     Dictionary<int, Vector3[]> idToPhysics {
@@ -687,6 +712,7 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
     }
 
     public bool SetTile (int tileID, TileLayer layer, Vector3 pos, bool updateMesh = true) {
+        if (layer == null) return false;
         int layerIndex = GetLayerIndexFromID(layer.id);
         int x = Mathf.FloorToInt((pos.x - offset.x) / tileOffset.x);
         int y = Mathf.FloorToInt((pos.y - offset.y) / tileOffset.y);

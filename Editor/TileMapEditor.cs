@@ -42,6 +42,24 @@ public class TileMapEditor : Editor {
         set { tileMap.tmxFilePath = value; }
     }
 
+    private Terrain[] _terrains;
+    public Terrain[] terrains {
+        get {
+            if (_terrains == null || _terrains.Length == 0) {
+                List<Terrain> terrainList = new List<Terrain>();
+                foreach (TileSet tileSet in tmxFile.tileSets) {
+                    if (tileSet.terrainTypes == null) continue;
+                    foreach (Terrain terrain in tileSet.terrainTypes) {
+                        terrainList.Add(terrain);
+                    }
+                }
+                _terrains = terrainList.ToArray();
+            }
+            return _terrains;
+        }
+    }
+    
+
     [SerializeField] TreeViewState treeViewState;
     TileMapTreeView treeView;
 
@@ -155,8 +173,8 @@ public class TileMapEditor : Editor {
         return tex;
     }
 
-    private static TileSet selectedTileSet;
-    private static int selectedTileIndex;
+    public static TileSet selectedTileSet;
+    public static int selectedTileIndex;
     private int GetTileIndex (TileSet tileSet, Rect rect, Vector2 pos) {
         pos -= rect.min;
         pos.x /= rect.width;
@@ -166,32 +184,8 @@ public class TileMapEditor : Editor {
         return i;
     }
 
-    private static Layer selectedLayer;
-    private static int selectedTerrainIndex = 0;
-    private Terrain[] _terrains;
-    private Terrain[] terrains {
-        get {
-            if (_terrains == null || _terrains.Length == 0) {
-                List<Terrain> terrainList = new List<Terrain>();
-                foreach (TileSet tileSet in tmxFile.tileSets) {
-                    if (tileSet.terrainTypes == null) continue;
-                    foreach (Terrain terrain in tileSet.terrainTypes) {
-                        terrainList.Add(terrain);
-                    }
-                }
-                _terrains = terrainList.ToArray();
-            }
-            return _terrains;
-        }
-    }
-    private Terrain selectedTerrain {
-        get {
-            if (selectedTerrainIndex >= 0 && selectedTerrainIndex < terrains.Length) {
-                return terrains[selectedTerrainIndex];
-            }
-            return null;
-        }
-    }
+    public static Layer selectedLayer;
+    public static int selectedTerrainIndex = 0;
 
     Rect tileRect;
     private void TileSetField (TileSet tileSet) {
@@ -249,11 +243,11 @@ public class TileMapEditor : Editor {
         }
     }
 
-    private static int editState = 0;
-    private static int paintType = 0;
-    private static int selectedTileSetIndex = 0;
+    public static int editState = 0;
+    public static int paintType = 0;
+    public static int selectedTileSetIndex = 0;
     public override void OnInspectorGUI() {	
-        // editState = GUILayout.Toolbar(editState, new string[] {"Move", "Paint", "Erase", "Select"});
+        editState = GUILayout.Toolbar(editState, new string[] {"Move", "Paint", "Erase", "Select"});
             
         DefaultAsset asset = AssetDatabase.LoadAssetAtPath(path, typeof(DefaultAsset)) as DefaultAsset;
         asset = EditorGUILayout.ObjectField("TMX File", asset, typeof(DefaultAsset), false) as DefaultAsset;
@@ -305,32 +299,6 @@ public class TileMapEditor : Editor {
         Rect r = GUILayoutUtility.GetRect(Screen.width, EditorGUIUtility.singleLineHeight * 5);
         if (treeView == null) treeView = new TileMapTreeView(tileMap, treeViewState);
         treeView.OnGUI(r);
-
-        // EditorGUILayout.Separator();
-
-        // if (tmxFile.layers != null) {
-        //     EditorGUILayout.LabelField("Layers", EditorStyles.boldLabel);
-        //     EditorGUILayout.BeginHorizontal();
-        //         string[] layerNames = Array.ConvertAll(tmxFile.layers.ToArray(), (layer) => layer.name);
-        //         Array.Reverse(layerNames);
-        //         int s = tmxFile.layers.Count - 1 - selectedLayer;
-        //         s = GUILayout.SelectionGrid(s, layerNames, 1);
-        //         selectedLayer = tmxFile.layers.Count - 1 - s;
-        //         EditorGUILayout.BeginVertical();
-        //             for (int i = tmxFile.layers.Count-1; i >= 0; i--) {
-        //                 Layer layer = tmxFile.layers[i];
-        //                 Color c = TileMap.TiledColorFromString(layer.tintColor);
-        //                 c = EditorGUILayout.ColorField(c);
-        //                 string newColor = TileMap.TiledColorToString(c);
-        //                 if (newColor != layer.tintColor) {
-        //                     layer.tintColor = newColor;
-        //                     tileMap.UpdateLayerColor(i);
-        //                 }
-        //             }
-        //         EditorGUILayout.EndVertical();
-        //     EditorGUILayout.EndHorizontal();
-        //     EditorGUILayout.Separator();
-        // }
     }
 
     void DrawTileSets () {
@@ -404,142 +372,6 @@ public class TileMapEditor : Editor {
                     Handles.DrawAAConvexPolygon(poly);
                 }
             }
-        }
-    }
-
-    Vector3 selectionStart;
-    Vector3 selectionEnd;
-    int[] selectedTileIndices = null;
-    void OnSceneGUI () {
-        if (tileMap == null || tileMap.tmxFile == null || tileMap.tmxFile.layers == null || !(selectedLayer is TileLayer)) return;
-
-        Event e = Event.current;
-        if (e == null) return;
-
-        #if UNITY_2017_1_OR_NEWER
-        if (e.isKey && e.modifiers == EventModifiers.None && e.keyCode == KeyCode.F) {
-            SceneView.lastActiveSceneView.Frame(tileMap.bounds, false);
-            e.Use();
-            return;
-        }
-        #endif
-
-        if (editState == 0 || e.modifiers != EventModifiers.None) return;
-        else if (editState == 3) DrawSelection();
-        else Undo.RecordObject(target, "Draw/Erase Tiles");
-
-        if (e.type == EventType.MouseDown) {
-            GUIUtility.hotControl = GUIUtility.GetControlID(FocusType.Passive);
-            selectedTileIndices = null;
-            if (editState == 3) selectionStart = MouseToWorldPoint();
-            else DrawTile(false);
-        }
-        else if (e.type == EventType.MouseDrag) {
-            if (editState != 3) DrawTile(true); 
-            else {
-                selectionEnd = MouseToWorldPoint();
-            }
-        }
-        else if (e.type == EventType.MouseUp) {
-            if (editState == 3) SelectTiles();
-            else {
-                TileLayer tileLayer = selectedLayer as TileLayer;
-                tileLayer.Encode();
-                tileMap.UpdatePolygonColliders(tileLayer);
-            }
-            GUIUtility.hotControl = 0;
-            Undo.FlushUndoRecordObjects();
-        }
-    }
-
-    Vector3 MouseToWorldPoint () {
-        Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
-        float dist = 0;
-        Plane plane = new Plane(Vector3.forward, tileMap.transform.position);
-        if (plane.Raycast(ray, out dist)) {
-            return ray.GetPoint(dist) - tileMap.transform.position;
-        }
-        return Vector3.zero;
-    }
-
-    void DrawSelection () {
-        Handles.DrawSolidRectangleWithOutline(new Vector3[] {
-                selectionStart,
-                new Vector3(selectionStart.x, selectionEnd.y, 0),
-                selectionEnd,
-                new Vector3(selectionEnd.x, selectionStart.y, 0)
-            },
-            new Color(1,1,1,0.1f),
-            new Color(1,1,1,0.5f)
-        );  
-    }
-
-    Vector3 lastTilePos;
-    Vector3 tilePos;
-    void DrawTile (bool drag) {
-        int tileIndex = selectedTileIndex;
-        if (selectedTileSet == null) { 
-            selectedTileSet = tmxFile.tileSets[0];
-            tileIndex = selectedTileSet.firstGID;
-        }
-
-        if (editState == 2) {
-            tileIndex = selectedTileSet.firstGID - 1;
-        }
-
-        Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
-        float dist = 0;
-        Plane plane = new Plane(Vector3.forward, tileMap.transform.position);
-        if (plane.Raycast(ray, out dist)) {
-            Vector3 p = ray.GetPoint(dist) - tileMap.transform.position;
-            lastTilePos = drag ? tilePos : p;
-            tilePos = p;
-            TileLayer tileLayer = selectedLayer as TileLayer;
-            switch (paintType) {
-                case 0:
-                    if ((!drag && tileMap.SetTile(tileIndex, tileLayer, tilePos)) || 
-                        (drag && tileMap.SetTiles(tileIndex, tileLayer, lastTilePos, tilePos))) {
-                        Event.current.Use();
-                        EditorUtility.SetDirty(target);
-                    }
-                    break;
-                case 1:
-                    if (selectedTerrain != null && tileMap.SetTerrain(selectedTerrain.tile, tileLayer, tilePos)) {
-                        Event.current.Use();
-                        EditorUtility.SetDirty(target);
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
-    }
-
-    void SelectTiles () {
-        Vector3 startPos = selectionStart - tileMap.transform.position;
-        Vector3 endPos = selectionEnd - tileMap.transform.position;
-
-        int startX = Mathf.Clamp(Mathf.FloorToInt(startPos.x / tileMap.tileOffset.x), 0, tmxFile.width);
-        int startY = Mathf.Clamp(Mathf.FloorToInt(startPos.y / tileMap.tileOffset.y), 0, tmxFile.height);
-    
-        int endX = Mathf.Clamp(Mathf.FloorToInt(endPos.x / tileMap.tileOffset.x), 0, tmxFile.width);
-        int endY = Mathf.Clamp(Mathf.FloorToInt(endPos.y / tileMap.tileOffset.y), 0, tmxFile.height);
-    
-        int width = Mathf.Abs(endX - startX);
-        int height = Mathf.Abs(endY - startY);
-        int a = Mathf.Min(startX, endX);
-        int b = Mathf.Min(startY, endY);
-        selectedTileIndices = new int[width * height];
-
-        int i = 0;
-        for (int x = a; x < a + width; x++) {
-            for (int y = b; y < b + width; y++) {
-                selectedTileIndices[i] = x + y * tmxFile.width;
-            }
-        }
-
-        if (selectedTileIndices != null) {
-            Event.current.Use();
         }
     }
 
