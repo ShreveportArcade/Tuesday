@@ -54,13 +54,13 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
     public GameObject[] prefabs;
 
     public void OnBeforeSerialize() {
-        if (tmxFile == null) return;
-        tmxFileString = tmxFile.Save();
+        if (tmxFile == null) tmxFileString = null;
+        else tmxFileString = tmxFile.Save();
     }
 
     public void OnAfterDeserialize() {
-        if (string.IsNullOrEmpty(tmxFileString)) return;
-        tmxFile = TMXFile.Load(tmxFileString, tmxFilePath);
+        if (string.IsNullOrEmpty(tmxFileString)) _tmxFile = null;
+        else tmxFile = TMXFile.Load(tmxFileString, tmxFilePath);
     }
 
     public int GetLayerIndexFromID (int id) {
@@ -123,7 +123,28 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         }
     }
 
-    public List<List<List<IntPoint>>[]> layerPaths;
+    private List<List<List<IntPoint>>[]> _layerPaths;
+    public List<List<List<IntPoint>>[]> layerPaths {
+        get {
+            if (_layerPaths == null) {
+                _layerPaths = new List<List<List<IntPoint>>[]>();
+                for (int layerIndex = 0; layerIndex < layers.Count; layerIndex++) {
+                    int id = layerIDs[layerIndex];
+                    Layer layerData = GetLayerDataFromID(id);
+                    if (layerData is TileLayer) {
+                        _layerPaths.Add(new List<List<IntPoint>>[meshesPerLayer]);
+                    }
+                    else {
+                        _layerPaths.Add(null);
+                    }
+                }
+            }
+            return _layerPaths;
+        }
+        set {
+            _layerPaths = value;
+        }
+    }
 
     Dictionary<int, Vector3[]> _idToPhysics;
     Dictionary<int, Vector3[]> idToPhysics {
@@ -191,6 +212,7 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
     }
 
     public void Setup () {
+        Debug.Log("Setup");
         if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileWidth;
 
         tileOffset = new Vector4(tmxFile.tileWidth, -tmxFile.tileHeight, tmxFile.tileWidth, -tmxFile.tileHeight);
@@ -222,8 +244,8 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
 
         layers = new List<GameObject>();
         layerIDs = new List<int>();
-        layerSubmeshObjects = new List<GameObject[]>();
-        layerPaths = new List<List<List<IntPoint>>[]>();
+        _layerSubmeshObjects = new List<GameObject[]>();
+        _layerPaths = new List<List<List<IntPoint>>[]>();
         CreateLayers(tmxFile.layers, transform);
 
         if (physicsLayers != null) {
@@ -311,28 +333,38 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         foreach (Property prop in props) {
             if (!prop.name.Contains(".")) continue;
             string[] classVar = prop.name.Split('.');
+            Object o = g as Object;
             System.Type type = System.Type.GetType(classVar[0]);
-            if (type == null) type = System.Type.GetType("UnityEngine.Rendering."+classVar[0]+",UnityEngine");
-            if (type == null) continue;
-            Component c = g.GetComponent(type);
-            if (c == null) c = g.AddComponent(type);
+            if (classVar[0] == "GameObject") {
+                if (classVar[1] == "layer" && !prop.typeSpecified) {
+                    g.layer = LayerMask.NameToLayer(prop.val);
+                    continue;
+                }
+            }
+            else {
+                if (type == null) type = System.Type.GetType("UnityEngine.Rendering."+classVar[0]+",UnityEngine");
+                if (type == null) continue;
+                Component c = g.GetComponent(type);
+                if (c == null) c = g.AddComponent(type);
+                o = c as Object;
+            }
             FieldInfo fieldInfo = type.GetField(classVar[1], BindingFlags.Public | BindingFlags.Instance);
             if (fieldInfo != null) {
                 switch (prop.type) {
                     case "float":
-                        fieldInfo.SetValue(c, float.Parse(prop.val));
+                        fieldInfo.SetValue(o, float.Parse(prop.val));
                         break;
                     case "int":
-                        fieldInfo.SetValue(c, int.Parse(prop.val));
+                        fieldInfo.SetValue(o, int.Parse(prop.val));
                         break;
                     case "bool":
-                        fieldInfo.SetValue(c, bool.Parse(prop.val));
+                        fieldInfo.SetValue(o, bool.Parse(prop.val));
                         break;
                     case "color":
-                        fieldInfo.SetValue(c, TiledColorFromString(prop.val));
+                        fieldInfo.SetValue(o, TiledColorFromString(prop.val));
                         break;
                     default:
-                        fieldInfo.SetValue(c, prop.val);
+                        fieldInfo.SetValue(o, prop.val);
                         break;
                 }
                 continue;
@@ -341,19 +373,19 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
             if (propInfo != null) {
                 switch (prop.type) {
                     case "float":
-                        propInfo.SetValue(c, float.Parse(prop.val));
+                        propInfo.SetValue(o, float.Parse(prop.val));
                         break;
                     case "int":
-                        propInfo.SetValue(c, int.Parse(prop.val));
+                        propInfo.SetValue(o, int.Parse(prop.val));
                         break;
                     case "bool":
-                        propInfo.SetValue(c, bool.Parse(prop.val));
+                        propInfo.SetValue(o, bool.Parse(prop.val));
                         break;
                     case "color":
-                        propInfo.SetValue(c, TiledColorFromString(prop.val));
+                        propInfo.SetValue(o, TiledColorFromString(prop.val));
                         break;
                     default:
-                        propInfo.SetValue(c, prop.val);
+                        propInfo.SetValue(o, prop.val);
                         break;
                 }
                 continue;
@@ -400,6 +432,7 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
     }
 
     public void ReloadMap () {
+        Debug.Log("ReloadMap");
         foreach (int id in layerIDs) {
             Layer layerData = GetLayerDataFromID(id);
             if (!(layerData is TileLayer)) continue;
@@ -633,7 +666,8 @@ public class TileMap : MonoBehaviour, ISerializationCallbackReceiver {
         }
 
         int layerIndex = GetLayerIndexFromID(layerData.id);
-        GameObject obj = layerSubmeshObjects[layerIndex][submeshIndex];
+        GameObject[] subMeshObjects = layerSubmeshObjects[layerIndex];
+        GameObject obj = subMeshObjects[submeshIndex];
         MeshFilter filter = obj.GetComponent<MeshFilter>();
         if (filter.sharedMesh == null) {
             filter.sharedMesh = new Mesh();

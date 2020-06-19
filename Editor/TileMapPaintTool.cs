@@ -61,6 +61,7 @@ class TileMapPaintTool : EditorTool {
     }
 
     void OnEnable() {
+        // Debug.Log("PaintTool.OnEnable");
         EditorTools.activeToolChanged += ActiveToolDidChange;
     }
 
@@ -93,10 +94,11 @@ class TileMapPaintTool : EditorTool {
         else if (e.type == EventType.MouseUp) {
             TileLayer tileLayer = TileMapEditor.selectedLayer as TileLayer;
             tileLayer.Encode();
+            tileMap.tmxFileString = tmxFile.Save();
             tileMap.UpdatePolygonColliders(tileLayer);
 
             GUIUtility.hotControl = 0;
-            Undo.FlushUndoRecordObjects();
+            // Undo.FlushUndoRecordObjects();
         }
     }
 

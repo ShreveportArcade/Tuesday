@@ -23,6 +23,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
+using System.Linq;
 
 namespace Tiled {
 [CustomEditor(typeof(TileMap))]
@@ -35,6 +36,11 @@ public class TileMapEditor : Editor {
     private TMXFile tmxFile {
         get { return tileMap.tmxFile; }
         set { tileMap.tmxFile = value; }
+    }
+
+    private string tmxFileString {
+        get { return tileMap.tmxFileString; }
+        set { tileMap.tmxFileString = value; }
     }
 
     private string path {
@@ -79,6 +85,7 @@ public class TileMapEditor : Editor {
 
     void UndoRedo () {
         if (target != null) {
+            tileMap.tmxFile = TMXFile.Load(tileMap.tmxFileString, path);
             tileMap.ReloadMap();
             treeView.Reload();
         }
@@ -184,6 +191,7 @@ public class TileMapEditor : Editor {
         return i;
     }
 
+    private static int selectedLayerID;
     public static Layer selectedLayer;
     public static int selectedTerrainIndex = 0;
 
@@ -246,9 +254,7 @@ public class TileMapEditor : Editor {
     public static int editState = 0;
     public static int paintType = 0;
     public static int selectedTileSetIndex = 0;
-    public override void OnInspectorGUI() {	
-        editState = GUILayout.Toolbar(editState, new string[] {"Move", "Paint", "Erase", "Select"});
-            
+    public override void OnInspectorGUI() {
         DefaultAsset asset = AssetDatabase.LoadAssetAtPath(path, typeof(DefaultAsset)) as DefaultAsset;
         asset = EditorGUILayout.ObjectField("TMX File", asset, typeof(DefaultAsset), false) as DefaultAsset;
         string assetPath = AssetDatabase.GetAssetPath(asset);
@@ -258,14 +264,14 @@ public class TileMapEditor : Editor {
             tmxFile = TMXFile.Load(assetPath);
             tileMap.Setup();
         }
+        if (path != null) DrawFilePanel();
 
         tileMap.pivot = EditorGUILayout.Vector2Field("Pivot", tileMap.pivot);
-        
-        // base.OnInspectorGUI();
-        
         DrawLayers();
         DrawTileSets();
+    }
 
+    void DrawFilePanel() {
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Reload")) {
             tmxFile = TMXFile.Load(path);
@@ -390,7 +396,6 @@ public class TileMapEditor : Editor {
         static Texture2D imageLayerIcon = EditorGUIUtility.IconContent("RawImage Icon").image as Texture2D;
         static Texture2D groupLayerIcon = EditorGUIUtility.IconContent("Folder Icon").image as Texture2D;
 
-        int id = 1;
         TileMap tileMap;
         TileMapTreeViewItem root;
 
@@ -400,7 +405,7 @@ public class TileMapEditor : Editor {
         }
 
         void AddLayerItem (TileMapTreeViewItem parent, Layer layer) {
-            TileMapTreeViewItem item = new TileMapTreeViewItem {id = id++, displayName = layer.name, layer = layer};
+            TileMapTreeViewItem item = new TileMapTreeViewItem {id = layer.id, displayName = layer.name, layer = layer};
             parent.AddChild(item);
             if (layer is GroupLayer) {
                 GroupLayer group = layer as GroupLayer;
@@ -411,7 +416,7 @@ public class TileMapEditor : Editor {
         }
             
         protected override TreeViewItem BuildRoot () {
-            root = new TileMapTreeViewItem {id = 0, depth = -1, displayName = "TileMap"};
+            root = new TileMapTreeViewItem {id = -1, depth = -1, displayName = "TileMap"};
             for (int i = tileMap.tmxFile.layers.Count-1; i >= 0; i--) {
                 AddLayerItem(root, tileMap.tmxFile.layers[i] as Layer);
             }            
@@ -426,6 +431,12 @@ public class TileMapEditor : Editor {
             if (item != null && item.layer != null) {
                 // Debug.Log(item.layer.name);
                 selectedLayer = item.layer;
+                selectedLayerID = item.id;
+            }
+            else if (item == null) {
+                List<int> ids = new List<int>();
+                ids.Add(selectedLayerID);
+                SetSelection(ids);
             }
         }
 
