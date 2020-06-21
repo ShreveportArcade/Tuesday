@@ -147,6 +147,7 @@ class TMXAssetEditor : Editor {
     }
 
     private static void DragAndDropTMXFile (bool isSceneView = false, Transform parent = null) {
+        return;
         EventType eventType = Event.current.type;
         if (eventType == EventType.DragUpdated || eventType == EventType.DragPerform) {
             DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
