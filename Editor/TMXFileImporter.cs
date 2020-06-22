@@ -6,7 +6,6 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 using UnityEditor;
 using UnityEditor.Experimental.AssetImporters;
-using Tiled;
 
 [ScriptedImporter(1, "tmx")]
 public class TMXFileImporter : ScriptedImporter {
@@ -29,11 +28,11 @@ public class TMXFileImporter : ScriptedImporter {
         return colorStr;
     }
 
-    TMXFile tmxFile;
+    Tiled.TMXFile tmxFile;
     string tmxFilePath;
     public override void OnImportAsset(AssetImportContext ctx) {
         tmxFilePath = ctx.assetPath;
-        tmxFile = TMXFile.Load(ctx.assetPath);
+        tmxFile = Tiled.TMXFile.Load(ctx.assetPath);
         if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileHeight;
         GameObject tileMap = new GameObject(Path.GetFileNameWithoutExtension(ctx.assetPath));
         Grid grid = tileMap.AddComponent<Grid>();
@@ -42,41 +41,80 @@ public class TMXFileImporter : ScriptedImporter {
         ctx.SetMainObject(tileMap);
     }
 
-    void CreateLayers (List<Layer> layers, Transform parent) {
-        foreach (Layer layerData in layers) {
+    void CreateLayers (List<Tiled.Layer> layers, Transform parent) {
+        foreach (Tiled.Layer layerData in layers) {
             GameObject layer = new GameObject(layerData.name);
             // SetProperties(layer, layerData.properties);
             layer.transform.SetParent(parent);
             layer.transform.localPosition = new Vector3(layerData.offsetX, -layerData.offsetY, 0) / pixelsPerUnit;
 
-            if (layerData is TileLayer) CreateTileLayer(layerData as TileLayer, layer);
-            else if (layerData is ObjectGroup) CreateObjectGroup(layerData as ObjectGroup, layer);
-            else if (layerData is GroupLayer) CreateLayers((layerData as GroupLayer).layers, layer.transform);
+            if (layerData is Tiled.TileLayer) CreateTileLayer(layerData as Tiled.TileLayer, layer);
+            else if (layerData is Tiled.ObjectGroup) CreateObjectGroup(layerData as Tiled.ObjectGroup, layer);
+            else if (layerData is Tiled.GroupLayer) CreateLayers((layerData as Tiled.GroupLayer).layers, layer.transform);
         }
     }
 
+    Dictionary<int, Tile> _tiles;
+    Dictionary<int, Tile> tiles {
+        get {
+            if (_tiles == null) {
+                _tiles = new Dictionary<int, Tile>();
+                foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
+                    if (tileSet.hasSource) {
+                        string tsxPath = tileSet.source;
+                        tsxPath = Path.Combine(Path.GetDirectoryName(tmxFilePath), tsxPath);
+                        tsxPath = Path.GetFullPath(tsxPath);
 
+                        string dataPath = Path.GetFullPath(Application.dataPath);
+                        tsxPath = tsxPath.Replace(dataPath, "Assets");
+                        Object[] assets = AssetDatabase.LoadAllAssetRepresentationsAtPath(tsxPath);
+                        foreach (Object asset in assets) {
+                            if (asset is Tile) {
+                                Tile tile = asset as Tile;
+                                int gid = tileSet.firstGID + int.Parse(tile.name.Split('_')[1]);
+                                _tiles[gid] = tile;
+                            }
+                        }
+                    }
+                }
+            }
+            return _tiles;
+        }
+    }
 
-    public void CreateTileLayer (TileLayer layerData, GameObject layer) {
+    public void CreateTileLayer (Tiled.TileLayer layerData, GameObject layer) {
         Tilemap tilemap = layer.AddComponent<Tilemap>();
+        tilemap.tileAnchor = Vector3.zero;
         TilemapRenderer renderer = layer.AddComponent<TilemapRenderer>();  
         tilemap.color = TiledColorFromString(layerData.tintColor);
-                   
-    }
+        
+        int rows = tmxFile.height;
+        int columns = tmxFile.width;
+        for (int y = 0; y < rows; y++) {
+            for (int x = 0; x < columns; x++) {
+                int tileID = layerData.GetTileID(x, y);
+                if (tileID == 0) continue;
 
-    public void CreateObjectGroup (ObjectGroup groupData, GameObject group) {
-        float w = tmxFile.tileWidth / pixelsPerUnit;
-        float h = tmxFile.tileHeight / pixelsPerUnit;
-        foreach (TileObject tileObject in groupData.objects) {
-            bool isPrefab = tileObject.properties != null && System.Array.Exists(tileObject.properties, (p) => p.name == "prefab");
-            if (isPrefab) CreatePrefabTile(group, tileObject);
-            else CreateSpriteTile(group, tileObject);
+                Tile tile = tile = tiles[tileID];
+                Vector3Int pos = new Vector3Int(x, rows-1-y, 0);
+                tilemap.SetTile(pos, tile);
+            }
         }
     }
 
-    public void CreatePrefabTile (GameObject group, TileObject tileObject) {
+    public void CreateObjectGroup (Tiled.ObjectGroup groupData, GameObject group) {
+        float w = tmxFile.tileWidth / pixelsPerUnit;
+        float h = tmxFile.tileHeight / pixelsPerUnit;
+        foreach (Tiled.TileObject tileObject in groupData.objects) {
+            bool isPrefab = tileObject.properties != null && System.Array.Exists(tileObject.properties, (p) => p.name == "prefab");
+            if (isPrefab) CreatePrefabTile(tileObject, group);
+            else CreateSpriteTile(tileObject, group);
+        }
+    }
+
+    public void CreatePrefabTile (Tiled.TileObject tileObject, GameObject group) {
         int tileID = (int)tileObject.gid;
-        Property prefabProp = System.Array.Find(tileObject.properties, (p) => p.name == "prefab");
+        Tiled.Property prefabProp = System.Array.Find(tileObject.properties, (p) => p.name == "prefab");
 
         string prefabPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(tmxFilePath), prefabProp.val));
         string dataPath = Path.GetFullPath(Application.dataPath);
@@ -91,9 +129,9 @@ public class TMXFileImporter : ScriptedImporter {
         g.SetActive(tileObject.visible);
     }
 
-    public void SetProperties (GameObject g, Property[] props) {
+    public void SetProperties (GameObject g, Tiled.Property[] props) {
         if (props == null) return;
-        foreach (Property prop in props) {
+        foreach (Tiled.Property prop in props) {
             if (!prop.name.Contains(".")) continue;
             string[] classVar = prop.name.Split('.');
             Object o = g as Object;
@@ -156,7 +194,7 @@ public class TMXFileImporter : ScriptedImporter {
         }
     }
 
-    public void CreateSpriteTile (GameObject group, TileObject tileObject) {
+    public void CreateSpriteTile (Tiled.TileObject tileObject, GameObject group) {
         int tileID = (int)tileObject.gid;
         GameObject g = new GameObject(tileObject.name);
         g.transform.SetParent(group.transform);
@@ -165,9 +203,9 @@ public class TMXFileImporter : ScriptedImporter {
         g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
 
         SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
-        sprite.flipX = TMXFile.FlippedHorizontally(tileObject.gid);
-        sprite.flipY = TMXFile.FlippedVertically(tileObject.gid);
-        TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
+        sprite.flipX = Tiled.TMXFile.FlippedHorizontally(tileObject.gid);
+        sprite.flipY = Tiled.TMXFile.FlippedVertically(tileObject.gid);
+        Tiled.TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
         // if (tileSet != null && tileSet.image != null && !string.IsNullOrEmpty(tileSet.image.source)) {
         //     g.transform.localScale = new Vector3(tileObject.width, tileObject.height, pixelsPerUnit) / pixelsPerUnit;
         //     int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);

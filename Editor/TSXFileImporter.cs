@@ -58,6 +58,7 @@ public class TSXFileImporter : ScriptedImporter {
                     Rect rect = new Rect(r.x, r.y, r.width, r.height);
                     Sprite sprite = Sprite.Create(tex, rect, Vector2.zero, pixelsPerUnit, 0, SpriteMeshType.FullRect);
                     sprite.name = name + "_" + x + "," + y;
+                    AddPhysicsToSprite(tiledTile, sprite);
                     ctx.AddObjectToAsset(sprite.name,  sprite);
 
                     Tile unityTile = ScriptableObject.CreateInstance<Tile>();
@@ -68,5 +69,35 @@ public class TSXFileImporter : ScriptedImporter {
                 }
             }
         }
+    }
+
+    void AddPhysicsToSprite (Tiled.Tile tile, Sprite sprite) {
+        if (tile == null
+        || tile.objectGroup == null
+        || tile.objectGroup.objects == null
+        || tile.objectGroup.objects.Length == 0) return;
+
+        List<Vector2[]> physicsShape = new List<Vector2[]>();          
+        Tiled.TileObject tileObject = tile.objectGroup.objects[0];
+        float x = tileObject.x;
+        float y = tileObject.y;
+        if (tileObject.polygonSpecified) {
+            float h = sprite.rect.height;
+            Vector2[] path = System.Array.ConvertAll(tileObject.polygon.path, (p) => new Vector2(p.x+x, h-(p.y+y)));
+            physicsShape.Add(path);
+        }
+        else {
+            float w = tileObject.width;
+            float h = tileObject.height;
+            Vector2[] path = new Vector2[] {
+                Vector2.zero,
+                Vector2.up * h,
+                new Vector2(w, h),
+                Vector2.right * w
+            };
+            physicsShape.Add(path);
+        }
+
+        sprite.OverridePhysicsShape(physicsShape); 
     }
 }
