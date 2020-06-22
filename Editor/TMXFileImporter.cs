@@ -11,7 +11,7 @@ using Tiled;
 [ScriptedImporter(1, "tmx")]
 public class TMXFileImporter : ScriptedImporter {
 
-    int pixelsPerUnit = 96;
+    public int pixelsPerUnit = -1;
 
     public static Color TiledColorFromString (string colorStr) {
         Color color = Color.white;
@@ -34,6 +34,7 @@ public class TMXFileImporter : ScriptedImporter {
     public override void OnImportAsset(AssetImportContext ctx) {
         tmxFilePath = ctx.assetPath;
         tmxFile = TMXFile.Load(ctx.assetPath);
+        if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileHeight;
         GameObject tileMap = new GameObject(Path.GetFileNameWithoutExtension(ctx.assetPath));
         Grid grid = tileMap.AddComponent<Grid>();
         CreateLayers(tmxFile.layers, tileMap.transform);
@@ -59,7 +60,7 @@ public class TMXFileImporter : ScriptedImporter {
     public void CreateTileLayer (TileLayer layerData, GameObject layer) {
         Tilemap tilemap = layer.AddComponent<Tilemap>();
         TilemapRenderer renderer = layer.AddComponent<TilemapRenderer>();  
-        
+        tilemap.color = TiledColorFromString(layerData.tintColor);
                    
     }
 
