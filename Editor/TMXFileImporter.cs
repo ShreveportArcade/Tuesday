@@ -42,11 +42,17 @@ public class TMXFileImporter : ScriptedImporter {
     }
 
     void CreateLayers (List<Tiled.Layer> layers, Transform parent) {
+        Dictionary<string, int> names = new Dictionary<string, int>();
         foreach (Tiled.Layer layerData in layers) {
-            GameObject layer = new GameObject(layerData.name);
-            // SetProperties(layer, layerData.properties);
+            string name = layerData.name;
+            if (!names.ContainsKey(name)) names[name] = 0;
+            else name += (++names[name]).ToString();
+
+            GameObject layer = new GameObject(name);
+            SetProperties(layer, layerData.properties);
             layer.transform.SetParent(parent);
             layer.transform.localPosition = new Vector3(layerData.offsetX, -layerData.offsetY, 0) / pixelsPerUnit;
+            layer.SetActive(layerData.visible);
 
             if (layerData is Tiled.TileLayer) CreateTileLayer(layerData as Tiled.TileLayer, layer);
             else if (layerData is Tiled.ObjectGroup) CreateObjectGroup(layerData as Tiled.ObjectGroup, layer);
@@ -105,14 +111,19 @@ public class TMXFileImporter : ScriptedImporter {
     public void CreateObjectGroup (Tiled.ObjectGroup groupData, GameObject group) {
         float w = tmxFile.tileWidth / pixelsPerUnit;
         float h = tmxFile.tileHeight / pixelsPerUnit;
+        Dictionary<string, int> names = new Dictionary<string, int>();
         foreach (Tiled.TileObject tileObject in groupData.objects) {
+            string name = tileObject.name;
+            if (!names.ContainsKey(name)) names[name] = 0;
+            else name += (++names[name]).ToString();
+
             bool isPrefab = tileObject.properties != null && System.Array.Exists(tileObject.properties, (p) => p.name == "prefab");
-            if (isPrefab) CreatePrefabTile(tileObject, group);
-            else CreateSpriteTile(tileObject, group);
+            if (isPrefab) CreatePrefabTile(name, tileObject, group);
+            else CreateSpriteTile(name, tileObject, group);
         }
     }
 
-    public void CreatePrefabTile (Tiled.TileObject tileObject, GameObject group) {
+    public void CreatePrefabTile (string name, Tiled.TileObject tileObject, GameObject group) {
         int tileID = (int)tileObject.gid;
         Tiled.Property prefabProp = System.Array.Find(tileObject.properties, (p) => p.name == "prefab");
 
@@ -121,12 +132,13 @@ public class TMXFileImporter : ScriptedImporter {
         prefabPath = prefabPath.Replace(dataPath, "Assets");
         GameObject prefab = AssetDatabase.LoadAssetAtPath(prefabPath, typeof(GameObject)) as GameObject;
         GameObject g = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+        g.name = name;
+        g.SetActive(tileObject.visible);
+        SetProperties(g, tileObject.properties);
         g.transform.SetParent(group.transform);
         float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
         g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
         g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
-        SetProperties(g, tileObject.properties);
-        g.SetActive(tileObject.visible);
     }
 
     public void SetProperties (GameObject g, Tiled.Property[] props) {
@@ -194,9 +206,9 @@ public class TMXFileImporter : ScriptedImporter {
         }
     }
 
-    public void CreateSpriteTile (Tiled.TileObject tileObject, GameObject group) {
+    public void CreateSpriteTile (string name, Tiled.TileObject tileObject, GameObject group) {
         int tileID = (int)tileObject.gid;
-        GameObject g = new GameObject(tileObject.name);
+        GameObject g = new GameObject(name);
         g.transform.SetParent(group.transform);
         float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
         g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
