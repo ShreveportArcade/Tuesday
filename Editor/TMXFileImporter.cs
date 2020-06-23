@@ -1,4 +1,23 @@
-﻿using System.Collections;
+﻿/*
+Copyright (C) 2020 Nolan Baker
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
+documentation files (the "Software"), to deal in the Software without restriction, including without limitation 
+the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
+and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions 
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED 
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL 
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF 
+CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+DEALINGS IN THE SOFTWARE.
+*/
+
+
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -49,7 +68,6 @@ public class TMXFileImporter : ScriptedImporter {
             else name += (++names[name]).ToString();
 
             GameObject layer = new GameObject(name);
-            SetProperties(layer, layerData.properties);
             layer.transform.SetParent(parent);
             layer.transform.localPosition = new Vector3(layerData.offsetX, -layerData.offsetY, 0) / pixelsPerUnit;
             layer.SetActive(layerData.visible);
@@ -57,6 +75,8 @@ public class TMXFileImporter : ScriptedImporter {
             if (layerData is Tiled.TileLayer) CreateTileLayer(layerData as Tiled.TileLayer, layer);
             else if (layerData is Tiled.ObjectGroup) CreateObjectGroup(layerData as Tiled.ObjectGroup, layer);
             else if (layerData is Tiled.GroupLayer) CreateLayers((layerData as Tiled.GroupLayer).layers, layer.transform);
+
+            SetProperties(layer, layerData.properties);
         }
     }
 
@@ -144,11 +164,11 @@ public class TMXFileImporter : ScriptedImporter {
     public void SetProperties (GameObject g, Tiled.Property[] props) {
         if (props == null) return;
         foreach (Tiled.Property prop in props) {
-            if (!prop.name.Contains(".")) continue;
+            if (prop == null || string.IsNullOrEmpty(prop.name)) continue;
             string[] classVar = prop.name.Split('.');
             Object o = g as Object;
             System.Type type = System.Type.GetType(classVar[0]);
-            if (classVar[0] == "GameObject") {
+            if (type != null && classVar[0] == "GameObject") {
                 if (classVar[1] == "layer" && !prop.typeSpecified) {
                     g.layer = LayerMask.NameToLayer(prop.val);
                     continue;
@@ -156,11 +176,13 @@ public class TMXFileImporter : ScriptedImporter {
             }
             else {
                 if (type == null) type = System.Type.GetType("UnityEngine.Rendering."+classVar[0]+",UnityEngine");
+                if (type == null) type = System.Type.GetType("UnityEngine.Tilemaps."+classVar[0]+",UnityEngine");
                 if (type == null) continue;
                 Component c = g.GetComponent(type);
                 if (c == null) c = g.AddComponent(type);
                 o = c as Object;
             }
+            if (classVar.Length < 2) continue;
             FieldInfo fieldInfo = type.GetField(classVar[1], BindingFlags.Public | BindingFlags.Instance);
             if (fieldInfo != null) {
                 switch (prop.type) {

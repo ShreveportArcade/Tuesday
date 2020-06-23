@@ -19,18 +19,19 @@ Tiled objects can be replaced with prefabs by adding a custom file property call
 ## Features
 
  * Drag and Drop TMX files into the Scene View or Hierarchy
+ * Converts TMX/TSX files to Unity Tilemaps/Tiles
  * External Tile Set support (TSX files)
  * CSV, Base64, GZIP, and zLib encoding/decoding
  * Collision geometry support
  * Tile layer tint support
  * Tiled Object support
- * Paint individual tiles in Unity
- * Paint Terrains in Unity
  * Prefab replacement
+ * Edit your tilemaps in Unity
  * Export your tile layer changes back out as TMX/TSX files
  * minimal component requirements
 
 ## Roadmap
+ * Zstd encoding/decoding
  * edit/export Tiled Objects
  * Paint Wang Tiles
  * Template Group (TGX) support
