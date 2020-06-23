@@ -443,6 +443,11 @@ public class TileLayer : Layer {
                     }
                 }
                 else if (tileData.encoding == "base64") {
+                    if (tileData.compression == "zstd") {
+                        Console.WriteLine("Error: Zstandard not yet supported.");
+                        return null;
+                    }
+
                     byte[] bytes = Convert.FromBase64String(tileData.contents);
                     Stream stream = new MemoryStream(bytes, false);
 

@@ -29,20 +29,22 @@ public class TSXFileImporter : ScriptedImporter {
         string name = Path.GetFileNameWithoutExtension(ctx.assetPath);
         Tiled.TileSet tsxFile = Tiled.TileSet.Load(ctx.assetPath);
         if (pixelsPerUnit < 0) pixelsPerUnit = tsxFile.tileHeight;
+        ctx.SetMainObject(AddTileSet(tsxFile, pixelsPerUnit, ctx));
+    }
 
-        GameObject gameObject = new GameObject(name);
+    public static GameObject AddTileSet(Tiled.TileSet tsxFile, int pixelsPerUnit, AssetImportContext ctx) {
+        GameObject gameObject = new GameObject(tsxFile.name);
         Grid grid = gameObject.AddComponent<Grid>();
-        Tilemap tileMap = gameObject.AddComponent<Tilemap>();
-        tileMap.tileAnchor = Vector3.zero;
+        Tilemap tilemap = gameObject.AddComponent<Tilemap>();
+        tilemap.tileAnchor = Vector3.zero;
         gameObject.AddComponent<TilemapRenderer>();
-        ctx.AddObjectToAsset(name + ".tmx", gameObject);
-        ctx.SetMainObject(gameObject);
+        ctx.AddObjectToAsset(tsxFile.name + ".tsx", gameObject);
 
         GridPalette gridPal = ScriptableObject.CreateInstance<GridPalette>();
         gridPal.cellSizing = GridPalette.CellSizing.Manual;
-        gridPal.name = "Palette Settings";
-        ctx.AddObjectToAsset("Palette Settings", gridPal);
-
+        gridPal.name = tsxFile.name + " Palette Settings";
+        ctx.AddObjectToAsset(tsxFile.name + " Palette Settings", gridPal);
+        
         int rows = tsxFile.rows;
         int columns = tsxFile.columns;
         if (tsxFile.image != null && !string.IsNullOrEmpty(tsxFile.image.source)) {
@@ -51,28 +53,30 @@ public class TSXFileImporter : ScriptedImporter {
             for (int y = 0; y < rows; y++) {
                 for (int x = 0; x < columns; x++) {
                     int id = y * columns + x;
-                    int gid = id + tsxFile.firstGID;
+                    int gid = id;
+                    if (tsxFile.firstGIDSpecified) gid += tsxFile.firstGID;
                     Tiled.Tile tiledTile = tsxFile.GetTile(gid);
 
                     Tiled.TileRect r = tsxFile.GetTileSpriteRect(gid);
                     Rect rect = new Rect(r.x, r.y, r.width, r.height);
                     Sprite sprite = Sprite.Create(tex, rect, Vector2.zero, pixelsPerUnit, 0, SpriteMeshType.FullRect);
-                    sprite.name = name + "_" + x + "," + y;
+                    sprite.name = tsxFile.name + "_" + x + "," + y;
                     bool phys = AddPhysicsToSprite(tiledTile, sprite);
                     ctx.AddObjectToAsset(sprite.name,  sprite);
 
                     Tile unityTile = ScriptableObject.CreateInstance<Tile>();
-                    unityTile.name = name + "_" + id;
+                    unityTile.name = tsxFile.name + "_" + id;
                     unityTile.sprite = sprite;
                     if (!phys) unityTile.colliderType = Tile.ColliderType.None;
                     ctx.AddObjectToAsset(unityTile.name, unityTile);
-                    tileMap.SetTile(new Vector3Int(x,rows-1-y,0), unityTile); 
+                    tilemap.SetTile(new Vector3Int(x,rows-1-y,0), unityTile); 
                 }
             }
         }
+        return gameObject;
     }
 
-    bool AddPhysicsToSprite (Tiled.Tile tile, Sprite sprite) {
+    static bool AddPhysicsToSprite (Tiled.Tile tile, Sprite sprite) {
         if (tile == null
         || tile.objectGroup == null
         || tile.objectGroup.objects == null

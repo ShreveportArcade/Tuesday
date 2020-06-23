@@ -31,20 +31,28 @@ public class TMXFileImporter : ScriptedImporter {
 
     public int pixelsPerUnit = -1;
 
-    public static Color TiledColorFromString (string colorStr) {
-        Color color = Color.white;
-        if (colorStr == null) return color;
-        if (colorStr.Length > 8) colorStr = "#" + colorStr.Substring(3) + colorStr.Substring(1, 2);
-        ColorUtility.TryParseHtmlString(colorStr, out color); 
-        return color;
-    }
+    Dictionary<int, Tile> _tiles;
+    Dictionary<int, Tile> tiles {
+        get {
+            if (_tiles == null) {
+                _tiles = new Dictionary<int, Tile>();
+                foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
+                    if (tileSet.hasSource) {
+                        string tsxPath = tileSet.source;
+                        tsxPath = Path.Combine(Path.GetDirectoryName(tmxFilePath), tsxPath);
+                        tsxPath = Path.GetFullPath(tsxPath);
 
-    public static string TiledColorToString (Color color) {
-        if (color == Color.white) return null;
-        if (color.a == 1) return "#" + ColorUtility.ToHtmlStringRGB(color).ToLower();
-        string colorStr = ColorUtility.ToHtmlStringRGBA(color).ToLower();;
-        colorStr = "#" + colorStr.Substring(6, 2) + colorStr.Substring(0, 6);
-        return colorStr;
+                        string dataPath = Path.GetFullPath(Application.dataPath);
+                        tsxPath = tsxPath.Replace(dataPath, "Assets");
+                        GetTileAssetsAtPath(tileSet, tsxPath);
+                    }
+                    else {
+                        GetTileAssetsAtPath(tileSet, tmxFilePath);
+                    }
+                }
+            }
+            return _tiles;
+        }
     }
 
     Tiled.TMXFile tmxFile;
@@ -54,16 +62,36 @@ public class TMXFileImporter : ScriptedImporter {
         tmxFile = Tiled.TMXFile.Load(ctx.assetPath);
         if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileHeight;
         GameObject tileMap = new GameObject(Path.GetFileNameWithoutExtension(ctx.assetPath));
+
         Grid grid = tileMap.AddComponent<Grid>();
+        if (tmxFile.orientation == "hexagonal") grid.cellLayout = GridLayout.CellLayout.Hexagon;
+        else if (tmxFile.orientation == "isometric") grid.cellLayout = GridLayout.CellLayout.Isometric;
+        else if (tmxFile.orientation == "staggered") grid.cellLayout = GridLayout.CellLayout.IsometricZAsY;
+
         CreateLayers(tmxFile.layers, tileMap.transform);
         ctx.AddObjectToAsset(Path.GetFileName(ctx.assetPath), tileMap);
         ctx.SetMainObject(tileMap);
+
+        bool hasEmbeddedTileSet = false;
+        foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
+            if (!tileSet.sourceSpecified) {
+                hasEmbeddedTileSet = true;
+                break;
+            }
+        }
+        if (!hasEmbeddedTileSet) return;
+
+        foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
+            if (tileSet.sourceSpecified) continue;
+            TSXFileImporter.AddTileSet(tileSet, pixelsPerUnit, ctx);
+        }
     }
 
     void CreateLayers (List<Tiled.Layer> layers, Transform parent) {
         Dictionary<string, int> names = new Dictionary<string, int>();
         foreach (Tiled.Layer layerData in layers) {
             string name = layerData.name;
+            if (name == null) name = "";
             if (!names.ContainsKey(name)) names[name] = 0;
             else name += (++names[name]).ToString();
 
@@ -80,31 +108,15 @@ public class TMXFileImporter : ScriptedImporter {
         }
     }
 
-    Dictionary<int, Tile> _tiles;
-    Dictionary<int, Tile> tiles {
-        get {
-            if (_tiles == null) {
-                _tiles = new Dictionary<int, Tile>();
-                foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
-                    if (tileSet.hasSource) {
-                        string tsxPath = tileSet.source;
-                        tsxPath = Path.Combine(Path.GetDirectoryName(tmxFilePath), tsxPath);
-                        tsxPath = Path.GetFullPath(tsxPath);
-
-                        string dataPath = Path.GetFullPath(Application.dataPath);
-                        tsxPath = tsxPath.Replace(dataPath, "Assets");
-                        Object[] assets = AssetDatabase.LoadAllAssetRepresentationsAtPath(tsxPath);
-                        foreach (Object asset in assets) {
-                            if (asset is Tile) {
-                                Tile tile = asset as Tile;
-                                int gid = tileSet.firstGID + int.Parse(tile.name.Split('_')[1]);
-                                _tiles[gid] = tile;
-                            }
-                        }
-                    }
-                }
+    void GetTileAssetsAtPath (Tiled.TileSet tileSet, string path) {
+        Object[] assets = AssetDatabase.LoadAllAssetRepresentationsAtPath(path);
+        foreach (Object asset in assets) {
+            if (asset is Tile) {
+                Tile tile = asset as Tile;
+                string[] splitName = tile.name.Split('_');
+                int gid = tileSet.firstGID + int.Parse(splitName[splitName.Length-1]);
+                _tiles[gid] = tile;
             }
-            return _tiles;
         }
     }
 
@@ -119,9 +131,8 @@ public class TMXFileImporter : ScriptedImporter {
         for (int y = 0; y < rows; y++) {
             for (int x = 0; x < columns; x++) {
                 int tileID = layerData.GetTileID(x, y);
-                if (tileID == 0) continue;
-
-                Tile tile = tile = tiles[tileID];
+                if (tileID == 0 || !tiles.ContainsKey(tileID)) continue;
+                Tile tile = tiles[tileID];
                 Vector3Int pos = new Vector3Int(x, rows-1-y, 0);
                 tilemap.SetTile(pos, tile);
             }
@@ -134,6 +145,7 @@ public class TMXFileImporter : ScriptedImporter {
         Dictionary<string, int> names = new Dictionary<string, int>();
         foreach (Tiled.TileObject tileObject in groupData.objects) {
             string name = tileObject.name;
+            if (name == null) name = "";
             if (!names.ContainsKey(name)) names[name] = 0;
             else name += (++names[name]).ToString();
 
@@ -256,6 +268,22 @@ public class TMXFileImporter : ScriptedImporter {
         // }
 
         SetProperties(g, tileObject.properties);
+    }
+
+    public static Color TiledColorFromString (string colorStr) {
+        Color color = Color.white;
+        if (colorStr == null) return color;
+        if (colorStr.Length > 8) colorStr = "#" + colorStr.Substring(3) + colorStr.Substring(1, 2);
+        ColorUtility.TryParseHtmlString(colorStr, out color); 
+        return color;
+    }
+
+    public static string TiledColorToString (Color color) {
+        if (color == Color.white) return null;
+        if (color.a == 1) return "#" + ColorUtility.ToHtmlStringRGB(color).ToLower();
+        string colorStr = ColorUtility.ToHtmlStringRGBA(color).ToLower();;
+        colorStr = "#" + colorStr.Substring(6, 2) + colorStr.Substring(0, 6);
+        return colorStr;
     }
 
 }
