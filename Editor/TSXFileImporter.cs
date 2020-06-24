@@ -10,6 +10,13 @@ using System.IO;
 public class TSXFileImporter : ScriptedImporter {
 
     public int pixelsPerUnit = -1;
+    static Texture2D _icon;
+    static Texture2D icon { 
+        get { 
+            if (_icon == null) _icon = EditorGUIUtility.IconContent("Tile Icon").image as Texture2D;
+            return _icon; 
+        } 
+    }  
 
     private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
     public static Texture2D GetImageTexture (Tiled.Image image, string texturePath) {
@@ -36,11 +43,11 @@ public class TSXFileImporter : ScriptedImporter {
         Tilemap tilemap = gameObject.AddComponent<Tilemap>();
         tilemap.tileAnchor = Vector3.zero;
         gameObject.AddComponent<TilemapRenderer>();
-        ctx.AddObjectToAsset(tileSet.name + ".tsx", gameObject);
+        ctx.AddObjectToAsset(tileSet.name + ".tsx", gameObject, icon);
         ctx.SetMainObject(gameObject);
 
         GridPalette gridPal = ScriptableObject.CreateInstance<GridPalette>();
-        gridPal.cellSizing = GridPalette.CellSizing.Manual;
+        gridPal.cellSizing = GridPalette.CellSizing.Automatic;
         gridPal.name = tileSet.name + " Palette Settings";
         ctx.AddObjectToAsset(tileSet.name + " Palette Settings", gridPal);
         
