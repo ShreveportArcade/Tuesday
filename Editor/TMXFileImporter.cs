@@ -64,10 +64,24 @@ public class TMXFileImporter : ScriptedImporter {
         GameObject gameObject = new GameObject(Path.GetFileNameWithoutExtension(ctx.assetPath));
 
         Grid grid = gameObject.AddComponent<Grid>();
-        grid.cellSize = new Vector3(tmxFile.tileWidth,tmxFile.tileHeight,0) / pixelsPerUnit;
-        if (tmxFile.orientation == "hexagonal") grid.cellLayout = GridLayout.CellLayout.Hexagon;
-        else if (tmxFile.orientation == "orthogonal") grid.cellLayout = GridLayout.CellLayout.Isometric;
+        Vector3 size = new Vector3(tmxFile.tileWidth,tmxFile.tileHeight,0) / pixelsPerUnit;
+        if (tmxFile.orientation == "orthogonal") grid.cellLayout = GridLayout.CellLayout.Rectangle;
+        else if (tmxFile.orientation == "hexagonal") {
+            grid.cellLayout = GridLayout.CellLayout.Hexagon;
+            if (tmxFile.hexSideLength > 0) {
+                if (tmxFile.staggerAxis == "x") {
+                    size.x = (tmxFile.tileWidth - tmxFile.hexSideLength * 0.5f) / pixelsPerUnit;
+                    size.y = size.x;
+                }
+                else {
+                    size.y = (tmxFile.tileHeight - tmxFile.hexSideLength * 0.5f) / pixelsPerUnit;
+                    size.x = size.y;
+                }
+            }
+        }
+        else if (tmxFile.orientation == "isometric") grid.cellLayout = GridLayout.CellLayout.Isometric;
         else if (tmxFile.orientation == "staggered") grid.cellLayout = GridLayout.CellLayout.Isometric;//ZAsY;
+        grid.cellSize = size;
 
         string dir = Path.GetFullPath(Path.GetDirectoryName(tmxFilePath));
         foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
@@ -78,7 +92,7 @@ public class TMXFileImporter : ScriptedImporter {
             path = FileUtil.GetProjectRelativePath(path);
             AssetDatabase.ImportAsset(path);
         }
-        AssetDatabase.Refresh();
+        AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
 
         CreateLayers(tmxFile.layers, gameObject.transform);
         ctx.AddObjectToAsset(Path.GetFileName(ctx.assetPath), gameObject);
@@ -124,10 +138,18 @@ public class TMXFileImporter : ScriptedImporter {
 
         TilemapRenderer renderer = layer.AddComponent<TilemapRenderer>();
         tilemap.color = TiledColorFromString(layerData.tintColor);
-        if (tmxFile.renderOrder == "right-up") renderer.sortOrder = TilemapRenderer.SortOrder.BottomLeft;
-        else if (tmxFile.renderOrder == "left-down") renderer.sortOrder = TilemapRenderer.SortOrder.TopRight;
-        else if (tmxFile.renderOrder == "left-up") renderer.sortOrder = TilemapRenderer.SortOrder.BottomRight;
-        else renderer.sortOrder = TilemapRenderer.SortOrder.TopLeft;
+        if (tmxFile.orientation == "isometric" || tmxFile.orientation == "staggered") {
+            if (tmxFile.renderOrder == "left-up") renderer.sortOrder = TilemapRenderer.SortOrder.BottomLeft;
+            else if (tmxFile.renderOrder == "right-down") renderer.sortOrder = TilemapRenderer.SortOrder.TopRight;
+            else if (tmxFile.renderOrder == "right-up") renderer.sortOrder = TilemapRenderer.SortOrder.BottomRight;
+            else renderer.sortOrder = TilemapRenderer.SortOrder.TopLeft;
+        }
+        else {
+            if (tmxFile.renderOrder == "right-up") renderer.sortOrder = TilemapRenderer.SortOrder.BottomLeft;
+            else if (tmxFile.renderOrder == "left-down") renderer.sortOrder = TilemapRenderer.SortOrder.TopRight;
+            else if (tmxFile.renderOrder == "left-up") renderer.sortOrder = TilemapRenderer.SortOrder.BottomRight;
+            else renderer.sortOrder = TilemapRenderer.SortOrder.TopLeft;
+        }
 
         bool staggerX = tmxFile.staggerAxis == "x";
         int staggerIndex = (tmxFile.staggerAxis == "even") ? 0 : 1;
@@ -154,6 +176,16 @@ public class TMXFileImporter : ScriptedImporter {
                     }
                 }
                 tilemap.SetTile(pos, tile);
+
+                int index = x + y * columns;
+                Quaternion rot = Quaternion.identity;
+                if (layerData.FlippedHorizontally(index)) rot *= Quaternion.AngleAxis(180, Vector3.up);
+                if (layerData.FlippedVertically(index)) rot *= Quaternion.AngleAxis(180, Vector3.right);
+                if (layerData.FlippedAntiDiagonally(index)) rot *= Quaternion.AngleAxis(180, Vector2.one);
+                if (layerData.RotatedHexagonal120(index)) rot *= Quaternion.AngleAxis(120, Vector3.forward);
+                Vector3 off = rot * new Vector3(1,1,0);
+                Matrix4x4 matrix = Matrix4x4.TRS(-off, rot, Vector3.one);
+                tilemap.SetTransformMatrix(pos, matrix);
             }
         }
     }
