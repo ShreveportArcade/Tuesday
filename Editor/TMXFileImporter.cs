@@ -41,13 +41,13 @@ public class TMXFileImporter : ScriptedImporter {
                         string tsxPath = tileSet.source;
                         tsxPath = Path.Combine(Path.GetDirectoryName(tmxFilePath), tsxPath);
                         tsxPath = Path.GetFullPath(tsxPath);
-
-                        string dataPath = Path.GetFullPath(Application.dataPath);
-                        tsxPath = tsxPath.Replace(dataPath, "Assets");
-                        GetTileAssetsAtPath(tileSet, tsxPath);
+                        GetTileAssetsAtPath(tileSet, FileUtil.GetProjectRelativePath(tsxPath));
                     }
                     else {
-                        GetTileAssetsAtPath(tileSet, tmxFilePath);
+                        string dir = Path.GetFullPath(Path.GetDirectoryName(tmxFilePath));
+                        string name = Path.GetFileNameWithoutExtension(tmxFilePath);
+                        string tsxPath = Path.Combine(dir, name + "." + tileSet.name + ".tsx");
+                        GetTileAssetsAtPath(tileSet, FileUtil.GetProjectRelativePath(tsxPath));
                     }
                 }
             }
@@ -61,30 +61,28 @@ public class TMXFileImporter : ScriptedImporter {
         tmxFilePath = ctx.assetPath;
         tmxFile = Tiled.TMXFile.Load(ctx.assetPath);
         if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileHeight;
-        GameObject tileMap = new GameObject(Path.GetFileNameWithoutExtension(ctx.assetPath));
+        GameObject gameObject = new GameObject(Path.GetFileNameWithoutExtension(ctx.assetPath));
 
-        Grid grid = tileMap.AddComponent<Grid>();
+        Grid grid = gameObject.AddComponent<Grid>();
+        grid.cellSize = new Vector3(tmxFile.tileWidth,tmxFile.tileHeight,0) / pixelsPerUnit;
         if (tmxFile.orientation == "hexagonal") grid.cellLayout = GridLayout.CellLayout.Hexagon;
-        else if (tmxFile.orientation == "isometric") grid.cellLayout = GridLayout.CellLayout.Isometric;
-        else if (tmxFile.orientation == "staggered") grid.cellLayout = GridLayout.CellLayout.IsometricZAsY;
+        else if (tmxFile.orientation == "orthogonal") grid.cellLayout = GridLayout.CellLayout.Isometric;
+        else if (tmxFile.orientation == "staggered") grid.cellLayout = GridLayout.CellLayout.Isometric;//ZAsY;
 
-        CreateLayers(tmxFile.layers, tileMap.transform);
-        ctx.AddObjectToAsset(Path.GetFileName(ctx.assetPath), tileMap);
-        ctx.SetMainObject(tileMap);
-
-        bool hasEmbeddedTileSet = false;
-        foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
-            if (!tileSet.sourceSpecified) {
-                hasEmbeddedTileSet = true;
-                break;
-            }
-        }
-        if (!hasEmbeddedTileSet) return;
-
+        string dir = Path.GetFullPath(Path.GetDirectoryName(tmxFilePath));
         foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
             if (tileSet.sourceSpecified) continue;
-            TSXFileImporter.AddTileSet(tileSet, pixelsPerUnit, ctx);
+            string name = Path.GetFileNameWithoutExtension(tmxFilePath);
+            string path = Path.Combine(dir, name + "." + tileSet.name + ".tsx");
+            tileSet.Save(path);
+            path = FileUtil.GetProjectRelativePath(path);
+            AssetDatabase.ImportAsset(path);
         }
+        AssetDatabase.Refresh();
+
+        CreateLayers(tmxFile.layers, gameObject.transform);
+        ctx.AddObjectToAsset(Path.GetFileName(ctx.assetPath), gameObject);
+        ctx.SetMainObject(gameObject);
     }
 
     void CreateLayers (List<Tiled.Layer> layers, Transform parent) {
@@ -123,9 +121,16 @@ public class TMXFileImporter : ScriptedImporter {
     public void CreateTileLayer (Tiled.TileLayer layerData, GameObject layer) {
         Tilemap tilemap = layer.AddComponent<Tilemap>();
         tilemap.tileAnchor = Vector3.zero;
-        TilemapRenderer renderer = layer.AddComponent<TilemapRenderer>();  
+
+        TilemapRenderer renderer = layer.AddComponent<TilemapRenderer>();
         tilemap.color = TiledColorFromString(layerData.tintColor);
-        
+        if (tmxFile.renderOrder == "right-up") renderer.sortOrder = TilemapRenderer.SortOrder.BottomLeft;
+        else if (tmxFile.renderOrder == "left-down") renderer.sortOrder = TilemapRenderer.SortOrder.TopRight;
+        else if (tmxFile.renderOrder == "left-up") renderer.sortOrder = TilemapRenderer.SortOrder.BottomRight;
+        else renderer.sortOrder = TilemapRenderer.SortOrder.TopLeft;
+
+        bool staggerX = tmxFile.staggerAxis == "x";
+        int staggerIndex = (tmxFile.staggerAxis == "even") ? 0 : 1;
         int rows = tmxFile.height;
         int columns = tmxFile.width;
         for (int y = 0; y < rows; y++) {
@@ -134,6 +139,20 @@ public class TMXFileImporter : ScriptedImporter {
                 if (tileID == 0 || !tiles.ContainsKey(tileID)) continue;
                 Tile tile = tiles[tileID];
                 Vector3Int pos = new Vector3Int(x, rows-1-y, 0);
+                if (tmxFile.orientation == "isometric") {
+                    pos = new Vector3Int(rows-1-y, columns-1-x, 0);
+                }
+                else if (tmxFile.orientation == "staggered") {
+                    if (staggerX) {
+                        pos.x -= y;
+                        if (x % 2 == staggerIndex) pos.x++;
+                    }
+                    else {
+                        pos.y = (rows-1-y)/2-x;
+                        pos.x = 2*x+pos.y;
+                        if (y % 2 == staggerIndex) pos.y--;
+                    }
+                }
                 tilemap.SetTile(pos, tile);
             }
         }
