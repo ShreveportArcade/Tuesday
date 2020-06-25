@@ -16,7 +16,6 @@ CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFT
 DEALINGS IN THE SOFTWARE.
 */
 
-
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -26,7 +25,7 @@ using UnityEngine.Tilemaps;
 using UnityEditor;
 using UnityEditor.Experimental.AssetImporters;
 
-[ScriptedImporter(1, "tmx")]
+[ScriptedImporter(1, "tmx", 2)]
 public class TMXFileImporter : ScriptedImporter {
 
     public int pixelsPerUnit = -1;
@@ -63,7 +62,40 @@ public class TMXFileImporter : ScriptedImporter {
         }
     }
 
-    GridLayout.CellLayout GetCellLayout () {
+    Tiled.TMXFile tmxFile;
+    string tmxFilePath;
+    public override void OnImportAsset(AssetImportContext ctx) {
+        Debug.Log("TMX: " + ctx.assetPath);
+        tmxFilePath = ctx.assetPath;
+        tmxFile = Tiled.TMXFile.Load(ctx.assetPath);
+        if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileHeight;
+        GameObject gameObject = new GameObject(Path.GetFileNameWithoutExtension(ctx.assetPath));
+
+        Grid grid = gameObject.AddComponent<Grid>();
+        grid.cellLayout = GetCellLayout(tmxFile);
+        grid.cellSize = GetCellSize();
+        grid.cellSwizzle = GetCellSwizzle(tmxFile);
+
+        string dir = Path.GetFullPath(Path.GetDirectoryName(tmxFilePath));
+        bool hasEmbeddedTiles = false;
+        foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
+            if (tileSet.sourceSpecified) continue;
+            hasEmbeddedTiles = true;
+            string name = Path.GetFileNameWithoutExtension(tmxFilePath);
+            string path = Path.Combine(dir, name + "." + tileSet.name + ".tsx");
+            tileSet.Save(path);
+            path = FileUtil.GetProjectRelativePath(path);
+            AssetDatabase.ImportAsset(path);
+        }
+
+        CreateLayers(tmxFile.layers, gameObject.transform);
+        ctx.AddObjectToAsset(Path.GetFileName(ctx.assetPath), gameObject, icon);
+        ctx.SetMainObject(gameObject);
+
+        if (hasEmbeddedTiles) AssetDatabase.ImportAsset(tmxFilePath);
+    }
+
+    public static GridLayout.CellLayout GetCellLayout (Tiled.TMXFile tmxFile) {
         if (tmxFile.orientation == "hexagonal") {
             return GridLayout.CellLayout.Hexagon;
         }
@@ -89,32 +121,11 @@ public class TMXFileImporter : ScriptedImporter {
         return size;
     }
 
-    Tiled.TMXFile tmxFile;
-    string tmxFilePath;
-    public override void OnImportAsset(AssetImportContext ctx) {
-        tmxFilePath = ctx.assetPath;
-        tmxFile = Tiled.TMXFile.Load(ctx.assetPath);
-        if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileHeight;
-        GameObject gameObject = new GameObject(Path.GetFileNameWithoutExtension(ctx.assetPath));
-
-        Grid grid = gameObject.AddComponent<Grid>();
-        grid.cellLayout = GetCellLayout();
-        grid.cellSize = GetCellSize();
-
-        string dir = Path.GetFullPath(Path.GetDirectoryName(tmxFilePath));
-        foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
-            if (tileSet.sourceSpecified) continue;
-            string name = Path.GetFileNameWithoutExtension(tmxFilePath);
-            string path = Path.Combine(dir, name + "." + tileSet.name + ".tsx");
-            tileSet.Save(path);
-            path = FileUtil.GetProjectRelativePath(path);
-            AssetDatabase.ImportAsset(path);
+    public static GridLayout.CellSwizzle GetCellSwizzle(Tiled.TMXFile tmxFile) {
+        if (tmxFile.orientation == "hexagonal" && tmxFile.staggerAxis == "x") {
+            return GridLayout.CellSwizzle.YXZ;
         }
-        AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
-
-        CreateLayers(tmxFile.layers, gameObject.transform);
-        ctx.AddObjectToAsset(Path.GetFileName(ctx.assetPath), gameObject, icon);
-        ctx.SetMainObject(gameObject);
+        return GridLayout.CellSwizzle.XYZ;
     }
 
     void CreateLayers (List<Tiled.Layer> layers, Transform parent) {
@@ -164,9 +175,10 @@ public class TMXFileImporter : ScriptedImporter {
         return TilemapRenderer.SortOrder.TopLeft;
     }
 
+
     public void CreateTileLayer (Tiled.TileLayer layerData, GameObject layer) {
         Tilemap tilemap = layer.AddComponent<Tilemap>();
-        tilemap.tileAnchor = Vector3.zero;
+        tilemap.tileAnchor = new Vector3(0.5f, 0.5f, 0);
 
         TilemapRenderer renderer = layer.AddComponent<TilemapRenderer>();
         renderer.sortOrder = GetSortOrder();

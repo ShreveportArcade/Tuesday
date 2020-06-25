@@ -240,6 +240,12 @@ public class TMXFile {
 public class TileSet {
     [XmlIgnore] public bool hasDocType = false;
 
+    [XmlAttribute("version")] public string version;
+    [XmlIgnore] public bool versionSpecified { get { return !string.IsNullOrEmpty(version); } set { } }
+    
+    [XmlAttribute("tiledversion")] public string tiledVersion;
+    [XmlIgnore] public bool tiledVersionSpecified { get { return !string.IsNullOrEmpty(tiledVersion); } set { } }
+    
     [XmlIgnore] public bool hasSource { get { return !string.IsNullOrEmpty(source); }}
 
     [XmlAttribute("firstgid")] public int firstGID;

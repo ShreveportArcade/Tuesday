@@ -6,10 +6,15 @@ using UnityEditor;
 using UnityEditor.Experimental.AssetImporters;
 using System.IO;
 
-[ScriptedImporter(1, "tsx")]
+[ScriptedImporter(1, "tsx", 1)]
 public class TSXFileImporter : ScriptedImporter {
 
     public int pixelsPerUnit = -1;
+    public string tsxFilePath;
+    public GridLayout.CellSwizzle gridCellSwizzle = GridLayout.CellSwizzle.XYZ;
+    public GridLayout.CellLayout gridCellLayout = GridLayout.CellLayout.Rectangle;
+    public Vector3 tileAnchor = new Vector3(0.5f, 0.5f, 0);
+
     static Texture2D _icon;
     static Texture2D icon { 
         get { 
@@ -33,23 +38,26 @@ public class TSXFileImporter : ScriptedImporter {
     }
 
     public override void OnImportAsset(AssetImportContext ctx) {
+        Debug.Log("TileSet: " + ctx.assetPath);
         string name = Path.GetFileNameWithoutExtension(ctx.assetPath);
         Tiled.TileSet tileSet = Tiled.TileSet.Load(ctx.assetPath);
         if (pixelsPerUnit < 0) pixelsPerUnit = tileSet.tileHeight;
 
         GameObject gameObject = new GameObject(tileSet.name);
         Grid grid = gameObject.AddComponent<Grid>();
+        grid.cellLayout = gridCellLayout;
+        grid.cellSwizzle = gridCellSwizzle;
         grid.cellSize = new Vector3(tileSet.tileWidth,tileSet.tileHeight,0) / pixelsPerUnit;
         Tilemap tilemap = gameObject.AddComponent<Tilemap>();
-        tilemap.tileAnchor = Vector3.zero;
+        tilemap.tileAnchor = tileAnchor;
         gameObject.AddComponent<TilemapRenderer>();
         ctx.AddObjectToAsset(tileSet.name + ".tsx", gameObject, icon);
         ctx.SetMainObject(gameObject);
 
-        GridPalette gridPal = ScriptableObject.CreateInstance<GridPalette>();
-        gridPal.cellSizing = GridPalette.CellSizing.Automatic;
-        gridPal.name = tileSet.name + " Palette Settings";
-        ctx.AddObjectToAsset(tileSet.name + " Palette Settings", gridPal);
+        GridPalette gridPalette = ScriptableObject.CreateInstance<GridPalette>();
+        gridPalette.cellSizing = GridPalette.CellSizing.Manual;
+        gridPalette.name = tileSet.name + " Palette Settings";
+        ctx.AddObjectToAsset(tileSet.name + " Palette Settings", gridPalette);
         
         if (tileSet.image != null && !string.IsNullOrEmpty(tileSet.image.source)) {
             string texturePath = Path.Combine(Path.GetDirectoryName(ctx.assetPath), tileSet.image.source);
@@ -65,6 +73,7 @@ public class TSXFileImporter : ScriptedImporter {
 
             int columns = tileSet.columns;
             int rows = tileSet.rows;
+            Vector2 anchor = Vector2.zero;
             for (int y = 0; y < rows; y++) {
                 for (int x = 0; x < columns; x++) {
                     int id = y * columns + x;
@@ -74,7 +83,7 @@ public class TSXFileImporter : ScriptedImporter {
 
                     Tiled.TileRect r = tileSet.GetTileSpriteRect(gid);
                     Rect rect = new Rect(r.x, r.y, r.width, r.height);
-                    Sprite sprite = Sprite.Create(tex, rect, Vector2.zero, pixelsPerUnit, 0, SpriteMeshType.FullRect);
+                    Sprite sprite = Sprite.Create(tex, rect, anchor, pixelsPerUnit, 0, SpriteMeshType.FullRect);
                     sprite.name = tileSet.name + "_" + x + "," + y;
                     bool phys = AddPhysicsToSprite(tiledTile, sprite);
                     ctx.AddObjectToAsset(sprite.name,  sprite);
@@ -90,6 +99,10 @@ public class TSXFileImporter : ScriptedImporter {
         }
         else {
             Debug.LogWarning("Importing image tiles not supported yet: " + ctx.assetPath);
+        }
+
+        if (!string.IsNullOrEmpty(tsxFilePath)) {
+            AssetDatabase.ImportAsset(tsxFilePath);
         }
     }
 
