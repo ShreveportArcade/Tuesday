@@ -64,6 +64,7 @@ public class TMXFileImporter : ScriptedImporter {
 
     Tiled.TMXFile tmxFile;
     string tmxFilePath;
+    int layerIndex;
     public override void OnImportAsset(AssetImportContext ctx) {
         Debug.Log("TMX: " + ctx.assetPath);
         tmxFilePath = ctx.assetPath;
@@ -88,6 +89,7 @@ public class TMXFileImporter : ScriptedImporter {
             AssetDatabase.ImportAsset(path);
         }
 
+        layerIndex = 0;
         CreateLayers(tmxFile.layers, gameObject.transform);
         ctx.AddObjectToAsset(Path.GetFileName(ctx.assetPath), gameObject, icon);
         ctx.SetMainObject(gameObject);
@@ -132,20 +134,21 @@ public class TMXFileImporter : ScriptedImporter {
         Dictionary<string, int> names = new Dictionary<string, int>();
         foreach (Tiled.Layer layerData in layers) {
             string name = layerData.name;
+            Debug.Log(name);
             if (name == null) name = "";
             if (!names.ContainsKey(name)) names[name] = 0;
             else name += (++names[name]).ToString();
 
             GameObject layer = new GameObject(name);
-            layer.transform.SetParent(parent);
-            layer.transform.localPosition = new Vector3(layerData.offsetX, -layerData.offsetY, 0) / pixelsPerUnit;
-            layer.SetActive(layerData.visible);
-
             if (layerData is Tiled.TileLayer) CreateTileLayer(layerData as Tiled.TileLayer, layer);
             else if (layerData is Tiled.ObjectGroup) CreateObjectGroup(layerData as Tiled.ObjectGroup, layer);
             else if (layerData is Tiled.GroupLayer) CreateLayers((layerData as Tiled.GroupLayer).layers, layer.transform);
-
             SetProperties(layer, layerData.properties);
+            
+            layer.transform.SetParent(parent);
+            layer.transform.localPosition = new Vector3(layerData.offsetX, -layerData.offsetY, 0) / pixelsPerUnit;
+            layer.SetActive(layerData.visible);
+            layerIndex++;
         }
     }
 
@@ -182,6 +185,7 @@ public class TMXFileImporter : ScriptedImporter {
 
         TilemapRenderer renderer = layer.AddComponent<TilemapRenderer>();
         renderer.sortOrder = GetSortOrder();
+        renderer.sortingOrder = layerIndex;
         tilemap.color = TiledColorFromString(layerData.tintColor);
 
         bool staggerX = tmxFile.staggerAxis == "x";
