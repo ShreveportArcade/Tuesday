@@ -102,8 +102,23 @@ public class TMXFileExporter : Editor {
         EditorGUILayout.EndHorizontal();
     }
 
+    Dictionary<TileBase, int> tileGIDs = new Dictionary<TileBase, int>();
+    void GetTileAssetsAtPath (Tiled.TileSet tileSet, string path) {
+        UnityEngine.Object[] assets = AssetDatabase.LoadAllAssetRepresentationsAtPath(path);
+        foreach (UnityEngine.Object asset in assets) {
+            if (asset is Tile) {
+                Tile tile = asset as Tile;
+                string[] splitName = tile.name.Split('_');
+                int gid = tileSet.firstGID + int.Parse(splitName[splitName.Length-1]);
+                tileGIDs[tile] = gid;
+            }
+        }
+    }
+
     int globalLayerID;
     void SaveTMX (string tmxFilePath) {
+        tmxFilePath = Path.Combine("Assets/TEST_EXPORT.tmx");
+
         Tiled.TMXFile tmxFile = new Tiled.TMXFile();
         tmxFile.orientation = GetOrientation();
         tmxFile.renderOrder = GetRenderOrder(tmxFile.orientation);
@@ -120,14 +135,13 @@ public class TMXFileExporter : Editor {
         tmxFile.nextObjectID = 0;
         tmxFile.tileSets = GetTileSets(bounds, tmxFilePath);
         globalLayerID = 0;
-        tmxFile.layers = GetLayers(grid.transform);
+        tmxFile.layers = CreateLayers(grid.transform);
         
-        string path = Path.Combine("Assets/TEST_EXPORT.tmx");
-        tmxFile.Save(path);
-        AssetDatabase.ImportAsset(path);
+        tmxFile.Save(tmxFilePath);
+        AssetDatabase.ImportAsset(tmxFilePath);
     }
 
-    List<Tiled.Layer> GetLayers (Transform root) {
+    List<Tiled.Layer> CreateLayers (Transform root) {
         List<Tiled.Layer> layers = new List<Tiled.Layer>();
         for (int i = 0; i < root.childCount; i++) {
             Transform t = root.GetChild(i);
@@ -169,12 +183,11 @@ public class TMXFileExporter : Editor {
         TileBase[] tiles = tilemap.GetTilesBlock(bounds);
         layer.width = bounds.size.x;
         layer.height = bounds.size.y;
-        for (int j = 0; j < layer.height; j++) {
-            for (int i = 0; i < layer.width; i++) {
-                int id = 0;
-                int x = i + bounds.xMin;
-                int y = i + bounds.yMin;
-                layer.SetTileID(id, x, y);
+        for (int y = 0; y < layer.height; y++) {
+            for (int x = 0; x < layer.width; x++) {
+                TileBase tile = tiles[y*layer.width+x];
+                int id = tile ? tileGIDs[tile] : 0;
+                layer.SetTileID(id, x, layer.height-1-y);
             }
         }
 
@@ -206,7 +219,7 @@ public class TMXFileExporter : Editor {
 
     Tiled.GroupLayer CreateGroupLayer (Transform t) {
         Tiled.GroupLayer layer = new Tiled.GroupLayer();
-        layer.layers = GetLayers(t);
+        layer.layers = CreateLayers(t);
         return layer;
     }
 
@@ -214,15 +227,22 @@ public class TMXFileExporter : Editor {
         string dir = Path.GetDirectoryName(tmxFilePath);
         List<Tiled.TileSet> tileSets = new List<Tiled.TileSet>();
         string[] paths = GetTileSetPaths(bounds, grid.transform);
+        int firstGID = 1;
         foreach (string path in paths) {
             if (Path.GetExtension(path) != ".tsx") {
-                Debug.Log("TODO: implement non-TSX tile sets... " + path);
+                Debug.LogWarning(path + " is not a Tile Set (.tsx).");
                 continue;
             }
-            Tiled.TileSet tileSet = Tiled.TileSet.Load(path);
-            Debug.Log("TODO: set tileset source and firstGID");
             
+            Uri tsxFileURI = new Uri(Path.GetFullPath(path));
+            Uri tmxFileURI = new Uri(Path.GetDirectoryName(Path.GetFullPath(tmxFilePath)));
+            Uri relativeURI = tmxFileURI.MakeRelativeUri(tsxFileURI);
+            Tiled.TileSet tileSet = Tiled.TileSet.Load(path);
+            tileSet.firstGID = firstGID;
+            firstGID += tileSet.tileCount;
+            tileSet.source = "../" + relativeURI.ToString();
             tileSets.Add(tileSet);
+            GetTileAssetsAtPath(tileSet, path);
         }
         return tileSets.ToArray();
     }

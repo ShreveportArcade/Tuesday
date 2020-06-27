@@ -30,7 +30,6 @@ using UnityEditor.Experimental.AssetImporters;
 public class TMXFileImporter : ScriptedImporter {
 
     public int pixelsPerUnit = -1;
-    public List<GridPalette> tileSets;//TODO: remapping these should update the file
 
     static Texture2D _icon;
     static Texture2D icon { 
@@ -44,7 +43,6 @@ public class TMXFileImporter : ScriptedImporter {
     Dictionary<int, Tile> tiles {
         get {
             if (_tiles == null) {
-                tileSets = new List<GridPalette>();
                 _tiles = new Dictionary<int, Tile>();
                 foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
                     if (tileSet.hasSource) {
@@ -159,9 +157,6 @@ public class TMXFileImporter : ScriptedImporter {
                 int gid = tileSet.firstGID + int.Parse(splitName[splitName.Length-1]);
                 _tiles[gid] = tile;
             }
-            if (asset is GridPalette) {
-                tileSets.Add(asset as GridPalette);
-            }
         }
     }
 
@@ -250,6 +245,8 @@ public class TMXFileImporter : ScriptedImporter {
     }
 
     public void CreateObjectGroup (Tiled.ObjectGroup groupData, GameObject group) {
+        if (groupData.objects == null) return;
+
         float w = tmxFile.tileWidth / pixelsPerUnit;
         float h = tmxFile.tileHeight / pixelsPerUnit;
         Dictionary<string, int> names = new Dictionary<string, int>();
