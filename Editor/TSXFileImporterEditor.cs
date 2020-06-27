@@ -26,6 +26,7 @@ using System.Reflection;
 
 namespace Tiled {
 [CustomEditor(typeof(TSXFileImporter))]
+[CanEditMultipleObjects]
 class TSXFileImporterEditor : ScriptedImporterEditor {
 
     TSXFileImporter importer {
@@ -62,9 +63,37 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
         if (GUILayout.Button("Update Texture Padding")) UpdateTexturePadding();        
     }
 
+    private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
+    public static Texture2D GetTileSetTexture (TileSet tileSet, string path) {
+        if (tileSet.image == null || tileSet.image.source == null) return null;
+
+        string texturePath = tileSet.image.source;
+        if (tileSet.source == null) {
+            texturePath = Path.Combine(Path.GetDirectoryName(path), texturePath);
+        }
+        else {
+            string tileSetPath = Path.Combine(Path.GetDirectoryName(path), tileSet.source);
+            texturePath = Path.Combine(Path.GetDirectoryName(tileSetPath), texturePath);
+        }
+        return GetImageTexture(tileSet.image, texturePath);
+    }
+
+    public static Texture2D GetImageTexture (Image image, string texturePath) {
+        if (tileSetTextures.ContainsKey(image.source)) return tileSetTextures[image.source];
+
+        texturePath = Path.GetFullPath(texturePath);
+        string dataPath = Path.GetFullPath(Application.dataPath);
+        texturePath = texturePath.Replace(dataPath, "Assets");
+        Texture2D tex = AssetDatabase.LoadAssetAtPath(texturePath, typeof(Texture2D)) as Texture2D;
+
+        if (tex != null) tileSetTextures[image.source] = tex;
+
+        return tex;
+    }
+
     void UpdateTexturePadding () {
         TileSet ts = tsxFile;
-        Texture2D texture = TileMapEditor.GetTileSetTexture(ts, path);
+        Texture2D texture = GetTileSetTexture(ts, path);
         string texturePath = AssetDatabase.GetAssetPath(texture);
 
         TextureImporter importer = (TextureImporter)TextureImporter.GetAtPath(texturePath);

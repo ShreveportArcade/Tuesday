@@ -26,9 +26,11 @@ using UnityEditor;
 using UnityEditor.Experimental.AssetImporters;
 
 [ScriptedImporter(1, "tmx", 2)]
+[CanEditMultipleObjects]
 public class TMXFileImporter : ScriptedImporter {
 
     public int pixelsPerUnit = -1;
+    public List<GridPalette> tileSets;//TODO: remapping these should update the file
 
     static Texture2D _icon;
     static Texture2D icon { 
@@ -42,6 +44,7 @@ public class TMXFileImporter : ScriptedImporter {
     Dictionary<int, Tile> tiles {
         get {
             if (_tiles == null) {
+                tileSets = new List<GridPalette>();
                 _tiles = new Dictionary<int, Tile>();
                 foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
                     if (tileSet.hasSource) {
@@ -66,7 +69,6 @@ public class TMXFileImporter : ScriptedImporter {
     string tmxFilePath;
     int layerIndex;
     public override void OnImportAsset(AssetImportContext ctx) {
-        Debug.Log("TMX: " + ctx.assetPath);
         tmxFilePath = ctx.assetPath;
         tmxFile = Tiled.TMXFile.Load(ctx.assetPath);
         if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileHeight;
@@ -97,10 +99,13 @@ public class TMXFileImporter : ScriptedImporter {
         if (hasEmbeddedTiles) AssetDatabase.ImportAsset(tmxFilePath);
     }
 
+    public override bool SupportsRemappedAssetType (System.Type type) {
+        return (type == typeof(GridPalette));
+    }
+
+
     public static GridLayout.CellLayout GetCellLayout (Tiled.TMXFile tmxFile) {
-        if (tmxFile.orientation == "hexagonal") {
-            return GridLayout.CellLayout.Hexagon;
-        }
+        if (tmxFile.orientation == "hexagonal") return GridLayout.CellLayout.Hexagon;
         else if (tmxFile.orientation == "isometric") return GridLayout.CellLayout.Isometric;
         else if (tmxFile.orientation == "staggered") return GridLayout.CellLayout.Isometric;//ZAsY;
         return GridLayout.CellLayout.Rectangle;
@@ -110,14 +115,8 @@ public class TMXFileImporter : ScriptedImporter {
         Vector3 size = new Vector3(tmxFile.tileWidth,tmxFile.tileHeight,0) / pixelsPerUnit;
         if (tmxFile.orientation == "hexagonal") {
             if (tmxFile.hexSideLength > 0) {
-                if (tmxFile.staggerAxis == "x") {
-                    size.x = (tmxFile.tileWidth - tmxFile.hexSideLength * 0.5f) / pixelsPerUnit;
-                    size.y = size.x;
-                }
-                else {
-                    size.y = (tmxFile.tileHeight - tmxFile.hexSideLength * 0.5f) / pixelsPerUnit;
-                    size.x = size.y;
-                }
+                size.x = (float)tmxFile.tileWidth/(float)(tmxFile.tileHeight+tmxFile.hexSideLength);
+                size.y = 1-(float)tmxFile.hexSideLength/(float)(tmxFile.hexSideLength+tmxFile.tileHeight);
             }
         }
         return size;
@@ -134,7 +133,6 @@ public class TMXFileImporter : ScriptedImporter {
         Dictionary<string, int> names = new Dictionary<string, int>();
         foreach (Tiled.Layer layerData in layers) {
             string name = layerData.name;
-            Debug.Log(name);
             if (name == null) name = "";
             if (!names.ContainsKey(name)) names[name] = 0;
             else name += (++names[name]).ToString();
@@ -161,6 +159,9 @@ public class TMXFileImporter : ScriptedImporter {
                 int gid = tileSet.firstGID + int.Parse(splitName[splitName.Length-1]);
                 _tiles[gid] = tile;
             }
+            if (asset is GridPalette) {
+                tileSets.Add(asset as GridPalette);
+            }
         }
     }
 
@@ -181,7 +182,14 @@ public class TMXFileImporter : ScriptedImporter {
 
     public void CreateTileLayer (Tiled.TileLayer layerData, GameObject layer) {
         Tilemap tilemap = layer.AddComponent<Tilemap>();
-        tilemap.tileAnchor = new Vector3(0.5f, 0.5f, 0);
+        tilemap.tileAnchor = new Vector3(0,0,0);
+        if (tmxFile.orientation == "hexagonal") {
+            tilemap.tileAnchor = new Vector3(
+                -(float)tmxFile.hexSideLength/(float)tmxFile.tileHeight,
+                -(float)tmxFile.tileWidth/(float)(tmxFile.tileHeight+tmxFile.hexSideLength),
+                0
+            );
+        }
 
         TilemapRenderer renderer = layer.AddComponent<TilemapRenderer>();
         renderer.sortOrder = GetSortOrder();
@@ -212,16 +220,30 @@ public class TMXFileImporter : ScriptedImporter {
                         if (y % 2 == staggerIndex) pos.y--;
                     }
                 }
+                else if (tmxFile.orientation == "hexagonal") {
+                    if (staggerX && x % 2 != staggerIndex) pos.y--;
+                    else if (!staggerX && y % 2 != staggerIndex) pos.x--;
+                }
                 tilemap.SetTile(pos, tile);
 
                 int index = x + y * columns;
                 Quaternion rot = Quaternion.identity;
-                if (layerData.FlippedHorizontally(index)) rot *= Quaternion.AngleAxis(180, Vector3.up);
-                if (layerData.FlippedVertically(index)) rot *= Quaternion.AngleAxis(180, Vector3.right);
-                if (layerData.FlippedAntiDiagonally(index)) rot *= Quaternion.AngleAxis(180, Vector2.one);
-                if (layerData.RotatedHexagonal120(index)) rot *= Quaternion.AngleAxis(120, Vector3.forward);
-                Vector3 off = rot * new Vector3(1,1,0);
-                Matrix4x4 matrix = Matrix4x4.TRS(-off, rot, Vector3.one);
+                Vector3 off = Vector3.zero;
+                if (layerData.FlippedHorizontally(index)) {
+                    rot *= Quaternion.AngleAxis(180, Vector3.up);
+                    off.x = -1;
+                }
+                if (layerData.FlippedVertically(index)) {
+                    rot *= Quaternion.AngleAxis(180, Vector3.right);
+                    off.y = 1;
+                }
+                if (layerData.FlippedAntiDiagonally(index)) {
+                    rot *= Quaternion.AngleAxis(180, Vector2.one);
+                }
+                if (layerData.RotatedHexagonal120(index)) {
+                    rot *= Quaternion.AngleAxis(120, Vector3.forward);
+                }
+                Matrix4x4 matrix = Matrix4x4.TRS(off, rot, Vector3.one);
                 tilemap.SetTransformMatrix(pos, matrix);
             }
         }
@@ -259,6 +281,35 @@ public class TMXFileImporter : ScriptedImporter {
         float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
         g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
         g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
+    }
+
+    public void CreateSpriteTile (string name, Tiled.TileObject tileObject, GameObject group) {
+        int tileID = (int)tileObject.gid;
+        GameObject g = new GameObject(name);
+        g.transform.SetParent(group.transform);
+        float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
+        g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
+        g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
+
+        SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
+        sprite.flipX = Tiled.TMXFile.FlippedHorizontally(tileObject.gid);
+        sprite.flipY = Tiled.TMXFile.FlippedVertically(tileObject.gid);
+        Tiled.TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
+        // if (tileSet != null && tileSet.image != null && !string.IsNullOrEmpty(tileSet.image.source)) {
+        //     g.transform.localScale = new Vector3(tileObject.width, tileObject.height, pixelsPerUnit) / pixelsPerUnit;
+        //     int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
+        //     Material mat = tileSetMaterials[tileSetIndex];
+        //     Texture2D tex = mat.mainTexture as Texture2D;
+        //     TileRect r = tileSet.GetTileSpriteRect(tileID);
+        //     Rect rect = new Rect(r.x, r.y, r.width, r.height);
+        //     Vector2 pivot = Vector2.zero;
+        //     sprite.sprite = Sprite.Create(tex, rect, pivot, pixelsPerUnit, 0, SpriteMeshType.FullRect);
+        // }
+        // else {
+        //     sprite.sprite = tiles[tileID].sprite;
+        // }
+
+        SetProperties(g, tileObject.properties);
     }
 
     public void SetProperties (GameObject g, Tiled.Property[] props) {
@@ -326,36 +377,6 @@ public class TMXFileImporter : ScriptedImporter {
                 continue;
             }
         }
-    }
-
-    public void CreateSpriteTile (string name, Tiled.TileObject tileObject, GameObject group) {
-        int tileID = (int)tileObject.gid;
-        GameObject g = new GameObject(name);
-        g.transform.SetParent(group.transform);
-        float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
-        g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
-        g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
-
-        SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
-        sprite.flipX = Tiled.TMXFile.FlippedHorizontally(tileObject.gid);
-        sprite.flipY = Tiled.TMXFile.FlippedVertically(tileObject.gid);
-        Tiled.TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
-        // if (tileSet != null && tileSet.image != null && !string.IsNullOrEmpty(tileSet.image.source)) {
-        //     g.transform.localScale = new Vector3(tileObject.width, tileObject.height, pixelsPerUnit) / pixelsPerUnit;
-        //     int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
-        //     Material mat = tileSetMaterials[tileSetIndex];
-        //     Texture2D tex = mat.mainTexture as Texture2D;
-        //     TileRect r = tileSet.GetTileSpriteRect(tileID);
-        //     Rect rect = new Rect(r.x, r.y, r.width, r.height);
-        //     Vector2 pivot = Vector2.zero;
-        //     sprite.sprite = Sprite.Create(tex, rect, pivot, pixelsPerUnit, 0, SpriteMeshType.FullRect);
-        // }
-        // else {
-        //     int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
-        //     sprite.sprite = tileSetSprites[tileSetIndex][tileID-tileSet.firstGID];
-        // }
-
-        SetProperties(g, tileObject.properties);
     }
 
     public static Color TiledColorFromString (string colorStr) {

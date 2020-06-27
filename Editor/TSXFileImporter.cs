@@ -10,10 +10,7 @@ using System.IO;
 public class TSXFileImporter : ScriptedImporter {
 
     public int pixelsPerUnit = -1;
-    public string tsxFilePath;
-    public GridLayout.CellSwizzle gridCellSwizzle = GridLayout.CellSwizzle.XYZ;
-    public GridLayout.CellLayout gridCellLayout = GridLayout.CellLayout.Rectangle;
-    public Vector3 tileAnchor = new Vector3(0.5f, 0.5f, 0);
+    public string tmxFilePath;
 
     static Texture2D _icon;
     static Texture2D icon { 
@@ -38,18 +35,17 @@ public class TSXFileImporter : ScriptedImporter {
     }
 
     public override void OnImportAsset(AssetImportContext ctx) {
-        Debug.Log("TileSet: " + ctx.assetPath);
         string name = Path.GetFileNameWithoutExtension(ctx.assetPath);
         Tiled.TileSet tileSet = Tiled.TileSet.Load(ctx.assetPath);
         if (pixelsPerUnit < 0) pixelsPerUnit = tileSet.tileHeight;
 
         GameObject gameObject = new GameObject(tileSet.name);
         Grid grid = gameObject.AddComponent<Grid>();
-        grid.cellLayout = gridCellLayout;
-        grid.cellSwizzle = gridCellSwizzle;
+        grid.cellLayout = GridLayout.CellLayout.Rectangle;
+        grid.cellSwizzle = GridLayout.CellSwizzle.XYZ;
         grid.cellSize = new Vector3(tileSet.tileWidth,tileSet.tileHeight,0) / pixelsPerUnit;
         Tilemap tilemap = gameObject.AddComponent<Tilemap>();
-        tilemap.tileAnchor = tileAnchor;
+        tilemap.tileAnchor = Vector3.zero;
         gameObject.AddComponent<TilemapRenderer>();
         ctx.AddObjectToAsset(tileSet.name + ".tsx", gameObject, icon);
         ctx.SetMainObject(gameObject);
@@ -101,8 +97,8 @@ public class TSXFileImporter : ScriptedImporter {
             Debug.LogWarning("Importing image tiles not supported yet: " + ctx.assetPath);
         }
 
-        if (!string.IsNullOrEmpty(tsxFilePath)) {
-            AssetDatabase.ImportAsset(tsxFilePath);
+        if (!string.IsNullOrEmpty(tmxFilePath)) {
+            AssetDatabase.ImportAsset(tmxFilePath);
         }
     }
 
