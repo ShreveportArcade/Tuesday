@@ -81,6 +81,7 @@ public class TMXFileExporter : Editor {
             Debug.Log("TODO: asset replace from file");
         }
 
+        GUI.enabled = false;
         if (GUILayout.Button("Save")) {
             SaveTMX(tmxFilePath);
             AssetDatabase.ImportAsset(tmxFilePath);
@@ -96,7 +97,6 @@ public class TMXFileExporter : Editor {
             );
             SaveTMX(path);
             AssetDatabase.Refresh();
-            AssetDatabase.ImportAsset(path);
         }
 
         EditorGUILayout.EndHorizontal();
@@ -117,8 +117,6 @@ public class TMXFileExporter : Editor {
 
     int globalLayerID;
     void SaveTMX (string tmxFilePath) {
-        tmxFilePath = Path.Combine("Assets/TEST_EXPORT.tmx");
-
         Tiled.TMXFile tmxFile = new Tiled.TMXFile();
         tmxFile.orientation = GetOrientation();
         tmxFile.renderOrder = GetRenderOrder(tmxFile.orientation);
@@ -138,7 +136,7 @@ public class TMXFileExporter : Editor {
         tmxFile.layers = CreateLayers(grid.transform);
         
         tmxFile.Save(tmxFilePath);
-        AssetDatabase.ImportAsset(tmxFilePath);
+        AssetDatabase.ImportAsset(FileUtil.GetProjectRelativePath(tmxFilePath));
     }
 
     List<Tiled.Layer> CreateLayers (Transform root) {
@@ -240,7 +238,7 @@ public class TMXFileExporter : Editor {
             Tiled.TileSet tileSet = Tiled.TileSet.Load(path);
             tileSet.firstGID = firstGID;
             firstGID += tileSet.tileCount;
-            tileSet.source = "../" + relativeURI.ToString();
+            tileSet.source = "../" + Uri.UnescapeDataString(relativeURI.ToString());
             tileSets.Add(tileSet);
             GetTileAssetsAtPath(tileSet, path);
         }

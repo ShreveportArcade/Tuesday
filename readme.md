@@ -7,7 +7,7 @@ The goals of this project are full support of the TMX file format, feature parit
 
 ## Installation
 
-[To add as a Unitypackage, download as from the itch.io page.](https://318arcade.itch.io/tuesday)
+[To add as a Unitypackage, download it from the itch.io page.](https://318arcade.itch.io/tuesday)
 
 To add as a Git submodule:
 `git submodule add https://github.com/ShreveportArcade/Tuesday.git Assets/Tuesday`
