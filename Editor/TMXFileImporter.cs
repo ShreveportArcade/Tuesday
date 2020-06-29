@@ -251,22 +251,25 @@ public class TMXFileImporter : ScriptedImporter {
         SortingGroup sortingGroup = layer.AddComponent<SortingGroup>();
         sortingGroup.sortingOrder = layerIndex;
 
+        bool isIndexOrdered = (groupData.drawOrder == "index");
         float w = tmxFile.tileWidth / pixelsPerUnit;
         float h = tmxFile.tileHeight / pixelsPerUnit;
         Dictionary<string, int> names = new Dictionary<string, int>();
-        foreach (Tiled.TileObject tileObject in groupData.objects) {
+        for (int i = 0; i < groupData.objects.Length; i++) {
+            Tiled.TileObject tileObject = groupData.objects[i];
             string name = tileObject.name;
             if (name == null) name = "";
             if (!names.ContainsKey(name)) names[name] = 0;
             else name += (++names[name]).ToString();
-
+            
+            int index = isIndexOrdered ? i : (int)(tileObject.y * 10);
             bool isPrefab = tileObject.properties != null && System.Array.Exists(tileObject.properties, (p) => p.name == "prefab");
-            if (isPrefab) CreatePrefabTile(name, tileObject, layer, groupData.opacity);
-            else CreateSpriteTile(name, tileObject, layer, groupData.opacity);
+            if (isPrefab) CreatePrefabTile(name, tileObject, layer, groupData.opacity, index);
+            else CreateSpriteTile(name, tileObject, layer, groupData.opacity, index);
         }
     }
 
-    public void CreatePrefabTile (string name, Tiled.TileObject tileObject, GameObject layer, float opacity) {
+    public void CreatePrefabTile (string name, Tiled.TileObject tileObject, GameObject layer, float opacity, int index) {
         int tileID = (int)tileObject.gid;
         Tiled.Property prefabProp = System.Array.Find(tileObject.properties, (p) => p.name == "prefab");
 
@@ -284,7 +287,7 @@ public class TMXFileImporter : ScriptedImporter {
         g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
     }
 
-    public void CreateSpriteTile (string name, Tiled.TileObject tileObject, GameObject layer, float opacity) {
+    public void CreateSpriteTile (string name, Tiled.TileObject tileObject, GameObject layer, float opacity, int index) {
         int tileID = tileObject.tileID;
         GameObject g = new GameObject(name);
         g.transform.SetParent(layer.transform);
@@ -292,6 +295,7 @@ public class TMXFileImporter : ScriptedImporter {
         g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
 
         SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
+        sprite.sortingOrder = index;
         Color c = Color.white;
         c. a = opacity;
         sprite.color = c;
