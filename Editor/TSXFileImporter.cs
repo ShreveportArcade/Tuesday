@@ -69,32 +69,30 @@ public class TSXFileImporter : ScriptedImporter {
 
             int columns = tileSet.columns;
             int rows = tileSet.rows;
-            Vector2 anchor = Vector2.zero;
             for (int y = 0; y < rows; y++) {
                 for (int x = 0; x < columns; x++) {
                     int id = y * columns + x;
                     int gid = id;
                     if (tileSet.firstGIDSpecified) gid += tileSet.firstGID;
                     Tiled.Tile tiledTile = tileSet.GetTile(gid);
-
+                    tiledTile.id = id;
                     Tiled.TileRect r = tileSet.GetTileSpriteRect(gid);
                     Rect rect = new Rect(r.x, r.y, r.width, r.height);
-                    Sprite sprite = Sprite.Create(tex, rect, anchor, pixelsPerUnit, 0, SpriteMeshType.FullRect);
-                    sprite.name = tileSet.name + "_" + x + "," + y;
-                    bool phys = AddPhysicsToSprite(tiledTile, sprite);
-                    ctx.AddObjectToAsset(sprite.name,  sprite);
-
-                    Tile unityTile = ScriptableObject.CreateInstance<Tile>();
-                    unityTile.name = tileSet.name + "_" + id;
-                    unityTile.sprite = sprite;
-                    if (!phys) unityTile.colliderType = Tile.ColliderType.None;
-                    ctx.AddObjectToAsset(unityTile.name, unityTile);
+                    Tile unityTile = AddTile(ctx, tileSet.name + "_" + x + "," + y, tileSet, tiledTile, tex, rect);
                     tilemap.SetTile(new Vector3Int(x,rows-1-y,0), unityTile); 
                 }
             }
         }
         else {
-            Debug.LogWarning("Importing image tiles not supported yet: " + ctx.assetPath);
+            Debug.LogWarning("Importing image tiles... " + ctx.assetPath);
+            for (int i = 0; i < tileSet.tiles.Length; i++) {
+                Tiled.Tile tiledTile = tileSet.tiles[i];
+                string tileSetPath = Path.Combine(Path.GetDirectoryName(ctx.assetPath), tiledTile.image.source);
+                Texture2D tex = GetImageTexture(tiledTile.image, tileSetPath);
+                Rect rect = new Rect(0, 0, tex.width, tex.height);
+                Tile unityTile = AddTile(ctx, tex.name + "_" + i, tileSet, tiledTile, tex, rect);
+                tilemap.SetTile(new Vector3Int(i,0,0), unityTile);
+            }
         }
 
         if (!string.IsNullOrEmpty(tmxFilePath)) {
@@ -102,7 +100,22 @@ public class TSXFileImporter : ScriptedImporter {
         }
     }
 
-    static bool AddPhysicsToSprite (Tiled.Tile tile, Sprite sprite) {
+    Tile AddTile (AssetImportContext ctx, string spriteName, Tiled.TileSet tileSet, Tiled.Tile tiledTile, Texture2D tex, Rect rect) {
+        Sprite sprite = Sprite.Create(tex, rect, Vector2.zero, pixelsPerUnit, 0, SpriteMeshType.FullRect);
+        sprite.name = spriteName;
+        bool phys = AddPhysicsToSprite(tiledTile, sprite);
+        ctx.AddObjectToAsset(sprite.name,  sprite);
+
+        Tile unityTile = ScriptableObject.CreateInstance<Tile>();
+        unityTile.name = tileSet.name + "_" + tiledTile.id;
+        unityTile.sprite = sprite;
+        if (!phys) unityTile.colliderType = Tile.ColliderType.None;
+        ctx.AddObjectToAsset(unityTile.name, unityTile);
+        
+        return unityTile;
+    }
+
+    bool AddPhysicsToSprite (Tiled.Tile tile, Sprite sprite) {
         if (tile == null
         || tile.objectGroup == null
         || tile.objectGroup.objects == null

@@ -181,11 +181,34 @@ public class TMXFileExporter : Editor {
         TileBase[] tiles = tilemap.GetTilesBlock(bounds);
         layer.width = bounds.size.x;
         layer.height = bounds.size.y;
-        for (int y = 0; y < layer.height; y++) {
-            for (int x = 0; x < layer.width; x++) {
-                TileBase tile = tiles[y*layer.width+x];
+        for (int j = 0; j < layer.height; j++) {
+            for (int i = 0; i < layer.width; i++) {
+                TileBase tile = tiles[j*layer.width+i];
                 int id = tile ? tileGIDs[tile] : 0;
-                layer.SetTileID(id, x, layer.height-1-y);
+
+                int x = i;
+                int y = layer.height-1-j;
+                // if (tmxFile.orientation == "isometric") {
+                //     pos = new Vector3Int(rows-1-y, columns-1-x, 0);
+                // }
+                // else if (tmxFile.orientation == "staggered") {
+                //     if (staggerX) {
+                //         pos.x -= y;
+                //         if (x % 2 == staggerIndex) pos.x++;
+                //     }
+                //     else {
+                //         pos.y = (rows-1-y)/2-x;
+                //         pos.x = 2*x+pos.y;
+                //         if (y % 2 == staggerIndex) pos.y--;
+                //     }
+                // }
+                // else if (tmxFile.orientation == "hexagonal") {
+                //     if (staggerX && x % 2 != staggerIndex) pos.y--;
+                //     else if (!staggerX && y % 2 != staggerIndex) pos.x--;
+                // }
+
+
+                layer.SetTileID(id, x, y);
             }
         }
 

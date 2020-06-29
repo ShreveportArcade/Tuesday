@@ -21,6 +21,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.Tilemaps;
 using UnityEditor;
 using UnityEditor.Experimental.AssetImporters;
@@ -244,8 +245,11 @@ public class TMXFileImporter : ScriptedImporter {
         }
     }
 
-    public void CreateObjectGroup (Tiled.ObjectGroup groupData, GameObject group) {
+    public void CreateObjectGroup (Tiled.ObjectGroup groupData, GameObject layer) {
         if (groupData.objects == null) return;
+
+        SortingGroup sortingGroup = layer.AddComponent<SortingGroup>();
+        sortingGroup.sortingOrder = layerIndex;
 
         float w = tmxFile.tileWidth / pixelsPerUnit;
         float h = tmxFile.tileHeight / pixelsPerUnit;
@@ -257,12 +261,12 @@ public class TMXFileImporter : ScriptedImporter {
             else name += (++names[name]).ToString();
 
             bool isPrefab = tileObject.properties != null && System.Array.Exists(tileObject.properties, (p) => p.name == "prefab");
-            if (isPrefab) CreatePrefabTile(name, tileObject, group);
-            else CreateSpriteTile(name, tileObject, group);
+            if (isPrefab) CreatePrefabTile(name, tileObject, layer, groupData.opacity);
+            else CreateSpriteTile(name, tileObject, layer, groupData.opacity);
         }
     }
 
-    public void CreatePrefabTile (string name, Tiled.TileObject tileObject, GameObject group) {
+    public void CreatePrefabTile (string name, Tiled.TileObject tileObject, GameObject layer, float opacity) {
         int tileID = (int)tileObject.gid;
         Tiled.Property prefabProp = System.Array.Find(tileObject.properties, (p) => p.name == "prefab");
 
@@ -274,37 +278,49 @@ public class TMXFileImporter : ScriptedImporter {
         g.name = name;
         g.SetActive(tileObject.visible);
         SetProperties(g, tileObject.properties);
-        g.transform.SetParent(group.transform);
+        g.transform.SetParent(layer.transform);
         float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
         g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
         g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
     }
 
-    public void CreateSpriteTile (string name, Tiled.TileObject tileObject, GameObject group) {
+    public void CreateSpriteTile (string name, Tiled.TileObject tileObject, GameObject layer, float opacity) {
         int tileID = (int)tileObject.gid;
         GameObject g = new GameObject(name);
-        g.transform.SetParent(group.transform);
+        g.transform.SetParent(layer.transform);
         float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
         g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
         g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
 
         SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
-        sprite.flipX = Tiled.TMXFile.FlippedHorizontally(tileObject.gid);
-        sprite.flipY = Tiled.TMXFile.FlippedVertically(tileObject.gid);
+        Color c = Color.white;
+        c. a = opacity;
+        sprite.color = c;
+
+        Vector3 scale = Vector3.one;
         Tiled.TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
-        // if (tileSet != null && tileSet.image != null && !string.IsNullOrEmpty(tileSet.image.source)) {
-        //     g.transform.localScale = new Vector3(tileObject.width, tileObject.height, pixelsPerUnit) / pixelsPerUnit;
-        //     int tileSetIndex = System.Array.IndexOf(tmxFile.tileSets, tileSet);
-        //     Material mat = tileSetMaterials[tileSetIndex];
-        //     Texture2D tex = mat.mainTexture as Texture2D;
-        //     TileRect r = tileSet.GetTileSpriteRect(tileID);
-        //     Rect rect = new Rect(r.x, r.y, r.width, r.height);
-        //     Vector2 pivot = Vector2.zero;
-        //     sprite.sprite = Sprite.Create(tex, rect, pivot, pixelsPerUnit, 0, SpriteMeshType.FullRect);
-        // }
-        // else {
-        //     sprite.sprite = tiles[tileID].sprite;
-        // }
+        if (tiles.ContainsKey(tileID)) {
+            sprite.sprite = tiles[tileID].sprite;
+            scale = new Vector3(
+                tileObject.width / sprite.sprite.rect.width, 
+                tileObject.height / sprite.sprite.rect.height, 
+                1
+            );
+            g.transform.localScale = scale;
+        }
+        else Debug.LogWarning("Tile" + tileID + " not found at " + tmxFilePath);
+
+        Vector3 origin = g.transform.position;
+        Vector3 center = origin + new Vector3(scale.x * 0.5f, 1-scale.y * 0.5f, 0);
+        if (Tiled.TMXFile.FlippedHorizontally(tileObject.gid)) {
+            g.transform.RotateAround(center, Vector3.up, 180); 
+        }
+        
+        if (Tiled.TMXFile.FlippedVertically(tileObject.gid)) {
+            g.transform.RotateAround(center, Vector3.right, 180); 
+        }
+
+        g.transform.RotateAround(origin, Vector3.forward, tileObject.rotation);
 
         SetProperties(g, tileObject.properties);
     }
