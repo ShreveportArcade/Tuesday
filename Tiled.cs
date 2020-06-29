@@ -724,6 +724,7 @@ public class TileObject {
     [XmlAttribute("type")] public string type;
     [XmlIgnore] public bool typeSpecified { get { return !string.IsNullOrEmpty(type); } set {} }
     [XmlAttribute("gid")] public uint gid;
+    [XmlIgnore] public int tileID { get { return (int)(gid & ~(TMXFile.FlippedHorizontallyFlag | TMXFile.FlippedVerticallyFlag | TMXFile.FlippedAntiDiagonallyFlag | TMXFile.RotatedHexagonal120Flag)); } }
     [XmlAttribute("x")] public float x = 0;
     [XmlAttribute("y")] public float y = 0;
     [XmlAttribute("width")] public float width = 0;

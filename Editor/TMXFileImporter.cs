@@ -285,33 +285,31 @@ public class TMXFileImporter : ScriptedImporter {
     }
 
     public void CreateSpriteTile (string name, Tiled.TileObject tileObject, GameObject layer, float opacity) {
-        int tileID = (int)tileObject.gid;
+        int tileID = tileObject.tileID;
         GameObject g = new GameObject(name);
         g.transform.SetParent(layer.transform);
         float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
         g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
-        g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
 
         SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
         Color c = Color.white;
         c. a = opacity;
         sprite.color = c;
 
-        Vector3 scale = Vector3.one;
         Tiled.TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
         if (tiles.ContainsKey(tileID)) {
             sprite.sprite = tiles[tileID].sprite;
-            scale = new Vector3(
+            g.transform.localScale = new Vector3(
                 tileObject.width / sprite.sprite.rect.width, 
                 tileObject.height / sprite.sprite.rect.height, 
                 1
             );
-            g.transform.localScale = scale;
         }
+        else if (tileID == 0) Debug.LogWarning("TileObjects without Tiles not yet supported");
         else Debug.LogWarning("Tile" + tileID + " not found at " + tmxFilePath);
 
         Vector3 origin = g.transform.position;
-        Vector3 center = origin + new Vector3(scale.x * 0.5f, 1-scale.y * 0.5f, 0);
+        Vector3 center = origin + new Vector3(tileObject.width, tileObject.height, 0) * 0.5f / (float)pixelsPerUnit;
         if (Tiled.TMXFile.FlippedHorizontally(tileObject.gid)) {
             g.transform.RotateAround(center, Vector3.up, 180); 
         }
@@ -320,7 +318,13 @@ public class TMXFileImporter : ScriptedImporter {
             g.transform.RotateAround(center, Vector3.right, 180); 
         }
 
-        g.transform.RotateAround(origin, Vector3.forward, tileObject.rotation);
+        if (Tiled.TMXFile.FlippedAntiDiagonally(tileObject.gid)) {
+            g.transform.RotateAround(center, Vector2.one, 180); 
+        }
+
+        if (tileObject.rotation != 0) {
+            g.transform.RotateAround(origin, Vector3.forward, -tileObject.rotation);
+        }
 
         SetProperties(g, tileObject.properties);
     }
