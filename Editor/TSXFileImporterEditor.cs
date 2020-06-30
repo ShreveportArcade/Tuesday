@@ -47,7 +47,7 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
 
     int spacing = -1;
     int margin = -1;
-    Color transparentColor = new Color(1,0,1);
+    Color transparentColor;
     public override void OnEnable() {
         base.OnEnable();
         spacing = tsxFile.spacing;
@@ -168,8 +168,32 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
     }
 
     void WriteTextureAlpha () {
-        Texture2D texture = GetTileSetTexture(tsxFile, path);
-        Debug.Log("This should set the transparent color of " + texture + " at " + path);
+        TileSet ts = tsxFile;
+        Texture2D texture = GetTileSetTexture(ts, path);
+        string texturePath = AssetDatabase.GetAssetPath(texture);
+
+        TextureImporter importer = (TextureImporter)TextureImporter.GetAtPath(texturePath);
+        importer.isReadable = true;
+        AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceUpdate);
+
+        Color[] inColors = texture.GetPixels();
+        int count = inColors.Length;
+        Color[] outColors = new Color[count];
+
+        Color trans = transparentColor;
+        for (int i = 0; i < count; i++) {
+            Color c = inColors[i];
+            if (c.r == trans.r && c.g == trans.g && c.b == trans.b) c.a = 0;
+            else c.a = 1;
+            outColors[i] = c;
+        }
+
+        Texture2D t = new Texture2D(texture.width, texture.height);
+        t.SetPixels(outColors);
+        byte[] bytes = t.EncodeToPNG();
+        File.WriteAllBytes(texturePath, bytes);
+
+        AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceUpdate);
     }
 }
 }

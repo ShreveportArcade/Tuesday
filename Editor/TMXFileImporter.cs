@@ -190,8 +190,11 @@ public class TMXFileImporter : ScriptedImporter {
         TilemapRenderer renderer = layer.AddComponent<TilemapRenderer>();
         renderer.sortOrder = GetSortOrder();
         renderer.sortingOrder = layerIndex;
-        tilemap.color = TiledColorFromString(layerData.tintColor);
+        Color c = TiledColorFromString(layerData.tintColor);
+        c.a *= layerData.opacity;
+        tilemap.color = c;
 
+        Vector3 size = GetCellSize();
         bool staggerX = tmxFile.staggerAxis == "x";
         int staggerIndex = (tmxFile.staggerAxis == "even") ? 0 : 1;
         int rows = tmxFile.height;
@@ -217,8 +220,11 @@ public class TMXFileImporter : ScriptedImporter {
                     }
                 }
                 else if (tmxFile.orientation == "hexagonal") {
-                    if (staggerX && x % 2 != staggerIndex) pos.y--;
-                    else if (!staggerX && y % 2 != staggerIndex) pos.x--;
+                    if (staggerX) {//x % 2 != staggerIndex) {
+                        pos = new Vector3Int(rows-1-y, x, 0);
+                        if (x % 2 != staggerIndex) pos.x++;
+                    }
+                    else if (y % 2 != staggerIndex) pos.x--;
                 }
                 tilemap.SetTile(pos, tile);
 
@@ -227,18 +233,23 @@ public class TMXFileImporter : ScriptedImporter {
                 Vector3 off = Vector3.zero;
                 if (layerData.FlippedHorizontally(index)) {
                     rot *= Quaternion.AngleAxis(180, Vector3.up);
-                    off.x = -1;
+                    off.x = size.x;
                 }
                 if (layerData.FlippedVertically(index)) {
                     rot *= Quaternion.AngleAxis(180, Vector3.right);
-                    off.y = 1;
+                    off.y = size.y;
                 }
-                if (layerData.FlippedAntiDiagonally(index)) {
-                    rot *= Quaternion.AngleAxis(180, Vector2.one);
+                bool flipAntiDiag = layerData.FlippedAntiDiagonally(index);
+                bool rotated120 = layerData.RotatedHexagonal120(index);
+                if (flipAntiDiag) rot *= Quaternion.AngleAxis(180, Vector2.one);
+                if (rotated120 || (flipAntiDiag && tmxFile.orientation == "hexagonal")) {
+                    float angle = rotated120 ? 120 : 0;
+                    angle += flipAntiDiag ? 60 : 0;
+                    Quaternion spin = Quaternion.AngleAxis(-angle, Vector3.forward);
+                    rot *= spin;
+                    off -= spin * size * 0.5f;
                 }
-                if (layerData.RotatedHexagonal120(index)) {
-                    rot *= Quaternion.AngleAxis(120, Vector3.forward);
-                }
+
                 Matrix4x4 matrix = Matrix4x4.TRS(off, rot, Vector3.one);
                 tilemap.SetTransformMatrix(pos, matrix);
             }
