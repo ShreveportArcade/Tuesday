@@ -404,12 +404,13 @@ public class TMXFileImporter : ScriptedImporter {
         Color color = Color.white;
         if (colorStr == null) return color;
         if (colorStr.Length > 8) colorStr = "#" + colorStr.Substring(3) + colorStr.Substring(1, 2);
+        else colorStr = "#" + colorStr;
         ColorUtility.TryParseHtmlString(colorStr, out color); 
         return color;
     }
 
-    public static string TiledColorToString (Color color) {
-        if (color == Color.white) return null;
+    public static string TiledColorToString (Color color, bool allowWhite = false) {
+        if (color == Color.white && !allowWhite) return null;
         if (color.a == 1) return "#" + ColorUtility.ToHtmlStringRGB(color).ToLower();
         string colorStr = ColorUtility.ToHtmlStringRGBA(color).ToLower();;
         colorStr = "#" + colorStr.Substring(6, 2) + colorStr.Substring(0, 6);

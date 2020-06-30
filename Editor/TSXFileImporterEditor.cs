@@ -47,12 +47,20 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
 
     int spacing = -1;
     int margin = -1;
+    Color transparentColor = new Color(1,0,1);
+    public override void OnEnable() {
+        base.OnEnable();
+        spacing = tsxFile.spacing;
+        margin = tsxFile.margin;
+        if (tsxFile.imageSpecified && tsxFile.image.transSpecified) {
+            transparentColor = TMXFileImporter.TiledColorFromString(tsxFile.image.trans);
+        }
+    }
+
     public override void OnInspectorGUI() {
         base.OnInspectorGUI();
-        if (spacing < 0 || margin < 0) {
-            spacing = tsxFile.spacing;
-            margin = tsxFile.margin;
-        }
+
+        if (!tsxFile.imageSpecified) return;
 
         bool padChange = (spacing != tsxFile.spacing || margin != tsxFile.margin);
         GUI.backgroundColor = padChange ? Color.red : Color.white;
@@ -60,7 +68,21 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
         margin = Mathf.Clamp(EditorGUILayout.IntField("Margin", margin), 0, 8);
         GUI.backgroundColor = Color.white;
         GUI.enabled = padChange;
-        if (GUILayout.Button("Update Texture Padding")) UpdateTexturePadding();        
+        if (GUILayout.Button("Update Texture Padding")) UpdateTexturePadding();   
+
+        GUI.enabled = true;
+        bool hasTransparency = EditorGUILayout.Toggle("Set Color to Transparent", tsxFile.image.transSpecified);
+        if (!hasTransparency && tsxFile.image.transSpecified) {
+            tsxFile.image.trans = null;
+        }
+        else if (hasTransparency && !tsxFile.image.transSpecified) {
+            tsxFile.image.trans = TMXFileImporter.TiledColorToString(transparentColor, true);
+        }
+        if (!hasTransparency) return;
+
+        transparentColor = EditorGUILayout.ColorField("Transparent Color", transparentColor);
+        tsxFile.image.trans = TMXFileImporter.TiledColorToString(transparentColor);
+        if (GUILayout.Button("Write Texture Alpha")) WriteTextureAlpha();
     }
 
     private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
@@ -143,6 +165,11 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
         tsxFile.image.width = outWidth;
         tsxFile.image.height = outHeight;
         tsxFile.Save(path);
+    }
+
+    void WriteTextureAlpha () {
+        Texture2D texture = GetTileSetTexture(tsxFile, path);
+        Debug.Log("This should set the transparent color of " + texture + " at " + path);
     }
 }
 }

@@ -77,14 +77,14 @@ public class TSXFileImporter : ScriptedImporter {
                     Tiled.Tile tiledTile = tileSet.GetTile(gid);
                     tiledTile.id = id;
                     Tiled.TileRect r = tileSet.GetTileSpriteRect(gid);
-                    Rect rect = new Rect(r.x, r.y, r.width, r.height);
+                    float rectOff = (tex.height % r.height+tileSet.spacing) - tileSet.margin;
+                    Rect rect = new Rect(r.x, r.y+rectOff, r.width, r.height);
                     Tile unityTile = AddTile(ctx, tileSet.name + "_" + x + "," + y, tileSet, tiledTile, tex, rect);
                     tilemap.SetTile(new Vector3Int(x,rows-1-y,0), unityTile); 
                 }
             }
         }
         else {
-            Debug.LogWarning("Importing image tiles... " + ctx.assetPath);
             for (int i = 0; i < tileSet.tiles.Length; i++) {
                 Tiled.Tile tiledTile = tileSet.tiles[i];
                 string tileSetPath = Path.Combine(Path.GetDirectoryName(ctx.assetPath), tiledTile.image.source);
