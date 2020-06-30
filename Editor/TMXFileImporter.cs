@@ -177,6 +177,8 @@ public class TMXFileImporter : ScriptedImporter {
 
 
     public void CreateTileLayer (Tiled.TileLayer layerData, GameObject layer) {
+        GameObject temp = new GameObject("TEMP");
+
         Tilemap tilemap = layer.AddComponent<Tilemap>();
         tilemap.tileAnchor = new Vector3(0,0,0);
         if (tmxFile.orientation == "hexagonal") {
@@ -195,6 +197,7 @@ public class TMXFileImporter : ScriptedImporter {
         tilemap.color = c;
 
         Vector3 size = GetCellSize();
+        float h = size.magnitude * 0.5f;
         bool staggerX = tmxFile.staggerAxis == "x";
         int staggerIndex = (tmxFile.staggerAxis == "even") ? 0 : 1;
         int rows = tmxFile.height;
@@ -229,31 +232,36 @@ public class TMXFileImporter : ScriptedImporter {
                 tilemap.SetTile(pos, tile);
 
                 int index = x + y * columns;
-                Quaternion rot = Quaternion.identity;
-                Vector3 off = Vector3.zero;
-                if (layerData.FlippedHorizontally(index)) {
-                    rot *= Quaternion.AngleAxis(180, Vector3.up);
-                    off.x = size.x;
-                }
-                if (layerData.FlippedVertically(index)) {
-                    rot *= Quaternion.AngleAxis(180, Vector3.right);
-                    off.y = size.y;
-                }
+                Transform t = temp.transform;
+                t.position = Vector3.zero;
+                t.rotation = Quaternion.identity;
+                t.localScale = Vector3.one;
+
                 bool flipAntiDiag = layerData.FlippedAntiDiagonally(index);
                 bool rotated120 = layerData.RotatedHexagonal120(index);
-                if (flipAntiDiag) rot *= Quaternion.AngleAxis(180, Vector2.one);
+                Vector3 center = size * 0.5f;
+                if (layerData.FlippedHorizontally(index)) {
+                    t.RotateAround(center, Vector3.up, 180); 
+                }
+                
+                if (layerData.FlippedVertically(index)) {
+                    t.RotateAround(center, Vector3.right, 180); 
+                }
+
+                if (layerData.FlippedAntiDiagonally(index) && tmxFile.orientation != "hexagonal") {
+                    t.RotateAround(center, Vector2.one, 180); 
+                }
+
                 if (rotated120 || (flipAntiDiag && tmxFile.orientation == "hexagonal")) {
                     float angle = rotated120 ? 120 : 0;
                     angle += flipAntiDiag ? 60 : 0;
-                    Quaternion spin = Quaternion.AngleAxis(-angle, Vector3.forward);
-                    rot *= spin;
-                    off -= spin * size * 0.5f;
+                    t.RotateAround(center, Vector3.forward, -angle);
                 }
 
-                Matrix4x4 matrix = Matrix4x4.TRS(off, rot, Vector3.one);
-                tilemap.SetTransformMatrix(pos, matrix);
+                tilemap.SetTransformMatrix(pos, t.localToWorldMatrix);
             }
         }
+        GameObject.DestroyImmediate(temp);
     }
 
     public void CreateObjectGroup (Tiled.ObjectGroup groupData, GameObject layer) {

@@ -11,6 +11,7 @@ public class TSXFileImporter : ScriptedImporter {
 
     public int pixelsPerUnit = -1;
     public string tmxFilePath;
+    public Tiled.TileSet tileSet;
 
     static Texture2D _icon;
     static Texture2D icon { 
@@ -34,9 +35,13 @@ public class TSXFileImporter : ScriptedImporter {
         return tex;
     }
 
+    void OnEnable () {
+        tileSet = Tiled.TileSet.Load(assetPath);
+    }
+
     public override void OnImportAsset(AssetImportContext ctx) {
         string name = Path.GetFileNameWithoutExtension(ctx.assetPath);
-        Tiled.TileSet tileSet = Tiled.TileSet.Load(ctx.assetPath);
+        tileSet = Tiled.TileSet.Load(ctx.assetPath);
         if (pixelsPerUnit < 0) pixelsPerUnit = tileSet.tileHeight;
 
         GameObject gameObject = new GameObject(tileSet.name);
@@ -77,7 +82,8 @@ public class TSXFileImporter : ScriptedImporter {
                     Tiled.Tile tiledTile = tileSet.GetTile(gid);
                     tiledTile.id = id;
                     Tiled.TileRect r = tileSet.GetTileSpriteRect(gid);
-                    float rectOff = (tex.height % r.height+tileSet.spacing) - tileSet.margin;
+                    Debug.Log("x:" + r.x + ", y" + r.y + ", w" + r.width + ", h" + r.height);
+                    float rectOff = (tex.height % (r.height+tileSet.spacing)) - tileSet.margin;
                     Rect rect = new Rect(r.x, r.y+rectOff, r.width, r.height);
                     Tile unityTile = AddTile(ctx, tileSet.name + "_" + x + "," + y, tileSet, tiledTile, tex, rect);
                     tilemap.SetTile(new Vector3Int(x,rows-1-y,0), unityTile); 

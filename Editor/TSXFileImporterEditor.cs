@@ -57,6 +57,17 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
         }
     }
 
+    protected override void Apply() {
+        base.Apply();
+        
+        for (int i = 0; i < targets.Length; i++) {
+            TSXFileImporter importer = (TSXFileImporter)targets[i];
+            if (importer.tileSet == null) continue;
+            string path = importer.assetPath;
+            importer.tileSet.Save(path);        
+        }
+    }
+
     public override void OnInspectorGUI() {
         base.OnInspectorGUI();
 
