@@ -82,6 +82,8 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
         if (GUILayout.Button("Update Texture Padding")) UpdateTexturePadding();   
 
         GUI.enabled = true;
+        if (!tsxFile.imageSpecified) return;
+        
         bool hasTransparency = EditorGUILayout.Toggle("Set Color to Transparent", tsxFile.image.transSpecified);
         if (!hasTransparency && tsxFile.image.transSpecified) {
             tsxFile.image.trans = null;

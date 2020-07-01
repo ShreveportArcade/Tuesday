@@ -74,6 +74,8 @@ public class TSXFileImporter : ScriptedImporter {
 
             int columns = tileSet.columns;
             int rows = tileSet.rows;
+            float rectOffset = tex.height - (tileSet.rows * (tileSet.tileHeight+tileSet.spacing) + tileSet.margin);
+            if (rectOffset < 0) rectOffset  =0;
             for (int y = 0; y < rows; y++) {
                 for (int x = 0; x < columns; x++) {
                     int id = y * columns + x;
@@ -82,8 +84,7 @@ public class TSXFileImporter : ScriptedImporter {
                     Tiled.Tile tiledTile = tileSet.GetTile(gid);
                     tiledTile.id = id;
                     Tiled.TileRect r = tileSet.GetTileSpriteRect(gid);
-                    float rectOff = (tex.height % (r.height+tileSet.spacing)) - tileSet.margin;
-                    Rect rect = new Rect(r.x, r.y+rectOff, r.width, r.height);
+                    Rect rect = new Rect(r.x, r.y+rectOffset, r.width, r.height);
                     Tile unityTile = AddTile(ctx, tileSet.name + "_" + x + "," + y, tileSet, tiledTile, tex, rect);
                     tilemap.SetTile(new Vector3Int(x,rows-1-y,0), unityTile); 
                 }
