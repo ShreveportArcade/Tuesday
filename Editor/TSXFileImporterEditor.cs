@@ -52,7 +52,7 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
         base.OnEnable();
         spacing = tsxFile.spacing;
         margin = tsxFile.margin;
-        if (tsxFile.imageSpecified && tsxFile.image.transSpecified) {
+        if (tsxFile.imageSpecified && tsxFile.image != null && tsxFile.image.transSpecified) {
             transparentColor = TMXFileImporter.TiledColorFromString(tsxFile.image.trans);
         }
     }
@@ -82,7 +82,7 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
         if (GUILayout.Button("Update Texture Padding")) UpdateTexturePadding();   
 
         GUI.enabled = true;
-        if (!tsxFile.imageSpecified) return;
+        if (!tsxFile.imageSpecified && tsxFile.image != null) return;
         
         bool hasTransparency = EditorGUILayout.Toggle("Set Color to Transparent", tsxFile.image.transSpecified);
         if (!hasTransparency && tsxFile.image.transSpecified) {

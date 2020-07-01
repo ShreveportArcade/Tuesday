@@ -63,6 +63,10 @@ public class TSXFileImporter : ScriptedImporter {
         if (tileSet.image != null && !string.IsNullOrEmpty(tileSet.image.source)) {
             string texturePath = Path.Combine(Path.GetDirectoryName(ctx.assetPath), tileSet.image.source);
             Texture2D tex = GetImageTexture(tileSet.image, texturePath);
+            if (tex == null) {
+                Debug.LogWarning("No texture found at " + texturePath);
+                return;
+            }
             if (tileSet.columns == 0 || tileSet.rows == 0) {
                 if (tileSet.image.width == 0 || tileSet.image.height == 0) {
                     tileSet.image.width = tex.width;
@@ -93,8 +97,12 @@ public class TSXFileImporter : ScriptedImporter {
         else {
             for (int i = 0; i < tileSet.tiles.Length; i++) {
                 Tiled.Tile tiledTile = tileSet.tiles[i];
-                string tileSetPath = Path.Combine(Path.GetDirectoryName(ctx.assetPath), tiledTile.image.source);
-                Texture2D tex = GetImageTexture(tiledTile.image, tileSetPath);
+                string texturePath = Path.Combine(Path.GetDirectoryName(ctx.assetPath), tiledTile.image.source);
+                Texture2D tex = GetImageTexture(tiledTile.image, texturePath);
+                if (tex == null) {
+                    Debug.LogWarning("No texture found at " + texturePath);
+                    continue;
+                }
                 Rect rect = new Rect(0, 0, tex.width, tex.height);
                 Tile unityTile = AddTile(ctx, tex.name + "_" + i, tileSet, tiledTile, tex, rect);
                 tilemap.SetTile(new Vector3Int(i,0,0), unityTile);
