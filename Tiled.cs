@@ -632,7 +632,7 @@ public class Tile {
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
-    [XmlElement("animation", typeof(Frame))] public Frame[] animation;
+    [XmlArray("animation")] [XmlArrayItem("frame", typeof(Frame))] public Frame[] animation;
     [XmlElement("image", typeof(Image))] public Image image;
     [XmlIgnore] public bool imageSpecified { get { return image != null && !string.IsNullOrEmpty(image.source); } set {} }
     [XmlElement("objectgroup", typeof(ObjectGroup))] public ObjectGroup objectGroup;

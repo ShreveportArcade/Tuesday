@@ -82,7 +82,6 @@ public class TSXFileImporter : ScriptedImporter {
                     Tiled.Tile tiledTile = tileSet.GetTile(gid);
                     tiledTile.id = id;
                     Tiled.TileRect r = tileSet.GetTileSpriteRect(gid);
-                    Debug.Log("x:" + r.x + ", y" + r.y + ", w" + r.width + ", h" + r.height);
                     float rectOff = (tex.height % (r.height+tileSet.spacing)) - tileSet.margin;
                     Rect rect = new Rect(r.x, r.y+rectOff, r.width, r.height);
                     Tile unityTile = AddTile(ctx, tileSet.name + "_" + x + "," + y, tileSet, tiledTile, tex, rect);
@@ -101,24 +100,52 @@ public class TSXFileImporter : ScriptedImporter {
             }
         }
 
+        foreach (AnimatedTile animTile in animations.Keys) {
+            Tiled.Frame[] frames = animations[animTile];
+            animTile.sprites = new Sprite[frames.Length];
+            animTile.durations = new float[frames.Length];
+            for (int i = 0; i < frames.Length; i++) {
+                Tiled.Frame frame = frames[i];
+                animTile.durations[i] = frame.duration;
+                if (tiles.ContainsKey(frame.tileID)) {
+                    animTile.sprites[i] = tiles[frame.tileID].sprite;
+                }
+                else Debug.LogWarning("Tile " + frame.tileID + " mising. No sprite found for frame " + i);
+            }
+        }
+
+        foreach (Tile tile in tiles.Values) {
+            ctx.AddObjectToAsset(tile.name, tile);
+        }
+
         if (!string.IsNullOrEmpty(tmxFilePath)) {
             AssetDatabase.ImportAsset(tmxFilePath);
         }
     }
 
+    Dictionary <AnimatedTile, Tiled.Frame[]> animations = new Dictionary<AnimatedTile, Tiled.Frame[]>();
+    Dictionary <int, Tile> tiles = new Dictionary<int, Tile>();
     Tile AddTile (AssetImportContext ctx, string spriteName, Tiled.TileSet tileSet, Tiled.Tile tiledTile, Texture2D tex, Rect rect) {
         Sprite sprite = Sprite.Create(tex, rect, Vector2.zero, pixelsPerUnit, 0, SpriteMeshType.FullRect);
         sprite.name = spriteName;
         bool phys = AddPhysicsToSprite(tiledTile, sprite);
         ctx.AddObjectToAsset(sprite.name,  sprite);
 
-        Tile unityTile = ScriptableObject.CreateInstance<Tile>();
-        unityTile.name = tileSet.name + "_" + tiledTile.id;
-        unityTile.sprite = sprite;
-        if (!phys) unityTile.colliderType = Tile.ColliderType.None;
-        ctx.AddObjectToAsset(unityTile.name, unityTile);
+        Tile tile = null;
+        if (tiledTile.animation == null || tiledTile.animation.Length == 0) {
+            tile = ScriptableObject.CreateInstance<Tile>();
+        }
+        else {
+            AnimatedTile animTile = ScriptableObject.CreateInstance<AnimatedTile>();
+            animations[animTile] = tiledTile.animation;
+            tile = animTile;
+        }
+        tile.sprite = sprite;
+        tile.name = tileSet.name + "_" + tiledTile.id;
+        if (!phys) tile.colliderType = Tile.ColliderType.None;
+        tiles[tiledTile.id] = tile;
         
-        return unityTile;
+        return tile;
     }
 
     bool AddPhysicsToSprite (Tiled.Tile tile, Sprite sprite) {
