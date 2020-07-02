@@ -30,9 +30,8 @@ using System.Linq;
 public class TMXFileExporter : Editor {
 
     Grid grid { get { return target as Grid; } }
-    int pixelsPerUnit {
-        get { return 32; }
-    }
+
+    int pixelsPerUnit = -1;
 
     string _tmxFilepath;
     string tmxFilePath {
@@ -117,7 +116,13 @@ public class TMXFileExporter : Editor {
 
     int globalLayerID;
     void SaveTMX (string tmxFilePath) {
-        Tiled.TMXFile tmxFile = new Tiled.TMXFile();
+        Tiled.TMXFile tmxFile = Tiled.TMXFile.Load(this.tmxFilePath);
+        if (tmxFile == null) {
+            tmxFile = new Tiled.TMXFile();
+            Debug.Log("TODO: calculate pixelsPerUnit from referenced textures");
+            tmxFile.tileHeight = 32;
+        }
+        if (pixelsPerUnit < 0) pixelsPerUnit = tmxFile.tileHeight;
         tmxFile.orientation = GetOrientation();
         tmxFile.renderOrder = GetRenderOrder(tmxFile.orientation);
         BoundsInt bounds = GetBounds();
@@ -127,10 +132,10 @@ public class TMXFileExporter : Editor {
         tmxFile.tileWidth = size.x;
         tmxFile.tileHeight = size.y;
         tmxFile.hexSideLength = size.z;
-        tmxFile.staggerAxis = null;
-        tmxFile.staggerIndex = null;
-        tmxFile.backgroundColor = null;
-        tmxFile.nextObjectID = 0;
+        // tmxFile.staggerAxis = null;
+        // tmxFile.staggerIndex = null;
+        // tmxFile.backgroundColor = null;
+        // tmxFile.nextObjectID = 0;
         tmxFile.tileSets = GetTileSets(bounds, tmxFilePath);
         globalLayerID = 0;
         tmxFile.layers = CreateLayers(grid.transform);

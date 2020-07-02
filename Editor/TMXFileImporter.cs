@@ -106,7 +106,7 @@ public class TMXFileImporter : ScriptedImporter {
     public static GridLayout.CellLayout GetCellLayout (Tiled.TMXFile tmxFile) {
         if (tmxFile.orientation == "hexagonal") return GridLayout.CellLayout.Hexagon;
         else if (tmxFile.orientation == "isometric") return GridLayout.CellLayout.Isometric;
-        else if (tmxFile.orientation == "staggered") return GridLayout.CellLayout.Isometric;//ZAsY;
+        else if (tmxFile.orientation == "staggered") return GridLayout.CellLayout.IsometricZAsY;
         return GridLayout.CellLayout.Rectangle;
     }
 
@@ -175,9 +175,9 @@ public class TMXFileImporter : ScriptedImporter {
         return TilemapRenderer.SortOrder.TopLeft;
     }
 
-
+    GameObject temp;
     public void CreateTileLayer (Tiled.TileLayer layerData, GameObject layer) {
-        GameObject temp = new GameObject("TEMP");
+        temp = new GameObject("TEMP");
 
         Tilemap tilemap = layer.AddComponent<Tilemap>();
         tilemap.tileAnchor = new Vector3(0,0,0);
@@ -196,81 +196,104 @@ public class TMXFileImporter : ScriptedImporter {
         c.a *= layerData.opacity;
         tilemap.color = c;
 
+        if (tmxFile.infinite) {
+            int right = int.MinValue;
+            foreach (Tiled.Chunk chunk in layerData.tileData.chunks) {
+                if (chunk.x + chunk.width > right) right = chunk.x + chunk.width;
+            }
+            int top = tmxFile.height;
+            right += tmxFile.width;
+
+            foreach (Tiled.Chunk chunk in layerData.tileData.chunks) {
+                for (int y = 0; y < chunk.height; y++) {
+                    for (int x = 0; x < chunk.width; x++) {
+                        SetTile(layerData, tilemap, x + chunk.x, y + chunk.y, right, top);
+                    }
+                }
+            }
+        }
+        else {
+            for (int y = 0; y < tmxFile.height; y++) {
+                for (int x = 0; x < tmxFile.width; x++) {
+                    SetTile(layerData, tilemap, x, y, tmxFile.width, tmxFile.height);
+                }
+            }
+        }
+        GameObject.DestroyImmediate(temp);
+        temp = null;
+    }
+
+    public void SetTile (Tiled.TileLayer layerData, Tilemap tilemap, int x, int y, int right, int top) {
         Vector3 size = GetCellSize();
         float h = size.magnitude * 0.5f;
         bool staggerX = tmxFile.staggerAxis == "x";
         int staggerIndex = (tmxFile.staggerAxis == "even") ? 0 : 1;
-        int rows = tmxFile.height;
-        int columns = tmxFile.width;
-        for (int y = 0; y < rows; y++) {
-            for (int x = 0; x < columns; x++) {
-                int tileID = layerData.GetTileID(x, y);
-                if (tileID == 0 || !tiles.ContainsKey(tileID)) continue;
-                Tile tile = tiles[tileID];
-                Vector3Int pos = new Vector3Int(x, rows-1-y, 0);
-                if (tmxFile.orientation == "isometric") {
-                    pos = new Vector3Int(rows-1-y, columns-1-x, 0);
-                }
-                else if (tmxFile.orientation == "staggered") {
-                    if (staggerX) {
-                        pos.x -= y;
-                        if (x % 2 == staggerIndex) pos.x++;
-                    }
-                    else {
-                        pos.y = (rows-1-y)/2-x;
-                        pos.x = 2*x+pos.y;
-                        if (y % 2 == staggerIndex) pos.y--;
-                    }
-                }
-                else if (tmxFile.orientation == "hexagonal") {
-                    if (staggerX) {//x % 2 != staggerIndex) {
-                        pos = new Vector3Int(rows-1-y, x, 0);
-                        if (x % 2 != staggerIndex) pos.x++;
-                    }
-                    else if (y % 2 != staggerIndex) pos.x--;
-                }
-                tilemap.SetTile(pos, tile);
-
-                int index = x + y * columns;
-                Transform t = temp.transform;
-                t.position = Vector3.zero;
-                t.rotation = Quaternion.identity;
-                t.localScale = Vector3.one;
-
-                bool flipAntiDiag = layerData.FlippedAntiDiagonally(index);
-                bool rotated120 = layerData.RotatedHexagonal120(index);
-                Vector3 center = size * 0.5f;
-                if (layerData.FlippedHorizontally(index)) {
-                    t.RotateAround(center, Vector3.up, 180); 
-                }
-                
-                if (layerData.FlippedVertically(index)) {
-                    t.RotateAround(center, Vector3.right, 180); 
-                }
-
-                if (layerData.FlippedAntiDiagonally(index) && tmxFile.orientation != "hexagonal") {
-                    t.RotateAround(center, Vector2.one, 180); 
-                }
-
-                if (rotated120 || (flipAntiDiag && tmxFile.orientation == "hexagonal")) {
-                    float angle = rotated120 ? 120 : 0;
-                    angle += flipAntiDiag ? 60 : 0;
-                    t.RotateAround(center, Vector3.forward, -angle);
-                }
-
-                tilemap.SetTransformMatrix(pos, t.localToWorldMatrix);
+        
+        int tileID = layerData.GetTileID(x, y);
+        if (tileID == 0 || !tiles.ContainsKey(tileID)) return;
+        Tile tile = tiles[tileID];
+        Vector3Int pos = new Vector3Int(x, top-1-y, 0);
+        if (tmxFile.orientation == "isometric") {
+            pos = new Vector3Int(top-1-y, right-1-x, 0);
+        }
+        else if (tmxFile.orientation == "staggered") {
+            if (staggerX) {
+                pos.x -= y;
+                if (x % 2 == staggerIndex) pos.x++;
+            }
+            else {
+                pos.y = (top-1-y)/2-x;
+                pos.x = 2*x+pos.y;
+                if (y % 2 == staggerIndex) pos.y--;
             }
         }
-        GameObject.DestroyImmediate(temp);
+        else if (tmxFile.orientation == "hexagonal") {
+            if (staggerX) {//x % 2 != staggerIndex) {
+                pos = new Vector3Int(top-1-y, x, 0);
+                if (x % 2 != staggerIndex) pos.x++;
+            }
+            else if (y % 2 != staggerIndex) pos.x--;
+        }
+        tilemap.SetTile(pos, tile);
+
+        Transform t = temp.transform;
+        t.position = Vector3.zero;
+        t.rotation = Quaternion.identity;
+        t.localScale = Vector3.one;
+
+        bool flipAntiDiag = layerData.FlippedAntiDiagonally(x,y);
+        bool rotated120 = layerData.RotatedHexagonal120(x,y);
+        Vector3 center = size * 0.5f;
+        if (layerData.FlippedHorizontally(x,y)) {
+            t.RotateAround(center, Vector3.up, 180); 
+        }
+        
+        if (layerData.FlippedVertically(x,y)) {
+            t.RotateAround(center, Vector3.right, 180); 
+        }
+
+        if (layerData.FlippedAntiDiagonally(x,y) && tmxFile.orientation != "hexagonal") {
+            t.RotateAround(center, Vector2.one, 180); 
+        }
+
+        if (rotated120 || (flipAntiDiag && tmxFile.orientation == "hexagonal")) {
+            float angle = rotated120 ? 120 : 0;
+            angle += flipAntiDiag ? 60 : 0;
+            t.RotateAround(center, Vector3.forward, -angle);
+        }
+
+        tilemap.SetTransformMatrix(pos, t.localToWorldMatrix);
     }
 
     public void CreateObjectGroup (Tiled.ObjectGroup groupData, GameObject layer) {
         if (groupData.objects == null) return;
-
-        SortingGroup sortingGroup = layer.AddComponent<SortingGroup>();
-        sortingGroup.sortingOrder = layerIndex;
-
         bool isIndexOrdered = (groupData.drawOrder == "index");
+
+        if (!isIndexOrdered) {
+            SortingGroup sortingGroup = layer.AddComponent<SortingGroup>();
+            sortingGroup.sortingOrder = layerIndex;
+        }
+
         float w = tmxFile.tileWidth / pixelsPerUnit;
         float h = tmxFile.tileHeight / pixelsPerUnit;
         Dictionary<string, int> names = new Dictionary<string, int>();
@@ -281,7 +304,7 @@ public class TMXFileImporter : ScriptedImporter {
             if (!names.ContainsKey(name)) names[name] = 0;
             else name += (++names[name]).ToString();
             
-            int index = isIndexOrdered ? i : (int)(tileObject.y * 10);
+            int index = isIndexOrdered ? layerIndex++ : (int)(tileObject.y * 10);
             bool isPrefab = tileObject.properties != null && System.Array.Exists(tileObject.properties, (p) => p.name == "prefab");
             if (isPrefab) CreatePrefabTile(name, tileObject, layer, groupData.opacity, index);
             else CreateSpriteTile(name, tileObject, layer, groupData.opacity, index);

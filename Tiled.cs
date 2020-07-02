@@ -46,10 +46,13 @@ public class TMXFile {
     [XmlIgnore] public bool staggerIndexSpecified { get { return !string.IsNullOrEmpty(staggerIndex); } set {}}
     [XmlAttribute("backgroundcolor")] public string backgroundColor;
     [XmlIgnore] public bool backgroundColorSpecified { get { return !string.IsNullOrEmpty(backgroundColor); } set {}}
+    [XmlAttribute("infinite")] public int infiniteInt = -1;
+    [XmlIgnore] public bool infiniteIntSpecified { get { return infiniteInt > -1; } set {}}
+    [XmlIgnore] public bool infinite { get { return infiniteInt > 0; } }
     [XmlAttribute("nextobjectid")] public int nextObjectID = 0;
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
-    [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
+    [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set {} }
     
     [XmlElement("tileset", typeof(TileSet))] public TileSet[] tileSets;
 
@@ -59,12 +62,17 @@ public class TMXFile {
     [XmlElement("group", typeof(GroupLayer))]
     public List<Layer> layers;
 
+    [XmlElement("editorsettings", typeof(EditorSettings))] public EditorSettings editorSettings;
+    [XmlIgnore] public bool editorSettingsSpecified { get { return editorSettings != null; } set {} }
+
     public static TMXFile Load (string path) {
+        if (!File.Exists(Path.GetFullPath(path))) return null;
         XmlTextReader xmlReader = new XmlTextReader(path);
         return Load(xmlReader, path);
     }
 
     public static TMXFile Load (string text, string path) {
+        if (!File.Exists(Path.GetFullPath(path))) return null;
         TextReader textReader = new StringReader(text);
         XmlTextReader xmlReader = new XmlTextReader(textReader);
         return Load(xmlReader, path);
@@ -170,12 +178,6 @@ public class TMXFile {
         return tileSet.GetTile(tileID);
     }
 
-    public Tile GetTile (TileLayer layer, int index) {
-        int tileID = layer.tileIDs[index];
-        TileSet tileSet = GetTileSetByTileID(tileID);
-        return tileSet.GetTile(tileID);
-    }
-
     public Tile GetTile (TileSet tileSet, int tileID) {
         return tileSet.GetTile(tileID);
     }
@@ -217,6 +219,7 @@ public class TMXFile {
     public const uint FlippedVerticallyFlag = 0x40000000;
     public const uint FlippedAntiDiagonallyFlag = 0x20000000;
     public const uint RotatedHexagonal120Flag = 0x10000000;
+    public const uint FlagMask = ~(FlippedHorizontallyFlag | FlippedVerticallyFlag | FlippedAntiDiagonallyFlag | RotatedHexagonal120Flag);
 
     public static bool FlippedHorizontally (uint gid) {
         return (gid & FlippedHorizontallyFlag) == FlippedHorizontallyFlag;
@@ -433,154 +436,84 @@ public class ObjectGroup : Layer {
 public class TileLayer : Layer {
     [XmlElement("data", typeof(Data))] public Data tileData;
 
-    [XmlIgnore] public uint[] tileFlags;
-    [XmlIgnore] public int[] _tileIDs;
-    public int[] tileIDs {
+    [XmlIgnore] public int Length { get { return width * height; } }
+    [XmlIgnore] public uint this[int x, int y] {
         get {
-            if (tileFlags == null || tileFlags.Length != width * height) {
-                tileFlags = new uint[width * height];
-
-                if (tileData.encoding == "csv") {
-                    string[] tiles = tileData.contents.Split(',');
-                    for (int i = 0; i < tiles.Length; i++) {
-                        string id = tiles[i].Trim();
-                        if (string.IsNullOrEmpty(id)) tileFlags[i] = 0;
-                        else tileFlags[i] = uint.Parse(id);
-                    }
+            if (tileData.contentSpecified) {
+                if (tileData.contentData == null || tileData.contentData.Length != width * height) {
+                    tileData.Decode(width, height);
                 }
-                else if (tileData.encoding == "base64") {
-                    if (tileData.compression == "zstd") {
-                        Console.WriteLine("Error: Zstandard not yet supported.");
-                        return null;
-                    }
-
-                    byte[] bytes = Convert.FromBase64String(tileData.contents);
-                    Stream stream = new MemoryStream(bytes, false);
-
-                    if (tileData.compression == "gzip") {
-                        stream = new GZipStream(stream, CompressionMode.Decompress);
-                    }
-                    else if (tileData.compression == "zlib") {
-                        stream = new MemoryStream(bytes, 2, bytes.Length-2, false);
-                        stream = new DeflateStream(stream, CompressionMode.Decompress);
-                    }
-                    
-                    using (BinaryReader binaryReader = new BinaryReader(stream)) {
-                        for (int j = 0; j < height; j++) {
-                            for (int i = 0; i < width; i++) {
-                                tileFlags[i + j * width] = binaryReader.ReadUInt32();
-                            }
-                        }
-                    }
-
-                    stream.Dispose();
-                }
+                return tileData.contentData[x + y * width];
             }
-
-            if (_tileIDs == null || _tileIDs.Length != width * height) {
-                _tileIDs = new int[width * height];
-                for (int i = 0; i < _tileIDs.Length; i++) {
-                    uint id = tileFlags[i];
-                    id &= ~(TMXFile.FlippedHorizontallyFlag | TMXFile.FlippedVerticallyFlag | TMXFile.FlippedAntiDiagonallyFlag | TMXFile.RotatedHexagonal120Flag);
-                    _tileIDs[i] = (int)id;
+            else {
+                for (int i = 0; i < tileData.chunks.Length; i++) {
+                    Chunk c = tileData.chunks[i];
+                    if (x >= c.x && x < c.x + c.width && y >= c.y && y < c.y + c.height) {
+                        if (c.contentData == null) tileData.Decode(c);
+                        return c.contentData[(x-c.x) + (y-c.y) * c.width];
+                    }
                 }
+                return 0;
             }
-
-            return _tileIDs;
         }
-    }
-
-    public void SetTileID (int id, int x, int y, uint flags = 0) {
-        int index = x + y * width;
-        tileIDs[index] = id;
-        tileFlags[index] = (uint)id | flags;
+        set {
+            if (tileData.contentSpecified) {
+                if (tileData.contentData == null || tileData.contentData.Length != width * height) {
+                    tileData.Decode(width, height);
+                }
+                tileData.contentData[x + y * width] = value;
+            }
+            else {
+                for (int i = 0; i < tileData.chunks.Length; i++) {
+                    Chunk c = tileData.chunks[i];
+                    if (x >= c.x && x < c.x + c.width && y >= c.y && y < c.y + c.height) {
+                        if (c.contentData == null) tileData.Decode(c);
+                        c.contentData[(x-c.x) + (y-c.y) * c.width] = value;
+                        return;
+                    }
+                }
+                Chunk chunk = new Chunk();
+                chunk.width = tileData.chunks[0].width;
+                chunk.height = tileData.chunks[0].height;
+                chunk.x = (int)Math.Floor((double)x / (double)chunk.width) * chunk.width;
+                chunk.y = (int)Math.Floor((double)y / (double)chunk.height) * chunk.height;
+                
+                chunk.contentData = new uint[chunk.width * chunk.height];
+                int index = (x-chunk.x) + (y-chunk.y) * chunk.width;
+                chunk.contentData[index] = value;
+                Array.Resize(ref tileData.chunks, tileData.chunks.Length+1);
+                tileData.chunks[tileData.chunks.Length-1] = chunk;
+            }
+        }
     }
 
     public void Encode () {
-        if (tileData.encoding == "csv") {
-            string csv = "";
-            for (int j = 0; j < height; j++) {
-                csv += "\n";
-                for (int i = 0; i < width; i++) {
-                    csv += tileFlags[i + j * width] + ",";
-                }
-            }
-            csv = csv.TrimEnd(',');
-            csv += "\n";
-            tileData.contents = csv;	
-        }
-        else if (tileData.encoding == "base64") {
-            MemoryStream stream = new MemoryStream();
-            using (BinaryWriter binaryWriter = new BinaryWriter(stream)){
-                for (int j = 0; j < height; j++) {
-                    for (int i = 0; i < width; i++) {
-                        binaryWriter.Write(tileFlags[i + j * width]);
-                    }
-                }
-            }
+        if (tileData.contentSpecified) tileData.Encode(width, height);
+        else foreach (Chunk chunk in tileData.chunks) tileData.Encode(chunk);
+    }
 
-            byte[] bytes = stream.ToArray();
-            if (tileData.compression == "gzip") {
-                using (MemoryStream compress = new MemoryStream()) {
-                    using (GZipStream gzip = new GZipStream(compress, CompressionMode.Compress)) {
-                        gzip.Write(bytes, 0, bytes.Length);
-                    }
-                    bytes = compress.ToArray();
-                }
-            }
-            else if (tileData.compression == "zlib") {
-                using (MemoryStream compress = new MemoryStream()) {
-                    using (DeflateStream zlib = new DeflateStream(compress, CompressionMode.Compress)) {
-                        zlib.Write(bytes, 0, bytes.Length);
-                    }					
-                    UInt32 a = 1;
-                    UInt32 b = 0;
-                    for (int i = 0; i < bytes.Length; i++) {
-                        a = (a + bytes[i]) % 65521;
-                        b = (b + a) % 65521;
-                    }
-                    UInt32 alder = (b << 16) | a;
-
-                    byte[] compressedBytes = compress.ToArray();
-                    int len = compressedBytes.Length;
-                    bytes = new byte[len+6];
-                    Array.ConstrainedCopy(compressedBytes, 0, bytes, 2, len);
-                    
-                    // first 2 bytes - zlib header for default compression
-                    bytes[0] = 0x78;
-                    bytes[1] = 0x9C;
-                    
-                    // last 4 bytes - alder32 checksum
-                    bytes[len+2] = (byte)((alder>>24) & 0xFF);
-                    bytes[len+3] = (byte)((alder>>16) & 0xFF);
-                    bytes[len+4] = (byte)((alder>>8) & 0xFF);
-                    bytes[len+5] = (byte)(alder & 0xFF);
-                }
-            }
-            
-            tileData.contents = Convert.ToBase64String(bytes);
-            stream.Dispose();
-        }
+    public void SetTileID (int id, int x, int y, uint flags = 0) {
+        this[x, y] = (uint)id | flags;
     }
 
     public int GetTileID (int x, int y) {
-        return tileIDs[x + y * width];
+        return (int)(this[x, y] & TMXFile.FlagMask);
     }
 
-    public bool FlippedHorizontally (int index) {
-        return TMXFile.FlippedHorizontally(tileFlags[index]);
+    public bool FlippedHorizontally (int x, int y) {
+        return TMXFile.FlippedHorizontally(this[x, y]);
     }
 
-    public bool FlippedVertically (int index) {
-        return TMXFile.FlippedVertically(tileFlags[index]);
+    public bool FlippedVertically (int x, int y) {
+        return TMXFile.FlippedVertically(this[x, y]);
     }
 
-    public bool FlippedAntiDiagonally (int index) {
-        return TMXFile.FlippedAntiDiagonally(tileFlags[index]);
+    public bool FlippedAntiDiagonally (int x, int y) {
+        return TMXFile.FlippedAntiDiagonally(this[x, y]);
     }
 
-    public bool RotatedHexagonal120 (int index) {
-        return TMXFile.RotatedHexagonal120(tileFlags[index]);
+    public bool RotatedHexagonal120 (int x, int y) {
+        return TMXFile.RotatedHexagonal120(this[x, y]);
     }
 
     public TilePoint GetTileLocation (int index) {
@@ -657,7 +590,7 @@ public class Image {
 
     [XmlElement("data", typeof(Data))] public Data data;
     [XmlIgnore] public bool dataSpecified { 
-        get { return data != null && !string.IsNullOrEmpty(data.contents); } 
+        get { return data != null && !string.IsNullOrEmpty(data.content); } 
         set {} 
     }
 }
@@ -669,7 +602,145 @@ public class Data {
     [XmlAttribute("compression")] public string compression;
     [XmlIgnore] public bool compressionSpecified { get { return !string.IsNullOrEmpty(compression); } set{} }
 
-    [XmlText] public string contents = "";
+    [XmlElement("chunk", typeof(Chunk))] public Chunk[] chunks;
+    [XmlIgnore] public bool chunksSpecified { get { return chunks != null && chunks.Length > 0; } set{} }
+
+    [XmlText] public string content;
+    [XmlIgnore] public bool contentSpecified { get { return !string.IsNullOrEmpty(content); } set{} }
+    [XmlIgnore][NonSerialized] public uint[] contentData;
+
+    public void Encode (int width, int height) {
+        content = Encode(contentData, width, height);
+    }
+
+    public void Encode (Chunk chunk) {
+        chunk.content = Encode(chunk.contentData, chunk.width, chunk.height);
+    }
+
+    string Encode (uint[] data, int width, int height) {
+        string dataString = "";
+        if (encoding == "csv") {
+            string csv = "";
+            for (int j = 0; j < height; j++) {
+                csv += "\n";
+                for (int i = 0; i < width; i++) {
+                    csv += data[i + j * width] + ",";
+                }
+            }
+            csv = csv.TrimEnd(',');
+            csv += "\n";
+            dataString = csv;
+        }
+        else if (encoding == "base64") {
+            MemoryStream stream = new MemoryStream();
+            using (BinaryWriter binaryWriter = new BinaryWriter(stream)){
+                for (int j = 0; j < height; j++) {
+                    for (int i = 0; i < width; i++) {
+                        binaryWriter.Write(data[i + j * width]);
+                    }
+                }
+            }
+
+            byte[] bytes = stream.ToArray();
+            if (compression == "gzip") {
+                using (MemoryStream compress = new MemoryStream()) {
+                    using (GZipStream gzip = new GZipStream(compress, CompressionMode.Compress)) {
+                        gzip.Write(bytes, 0, bytes.Length);
+                    }
+                    bytes = compress.ToArray();
+                }
+            }
+            else if (compression == "zlib") {
+                using (MemoryStream compress = new MemoryStream()) {
+                    using (DeflateStream zlib = new DeflateStream(compress, CompressionMode.Compress)) {
+                        zlib.Write(bytes, 0, bytes.Length);
+                    }
+                    UInt32 a = 1;
+                    UInt32 b = 0;
+                    for (int i = 0; i < bytes.Length; i++) {
+                        a = (a + bytes[i]) % 65521;
+                        b = (b + a) % 65521;
+                    }
+                    UInt32 alder = (b << 16) | a;
+
+                    byte[] compressedBytes = compress.ToArray();
+                    int len = compressedBytes.Length;
+                    bytes = new byte[len+6];
+                    Array.ConstrainedCopy(compressedBytes, 0, bytes, 2, len);
+                    
+                    // first 2 bytes - zlib header for default compression
+                    bytes[0] = 0x78;
+                    bytes[1] = 0x9C;
+                    
+                    // last 4 bytes - alder32 checksum
+                    bytes[len+2] = (byte)((alder>>24) & 0xFF);
+                    bytes[len+3] = (byte)((alder>>16) & 0xFF);
+                    bytes[len+4] = (byte)((alder>>8) & 0xFF);
+                    bytes[len+5] = (byte)(alder & 0xFF);
+                }
+            }
+            
+            dataString = Convert.ToBase64String(bytes);
+            stream.Dispose();
+        }
+        return dataString;
+    }
+
+    public void Decode (int width, int height) {
+        contentData = Decode(content, width, height);
+    }
+
+    public void Decode (Chunk chunk) {
+        chunk.contentData = Decode(chunk.content, chunk.width, chunk.height);
+    }
+    
+    uint[] Decode (string dataString, int width, int height) {
+        uint[] data = new uint[width * height];
+
+        if (encoding == "csv") {
+            string[] tiles = dataString.Split(',');
+            for (int i = 0; i < tiles.Length; i++) {
+                string id = tiles[i].Trim();
+                if (string.IsNullOrEmpty(id)) data[i] = 0;
+                else data[i] = uint.Parse(id);
+            }
+        }
+        else if (encoding == "base64") {
+            byte[] bytes = Convert.FromBase64String(dataString);
+            Stream stream = new MemoryStream(bytes, false);
+
+            if (compression == "gzip") {
+                stream = new GZipStream(stream, CompressionMode.Decompress);
+            }
+            else if (compression == "zlib") {
+                stream = new MemoryStream(bytes, 2, bytes.Length-2, false);
+                stream = new DeflateStream(stream, CompressionMode.Decompress);
+            }
+            
+            using (BinaryReader binaryReader = new BinaryReader(stream)) {
+                for (int j = 0; j < height; j++) {
+                    for (int i = 0; i < width; i++) {
+                        data[i + j * width] = binaryReader.ReadUInt32();
+                    }
+                }
+            }
+
+            stream.Dispose();
+        }
+        return data;
+    }
+}
+
+[System.Serializable]
+public class Chunk {
+    [XmlAttribute("x")] public int x;
+    [XmlAttribute("y")] public int y;
+    [XmlAttribute("width")] public int width;
+    [XmlAttribute("height")] public int height;
+
+    [XmlText] public string content;
+    [XmlIgnore] public bool contentSpecified { get { return !string.IsNullOrEmpty(content); } set{} }
+    [XmlIgnore][NonSerialized] public uint[] contentData;
 }
 
 [System.Serializable]
@@ -804,5 +875,25 @@ public class WangTile {
             }
         }
     }
+}
+
+[System.Serializable]
+public class ChunkSize {
+    [XmlAttribute("width")] public int width = 16;
+    [XmlAttribute("height")] public int height = 16;
+}
+
+[System.Serializable]
+public class Export {
+    [XmlAttribute("target")] public string target;
+    [XmlAttribute("format")] public string format;
+}
+
+[System.Serializable]
+public class EditorSettings {
+    [XmlElement("chunksize", typeof(ChunkSize))] public ChunkSize chunkSize;
+    [XmlIgnore] public bool chunkSizeSpecified { get { return chunkSize != null && (chunkSize.width != 16 || chunkSize.height != 16); } set {} }
+    [XmlElement("export", typeof(Export))] public Export export;
+    [XmlIgnore] public bool exportSpecified { get { return export != null; } set {} }
 }
 }
