@@ -439,7 +439,7 @@ public class TileLayer : Layer {
     [XmlIgnore] public int Length { get { return width * height; } }
     [XmlIgnore] public uint this[int x, int y] {
         get {
-            if (tileData.contentSpecified) {
+            if (tileData.chunks == null) {
                 if (tileData.contentData == null || tileData.contentData.Length != width * height) {
                     tileData.Decode(width, height);
                 }
@@ -457,7 +457,7 @@ public class TileLayer : Layer {
             }
         }
         set {
-            if (tileData.contentSpecified) {
+            if (tileData.chunks == null) {
                 if (tileData.contentData == null || tileData.contentData.Length != width * height) {
                     tileData.Decode(width, height);
                 }
@@ -488,7 +488,7 @@ public class TileLayer : Layer {
     }
 
     public void Encode () {
-        if (tileData.contentSpecified) tileData.Encode(width, height);
+        if (tileData.chunks == null) tileData.Encode(width, height);
         else foreach (Chunk chunk in tileData.chunks) tileData.Encode(chunk);
     }
 

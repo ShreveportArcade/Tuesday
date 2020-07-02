@@ -115,8 +115,9 @@ public class TMXFileExporter : Editor {
     }
 
     int globalLayerID;
+    Tiled.TMXFile tmxFile;
     void SaveTMX (string tmxFilePath) {
-        Tiled.TMXFile tmxFile = Tiled.TMXFile.Load(this.tmxFilePath);
+        tmxFile = Tiled.TMXFile.Load(this.tmxFilePath);
         if (tmxFile == null) {
             tmxFile = new Tiled.TMXFile();
             Debug.Log("TODO: calculate pixelsPerUnit from referenced textures");
@@ -126,8 +127,10 @@ public class TMXFileExporter : Editor {
         tmxFile.orientation = GetOrientation();
         tmxFile.renderOrder = GetRenderOrder(tmxFile.orientation);
         BoundsInt bounds = GetBounds();
-        tmxFile.width = bounds.size.x;
-        tmxFile.height = bounds.size.y;
+        if (!tmxFile.infinite) {
+            tmxFile.width = bounds.size.x;
+            tmxFile.height = bounds.size.y;
+        }
         Vector3Int size = GetTileSize(tmxFile.orientation);
         tmxFile.tileWidth = size.x;
         tmxFile.tileHeight = size.y;
@@ -179,40 +182,35 @@ public class TMXFileExporter : Editor {
     }
 
     Tiled.TileLayer CreateTileLayer (Transform t) {
-        Tiled.TileLayer layer = new Tiled.TileLayer();
-        layer.tileData = new Tiled.Data();
         Tilemap tilemap = t.GetComponent<Tilemap>();
+        Tiled.TileLayer layer = new Tiled.TileLayer();
         BoundsInt bounds = tilemap.cellBounds;
+        layer.tileData = new Tiled.Data();
+        if (tmxFile.infinite) {
+            Tiled.Chunk chunk = new Tiled.Chunk();
+            chunk.width = 16;
+            chunk.height = 16;
+            if (tmxFile.editorSettingsSpecified && tmxFile.editorSettings.chunkSizeSpecified) {
+                chunk.width = tmxFile.editorSettings.chunkSize.width;
+                chunk.height = tmxFile.editorSettings.chunkSize.height;
+            }
+            chunk.contentData = new uint[chunk.width * chunk.height];
+            layer.tileData.chunks = new Tiled.Chunk[]{chunk};
+        }
+        else {
+            layer.width = bounds.size.x;
+            layer.height = bounds.size.y;
+            layer.tileData.contentData = new uint[layer.width * layer.height];
+        }
+
         TileBase[] tiles = tilemap.GetTilesBlock(bounds);
-        layer.width = bounds.size.x;
-        layer.height = bounds.size.y;
-        for (int j = 0; j < layer.height; j++) {
-            for (int i = 0; i < layer.width; i++) {
-                TileBase tile = tiles[j*layer.width+i];
+        for (int j = 0; j < bounds.size.y; j++) {
+            for (int i = 0; i < bounds.size.x; i++) {
+                TileBase tile = tiles[j*bounds.size.x+i];
                 int id = tile ? tileGIDs[tile] : 0;
 
-                int x = i;
-                int y = layer.height-1-j;
-                // if (tmxFile.orientation == "isometric") {
-                //     pos = new Vector3Int(rows-1-y, columns-1-x, 0);
-                // }
-                // else if (tmxFile.orientation == "staggered") {
-                //     if (staggerX) {
-                //         pos.x -= y;
-                //         if (x % 2 == staggerIndex) pos.x++;
-                //     }
-                //     else {
-                //         pos.y = (rows-1-y)/2-x;
-                //         pos.x = 2*x+pos.y;
-                //         if (y % 2 == staggerIndex) pos.y--;
-                //     }
-                // }
-                // else if (tmxFile.orientation == "hexagonal") {
-                //     if (staggerX && x % 2 != staggerIndex) pos.y--;
-                //     else if (!staggerX && y % 2 != staggerIndex) pos.x--;
-                // }
-
-
+                int x = i+bounds.x;
+                int y = tmxFile.height-1-(j+bounds.y);
                 layer.SetTileID(id, x, y);
             }
         }
