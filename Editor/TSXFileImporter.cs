@@ -79,7 +79,7 @@ public class TSXFileImporter : ScriptedImporter {
             int columns = tileSet.columns;
             int rows = tileSet.rows;
             float rectOffset = tex.height - (tileSet.rows * (tileSet.tileHeight+tileSet.spacing) + tileSet.margin);
-            if (rectOffset < 0) rectOffset  =0;
+            if (rectOffset < 0) rectOffset = 0;
             for (int y = 0; y < rows; y++) {
                 for (int x = 0; x < columns; x++) {
                     int id = y * columns + x;
@@ -89,7 +89,7 @@ public class TSXFileImporter : ScriptedImporter {
                     tiledTile.id = id;
                     Tiled.TileRect r = tileSet.GetTileSpriteRect(gid);
                     Rect rect = new Rect(r.x, r.y+rectOffset, r.width, r.height);
-                    Tile unityTile = AddTile(ctx, tileSet.name + "_" + x + "," + y, tileSet, tiledTile, tex, rect);
+                    Tile unityTile = AddTile(ctx, tileSet, tiledTile, tex, rect);
                     tilemap.SetTile(new Vector3Int(x,rows-1-y,0), unityTile); 
                 }
             }
@@ -104,7 +104,7 @@ public class TSXFileImporter : ScriptedImporter {
                     continue;
                 }
                 Rect rect = new Rect(0, 0, tex.width, tex.height);
-                Tile unityTile = AddTile(ctx, tex.name + "_" + i, tileSet, tiledTile, tex, rect);
+                Tile unityTile = AddTile(ctx, tileSet, tiledTile, tex, rect);
                 tilemap.SetTile(new Vector3Int(i,0,0), unityTile);
             }
         }
@@ -134,9 +134,9 @@ public class TSXFileImporter : ScriptedImporter {
 
     Dictionary <AnimatedTile, Tiled.Frame[]> animations = new Dictionary<AnimatedTile, Tiled.Frame[]>();
     Dictionary <int, Tile> tiles = new Dictionary<int, Tile>();
-    Tile AddTile (AssetImportContext ctx, string spriteName, Tiled.TileSet tileSet, Tiled.Tile tiledTile, Texture2D tex, Rect rect) {
+    Tile AddTile (AssetImportContext ctx, Tiled.TileSet tileSet, Tiled.Tile tiledTile, Texture2D tex, Rect rect) {
         Sprite sprite = Sprite.Create(tex, rect, Vector2.zero, pixelsPerUnit, 0, SpriteMeshType.FullRect);
-        sprite.name = spriteName;
+        sprite.name = tileSet.name + "_" + tiledTile.id;
         bool phys = AddPhysicsToSprite(tiledTile, sprite);
         ctx.AddObjectToAsset(sprite.name,  sprite);
 

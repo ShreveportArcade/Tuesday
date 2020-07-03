@@ -32,7 +32,6 @@ Tiled objects can be replaced with prefabs by adding a custom file property call
 
 ## Roadmap
  * Zstd encoding/decoding
- * edit/export Tiled Objects
  * Wang Tile and Terrain Brushes
- * Template Group (TGX) support
+ * Template Group (.tx) support
  * Map Editor Settings support

@@ -32,24 +32,34 @@ public class TMXFile {
     [XmlAttribute("version")] public string version = "1.0";
     [XmlAttribute("tiledversion")] public string tiledVersion;
     [XmlIgnore] public bool tiledVersionSpecified { get { return tiledVersion != null; } set { } }
+    
     [XmlAttribute("orientation")] public string orientation = "orthogonal";
     [XmlAttribute("renderorder")] public string renderOrder = "right-down";
     [XmlAttribute("width")] public int width = 0;
     [XmlAttribute("height")] public int height = 0;
     [XmlAttribute("tilewidth")] public int tileWidth = 0;
     [XmlAttribute("tileheight")] public int tileHeight = 0;
+    
     [XmlAttribute("hexsidelength")] public int hexSideLength;
     [XmlIgnore] public bool hexSideLengthSpecified { get { return (hexSideLength > 0); } set {}}
+    
     [XmlAttribute("staggeraxis")] public string staggerAxis;
     [XmlIgnore] public bool staggerAxisSpecified { get { return !string.IsNullOrEmpty(staggerAxis); } set {}}
+    
     [XmlAttribute("staggerindex")] public string staggerIndex;
     [XmlIgnore] public bool staggerIndexSpecified { get { return !string.IsNullOrEmpty(staggerIndex); } set {}}
+    
     [XmlAttribute("backgroundcolor")] public string backgroundColor;
     [XmlIgnore] public bool backgroundColorSpecified { get { return !string.IsNullOrEmpty(backgroundColor); } set {}}
+    
+    [XmlAttribute("nextlayerid")] public int nextLayerID = -1;
+    [XmlIgnore] public bool nextLayerIDSpecified { get { return nextLayerID > 0; } set{} }
+    
+    [XmlAttribute("nextobjectid")] public int nextObjectID = 0;
+    
     [XmlAttribute("infinite")] public int infiniteInt = -1;
     [XmlIgnore] public bool infiniteIntSpecified { get { return infiniteInt > -1; } set {}}
     [XmlIgnore] public bool infinite { get { return infiniteInt > 0; } }
-    [XmlAttribute("nextobjectid")] public int nextObjectID = 0;
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set {} }
@@ -282,6 +292,9 @@ public class TileSet {
         get { return (columns > 0) ? tileCount / columns : 0; } 
         set { tileCount = value * columns; }
     }
+
+    [XmlAttribute("objectalignment")] public string objectAlignment = "unspecified";
+    [XmlIgnore] public bool objectAlignmentSpecified { get { return objectAlignment != "unspecified"; } set {} }
 
     [XmlElement("tileoffset", typeof(TilePoint))] public TilePoint tileOffset;
     [XmlIgnore] public bool tileOffsetSpecified { 
@@ -805,8 +818,10 @@ public class TileObject {
     [XmlAttribute("rotation")] public float rotation;
     [XmlIgnore] public bool rotationSpecified { get { return rotation != 0; } set { } }
     [XmlAttribute("visible")] public int visibleInt = 1;
-    [XmlIgnore] public bool visible { get { return visibleInt == 1; } set { visibleInt = value ? 1 : 0; }}
-    [XmlIgnore] public bool visibleIntSpecified { get { return visibleInt == 0; } set {}}
+    [XmlIgnore] public bool visible { get { return visibleInt == 1; } set { visibleInt = value ? 1 : 0; } }
+    [XmlIgnore] public bool visibleIntSpecified { get { return visibleInt == 0; } set {} }
+    [XmlAttribute("template")] public string template;
+    [XmlIgnore] public bool templateSpecified { get { return !string.IsNullOrEmpty(template); } set {} }
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
     [XmlIgnore] public bool propertiesSpecified { get { return properties != null && properties.Length > 0; } set { } }
     [XmlElement("ellipse")] public string ellipse;
@@ -815,6 +830,8 @@ public class TileObject {
     [XmlIgnore] public bool polygonSpecified { get { return polygon != null && !string.IsNullOrEmpty(polygon.points); } set {} }
     [XmlElement("polyline", typeof(Polygon))] public Polygon polyline;
     [XmlIgnore] public bool polylineSpecified { get { return polyline != null && !string.IsNullOrEmpty(polyline.points); } set {} }
+    [XmlElement("text", typeof(Text))] public Text text;
+    [XmlIgnore] public bool textSpecified { get { return text != null; } set {} }
     [XmlElement("image", typeof(Image))] public Image image;
     [XmlIgnore] public bool imageSpecified { get { return image != null && !string.IsNullOrEmpty(image.source); } set {} }
 }
@@ -833,7 +850,21 @@ public class Polygon {
             return _path;
         }
     }
+}
 
+[System.Serializable]
+public class Text {
+    [XmlAttribute("fontfamily")] public string fontFamily = "sans-serif";
+    [XmlAttribute("pixelsize")] public int pixelSize = 16;
+    [XmlAttribute("wrap")] public int wrap = 0;
+    [XmlAttribute("color")] public string color = "#000000";
+    [XmlAttribute("bold")] public int bold = 0;
+    [XmlAttribute("italic")] public int italic = 0;
+    [XmlAttribute("underline")] public int underline = 0;
+    [XmlAttribute("strikeout")] public int strikeout = 0;
+    [XmlAttribute("kerning")] public int kerning = 1;
+    [XmlAttribute("halign")] public string halign = "left";
+    [XmlAttribute("valign")] public string valign = "top";
 }
 
 [System.Serializable]
@@ -851,6 +882,35 @@ public class WangColor {
     [XmlAttribute("color")] public string color = "";
     [XmlAttribute("tile")] public int tileID = 0;
     [XmlAttribute("probability")] public float probability = 1;
+}
+
+[XmlRoot("template")]
+[System.Serializable]
+public class Template {
+    [XmlElement("tileset", typeof(TileSet))] public TileSet tileSet;
+    [XmlElement("object", typeof(TileObject))] public TileObject tileObject;
+
+    public static Template Load (string path) {
+        XmlSerializer deserializer = new XmlSerializer(typeof(Template));
+        TextReader textReader = new StreamReader(path);
+        Template template = (Template)deserializer.Deserialize(textReader);
+        textReader.Close();
+        return template;
+    }
+
+    public void Save (string path) {
+        XmlSerializer serializer = new XmlSerializer(typeof(Template));
+        TextWriter textWriter = new StreamWriter(path, false, System.Text.Encoding.UTF8);
+        XmlTextWriter xmlWriter = new XmlTextWriter(textWriter);
+        xmlWriter.Formatting = Formatting.Indented;
+        xmlWriter.Indentation = 1;
+        xmlWriter.WriteStartDocument();
+        XmlSerializerNamespaces nameSpaces = new XmlSerializerNamespaces();
+        nameSpaces.Add("","");
+        serializer.Serialize(xmlWriter, this, nameSpaces);
+        xmlWriter.Close();
+        textWriter.Close();
+    }
 }
 
 [System.Serializable]

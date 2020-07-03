@@ -339,7 +339,7 @@ public class TMXFileImporter : ScriptedImporter {
         SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
         sprite.sortingOrder = index;
         Color c = Color.white;
-        c. a = opacity;
+        c.a = opacity;
         sprite.color = c;
 
         Tiled.TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);

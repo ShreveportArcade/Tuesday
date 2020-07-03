@@ -116,6 +116,7 @@ public class TMXFileExporter : Editor {
 
     int globalLayerID;
     Tiled.TMXFile tmxFile;
+    Dictionary<string, Tiled.TileSet> tileSetCache = new Dictionary<string, Tiled.TileSet>();
     void SaveTMX (string tmxFilePath) {
         tmxFile = Tiled.TMXFile.Load(this.tmxFilePath);
         if (tmxFile == null) {
@@ -127,14 +128,17 @@ public class TMXFileExporter : Editor {
         tmxFile.orientation = GetOrientation();
         tmxFile.renderOrder = GetRenderOrder(tmxFile.orientation);
         BoundsInt bounds = GetBounds();
-        if (!tmxFile.infinite) {
+        if (!tmxFile.infinite && bounds.size.x != 0 && bounds.size.y != 0) {
             tmxFile.width = bounds.size.x;
             tmxFile.height = bounds.size.y;
         }
+
         Vector3Int size = GetTileSize(tmxFile.orientation);
-        tmxFile.tileWidth = size.x;
-        tmxFile.tileHeight = size.y;
-        tmxFile.hexSideLength = size.z;
+        if (size.x != 0 && size.y != 0) {
+            tmxFile.tileWidth = size.x;
+            tmxFile.tileHeight = size.y;
+            tmxFile.hexSideLength = size.z;
+        }
         // tmxFile.staggerAxis = null;
         // tmxFile.staggerIndex = null;
         // tmxFile.backgroundColor = null;
@@ -203,6 +207,7 @@ public class TMXFileExporter : Editor {
             layer.tileData.contentData = new uint[layer.width * layer.height];
         }
 
+        //TODO: iterate over chunks when infinite
         TileBase[] tiles = tilemap.GetTilesBlock(bounds);
         for (int j = 0; j < bounds.size.y; j++) {
             for (int i = 0; i < bounds.size.x; i++) {
@@ -211,7 +216,7 @@ public class TMXFileExporter : Editor {
 
                 int x = i+bounds.x;
                 int y = tmxFile.height-1-(j+bounds.y);
-                layer.SetTileID(id, x, y);
+                layer.SetTileID(id, x, y);//TODO: export hex and iso maps
             }
         }
 
@@ -224,15 +229,60 @@ public class TMXFileExporter : Editor {
         List<Tiled.TileObject> objects = new List<Tiled.TileObject>();
         for (int i = 0; i < root.childCount; i++) {
             Transform t = root.GetChild(i);
-            if (PrefabUtility.IsPartOfPrefabInstance(t)) {
+            // if (PrefabUtility.IsPartOfPrefabInstance(t)) {
                 
-            }
-            else {
-
-            }
+            // }
+            // else {
+                objects.Add(GetTileObject(t, layer));
+            // }
         }
         layer.objects = objects.ToArray();
         return layer;
+    }
+
+    public Tiled.TileObject GetTileObject (Transform t, Tiled.ObjectGroup group) {
+        Tiled.TileObject tileObject = new Tiled.TileObject();
+        tileObject.name = t.name;
+        
+        SpriteRenderer sprite = t.GetComponent<SpriteRenderer>();
+        if (sprite != null && sprite.sprite != null) {
+            string spritePath = AssetDatabase.GetAssetPath(sprite.sprite);
+            if (tileSetCache.ContainsKey(spritePath)) {
+                Tiled.TileSet tileSet = tileSetCache[spritePath];
+                string[] splitName = sprite.sprite.name.Split('_');
+                int gid = tileSet.firstGID + int.Parse(splitName[splitName.Length-1]);
+                tileObject.gid = (uint)gid;
+                // index = sprite.sortingOrder
+                // calc group opacity from each sprite.color
+                tileObject.width = t.localScale.x * sprite.sprite.rect.width;
+                tileObject.height = t.localScale.y * sprite.sprite.rect.height;
+            }
+            else {
+                Debug.LogWarning("Sprites not in a TSX file not supported yet. " + spritePath);
+            }
+        }
+
+        Vector3 center = t.right * tileObject.width - t.up * tileObject.height;
+        center *= 0.5f / pixelsPerUnit;
+        center += t.position;
+
+        Vector3 rot = t.transform.localEulerAngles;
+        tileObject.rotation = rot.z;
+        if (Mathf.Abs(rot.x) == 180) tileObject.gid |= Tiled.TMXFile.FlippedVerticallyFlag;
+        if (Mathf.Abs(rot.y) == 180) tileObject.gid |= Tiled.TMXFile.FlippedHorizontallyFlag;
+
+        //TODO: reverse engineer position from rotations
+
+        tileObject.y = tmxFile.height * tmxFile.tileHeight - t.localPosition.y * pixelsPerUnit;
+        tileObject.x = t.localPosition.x * pixelsPerUnit;
+
+        tileObject.properties = GetProperties(t.gameObject);
+        return tileObject;
+    }
+
+    Tiled.Property[] GetProperties(GameObject g) {
+        Debug.Log("TODO: get props");
+        return null;
     }
 
     Tiled.ImageLayer CreateImageLayer (Transform t) {
@@ -266,32 +316,40 @@ public class TMXFileExporter : Editor {
             firstGID += tileSet.tileCount;
             tileSet.source = "../" + Uri.UnescapeDataString(relativeURI.ToString());
             tileSets.Add(tileSet);
+            tileSetCache[path] = tileSet;
             GetTileAssetsAtPath(tileSet, path);
         }
         return tileSets.ToArray();
     }
 
     string[] GetTileSetPaths(BoundsInt bounds, Transform root) {
-        HashSet<string> tileSetPaths = new HashSet<string>();
+        List<string> tileSetPaths = new List<string>();
         for (int i = 0; i < root.childCount; i++) {
             Transform t = root.GetChild(i);
+            SpriteRenderer sprite = t.GetComponent<SpriteRenderer>();
             Tilemap tilemap = t.GetComponent<Tilemap>();
             if (tilemap != null) {
                 TileBase[] tiles = tilemap.GetTilesBlock(bounds);
                 List<string> paths = new List<string>();
                 foreach (TileBase tile in tiles) {
                     string path = AssetDatabase.GetAssetPath(tile);
-                    if (string.IsNullOrEmpty(path) || paths.Contains(path)) continue;
-                    paths.Add(path);
+                    if (!string.IsNullOrEmpty(path) && !paths.Contains(path)) paths.Add(path);
                 }
                 foreach (string path in paths) {
                     GridPalette gridPalette = AssetDatabase.LoadAssetAtPath(path, typeof(GridPalette)) as GridPalette;
-                    if (gridPalette != null) tileSetPaths.Add(path);
+                    if (gridPalette != null && !tileSetPaths.Contains(path)) tileSetPaths.Add(path);
                 }
             }
             if (t.childCount > 0) {
                 string[] paths = GetTileSetPaths(bounds, t);
-                if (paths != null) tileSetPaths.UnionWith(tileSetPaths);
+                foreach (string path in paths) {
+                    if (!tileSetPaths.Contains(path)) tileSetPaths.Add(path);
+                }
+            }
+            else if (sprite != null && sprite.sprite != null) {
+                string path = AssetDatabase.GetAssetPath(sprite.sprite);
+                GridPalette gridPalette = AssetDatabase.LoadAssetAtPath(path, typeof(GridPalette)) as GridPalette;
+                if (gridPalette != null && !tileSetPaths.Contains(path)) tileSetPaths.Add(path);
             }
         }
         return tileSetPaths.ToArray();
@@ -307,6 +365,7 @@ public class TMXFileExporter : Editor {
 
     public string GetRenderOrder (string orientation) {
         TilemapRenderer renderer = grid.GetComponentInChildren<TilemapRenderer>();//assumes all render orders are the same
+        if (renderer == null) return "right-down";
         if (orientation == "isometric" || orientation == "staggered") {
             if (renderer.sortOrder == TilemapRenderer.SortOrder.BottomLeft) return "left-up";
             else if (renderer.sortOrder == TilemapRenderer.SortOrder.TopRight) return "right-down";
@@ -322,6 +381,7 @@ public class TMXFileExporter : Editor {
 
     public BoundsInt GetBounds() {
         Tilemap[] tilemaps = grid.GetComponentsInChildren<Tilemap>();
+        if (tilemaps.Length == 0) return new BoundsInt();
         BoundsInt bounds = tilemaps[0].cellBounds;
         foreach (Tilemap tilemap in tilemaps) {
             if (bounds.xMin > tilemap.cellBounds.xMin) bounds.xMin = tilemap.cellBounds.xMin;
@@ -334,6 +394,7 @@ public class TMXFileExporter : Editor {
 
     Vector3Int GetTileSize(string orientation) {
         Tilemap tilemap = grid.GetComponentInChildren<Tilemap>();
+        if (tilemap == null) return Vector3Int.zero;
         Vector3 size = tilemap.cellSize * pixelsPerUnit;//assumes all other tilemaps are the same
         if (orientation == "hexagonal") {
             // if (tmxFile.hexSideLength > 0) {
