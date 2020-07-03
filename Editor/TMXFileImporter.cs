@@ -102,7 +102,6 @@ public class TMXFileImporter : ScriptedImporter {
         return (type == typeof(GridPalette));
     }
 
-
     public static GridLayout.CellLayout GetCellLayout (Tiled.TMXFile tmxFile) {
         if (tmxFile.orientation == "hexagonal") return GridLayout.CellLayout.Hexagon;
         else if (tmxFile.orientation == "isometric") return GridLayout.CellLayout.Isometric;
@@ -458,5 +457,4 @@ public class TMXFileImporter : ScriptedImporter {
         colorStr = "#" + colorStr.Substring(6, 2) + colorStr.Substring(0, 6);
         return colorStr;
     }
-
 }

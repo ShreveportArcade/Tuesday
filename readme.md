@@ -34,4 +34,5 @@ Tiled objects can be replaced with prefabs by adding a custom file property call
  * Zstd encoding/decoding
  * Wang Tile and Terrain Brushes
  * Template Group (.tx) support
+ * Text Support
  * Map Editor Settings support

@@ -262,19 +262,37 @@ public class TMXFileExporter : Editor {
             }
         }
 
+        Vector2 pos = t.localPosition;
+        Vector3 rot = t.localEulerAngles;
+        Vector3 origin = pos;
+        tileObject.rotation = rot.z;
+        bool flipX = false;
+        bool flipY = false;
+        if (Mathf.Abs(rot.x) == 180) {
+            flipY = true;
+            tileObject.gid |= Tiled.TMXFile.FlippedVerticallyFlag;
+            origin -= t.up * tileObject.height / (float)pixelsPerUnit;
+        }
+        if (Mathf.Abs(rot.y) == 180) {
+            flipX = true;
+            tileObject.gid |= Tiled.TMXFile.FlippedHorizontallyFlag;
+            origin -= t.right * tileObject.width / (float)pixelsPerUnit;
+        }
+
+        t.RotateAround(origin, Vector3.forward, tileObject.rotation);
+
         Vector3 center = t.right * tileObject.width - t.up * tileObject.height;
         center *= 0.5f / pixelsPerUnit;
         center += t.position;
 
-        Vector3 rot = t.transform.localEulerAngles;
-        tileObject.rotation = rot.z;
-        if (Mathf.Abs(rot.x) == 180) tileObject.gid |= Tiled.TMXFile.FlippedVerticallyFlag;
-        if (Mathf.Abs(rot.y) == 180) tileObject.gid |= Tiled.TMXFile.FlippedHorizontallyFlag;
-
-        //TODO: reverse engineer position from rotations
+        if (flipY) t.RotateAround(center, Vector2.one, 180); 
+        if (flipX) t.RotateAround(center, Vector3.up, 180);
 
         tileObject.y = tmxFile.height * tmxFile.tileHeight - t.localPosition.y * pixelsPerUnit;
         tileObject.x = t.localPosition.x * pixelsPerUnit;
+
+        t.localPosition = pos;
+        t.localEulerAngles = rot;
 
         tileObject.properties = GetProperties(t.gameObject);
         return tileObject;

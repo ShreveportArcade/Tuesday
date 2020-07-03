@@ -31,26 +31,29 @@ public class TMXFile {
     [XmlIgnore] public bool hasDocType = false;
     [XmlAttribute("version")] public string version = "1.0";
     [XmlAttribute("tiledversion")] public string tiledVersion;
-    [XmlIgnore] public bool tiledVersionSpecified { get { return tiledVersion != null; } set { } }
+    [XmlIgnore] public bool tiledVersionSpecified { get { return tiledVersion != null; } set {} }
     
     [XmlAttribute("orientation")] public string orientation = "orthogonal";
     [XmlAttribute("renderorder")] public string renderOrder = "right-down";
+    [XmlAttribute("compressionlevel")] public int compressionLevel = -1;
+    [XmlIgnore] public bool compressionLevelSpecified { get { return compressionLevel > -1; } set {} }
+
     [XmlAttribute("width")] public int width = 0;
     [XmlAttribute("height")] public int height = 0;
     [XmlAttribute("tilewidth")] public int tileWidth = 0;
     [XmlAttribute("tileheight")] public int tileHeight = 0;
     
     [XmlAttribute("hexsidelength")] public int hexSideLength;
-    [XmlIgnore] public bool hexSideLengthSpecified { get { return (hexSideLength > 0); } set {}}
+    [XmlIgnore] public bool hexSideLengthSpecified { get { return (hexSideLength > 0); } set {} }
     
     [XmlAttribute("staggeraxis")] public string staggerAxis;
-    [XmlIgnore] public bool staggerAxisSpecified { get { return !string.IsNullOrEmpty(staggerAxis); } set {}}
+    [XmlIgnore] public bool staggerAxisSpecified { get { return !string.IsNullOrEmpty(staggerAxis); } set {} }
     
     [XmlAttribute("staggerindex")] public string staggerIndex;
-    [XmlIgnore] public bool staggerIndexSpecified { get { return !string.IsNullOrEmpty(staggerIndex); } set {}}
+    [XmlIgnore] public bool staggerIndexSpecified { get { return !string.IsNullOrEmpty(staggerIndex); } set {} }
     
     [XmlAttribute("backgroundcolor")] public string backgroundColor;
-    [XmlIgnore] public bool backgroundColorSpecified { get { return !string.IsNullOrEmpty(backgroundColor); } set {}}
+    [XmlIgnore] public bool backgroundColorSpecified { get { return !string.IsNullOrEmpty(backgroundColor); } set {} }
     
     [XmlAttribute("nextlayerid")] public int nextLayerID = -1;
     [XmlIgnore] public bool nextLayerIDSpecified { get { return nextLayerID > 0; } set{} }
@@ -58,7 +61,7 @@ public class TMXFile {
     [XmlAttribute("nextobjectid")] public int nextObjectID = 0;
     
     [XmlAttribute("infinite")] public int infiniteInt = -1;
-    [XmlIgnore] public bool infiniteIntSpecified { get { return infiniteInt > -1; } set {}}
+    [XmlIgnore] public bool infiniteIntSpecified { get { return infiniteInt > -1; } set {} }
     [XmlIgnore] public bool infinite { get { return infiniteInt > 0; } }
 
     [XmlArray("properties")] [XmlArrayItem("property", typeof(Property))] public Property[] properties;
