@@ -136,8 +136,8 @@ public class TMXFileImporter : ScriptedImporter {
             else name += (++names[name]).ToString();
 
             GameObject layer = new GameObject(name);
-            if (layerData is Tiled.TileLayer) CreateTileLayer(layerData as Tiled.TileLayer, layer);
-            else if (layerData is Tiled.ObjectGroup) CreateObjectGroup(layerData as Tiled.ObjectGroup, layer);
+            if (layerData is Tiled.TileLayer) CreateTileLayer(ctx, layerData as Tiled.TileLayer, layer);
+            else if (layerData is Tiled.ObjectGroup) CreateObjectGroup(ctx, layerData as Tiled.ObjectGroup, layer);
             else if (layerData is Tiled.GroupLayer) CreateLayers(ctx, (layerData as Tiled.GroupLayer).layers, layer.transform);
             TMXFileUtils.SetProperties(layer, layerData.properties);
             
@@ -176,7 +176,7 @@ public class TMXFileImporter : ScriptedImporter {
     }
 
     GameObject temp;
-    public void CreateTileLayer (Tiled.TileLayer layerData, GameObject layer) {
+    public void CreateTileLayer (AssetImportContext ctx, Tiled.TileLayer layerData, GameObject layer) {
         temp = new GameObject("TEMP");
 
         Tilemap tilemap = layer.AddComponent<Tilemap>();
@@ -285,7 +285,7 @@ public class TMXFileImporter : ScriptedImporter {
         tilemap.SetTransformMatrix(pos, t.localToWorldMatrix);
     }
 
-    public void CreateObjectGroup (Tiled.ObjectGroup groupData, GameObject layer) {
+    public void CreateObjectGroup (AssetImportContext ctx, Tiled.ObjectGroup groupData, GameObject layer) {
         if (groupData.objects == null) return;
         bool isIndexOrdered = (groupData.drawOrder == "index");
 
@@ -305,11 +305,11 @@ public class TMXFileImporter : ScriptedImporter {
             else name += (++names[name]).ToString();
             
             int index = isIndexOrdered ? layerIndex++ : (int)(tileObject.y * 10);
-            CreateTileObject(name, tileObject, layer, groupData.opacity, index);
+            CreateTileObject(ctx, name, tileObject, layer, groupData.opacity, index);
         }
     }
 
-    public void CreateTileObject (string name, Tiled.TileObject tileObject, GameObject layer, float opacity, int index) {
+    public void CreateTileObject (AssetImportContext ctx, string name, Tiled.TileObject tileObject, GameObject layer, float opacity, int index) {
         int tileID = tileObject.tileID;
         GameObject g = null;
         if (tileObject.templateSpecified) {
@@ -359,8 +359,9 @@ public class TMXFileImporter : ScriptedImporter {
         TextMesh text = g.GetComponent<TextMesh>();
         if (text != null && tileObject.textSpecified) {
             text.fontSize = tileObject.text.pixelSize;
-            text.characterSize = (float)text.fontSize / (float)pixelsPerUnit;
-            text.font = GetFont(tileObject.text.fontFamily, text.fontSize);
+            text.characterSize = 0.1f;
+            text.font = GetFont(ctx, tileObject.text.fontFamily, text.fontSize);
+            g.GetComponent<MeshRenderer>().sharedMaterial = text.font.material;
             text.color = TMXFileUtils.TiledColorFromString(tileObject.text.color);
             if (tileObject.text.bold == 1 && tileObject.text.italic == 1) text.fontStyle = FontStyle.BoldAndItalic;
             else if (tileObject.text.bold == 1) text.fontStyle = FontStyle.Bold;
@@ -410,10 +411,15 @@ public class TMXFileImporter : ScriptedImporter {
     }
 
     Dictionary<string, Font> fonts = new Dictionary<string, Font>();
-    Font GetFont (string fontFamily, int size) {
+    Font GetFont (AssetImportContext ctx, string fontFamily, int size) {
         if (fonts.ContainsKey(fontFamily)) return fonts[fontFamily];
         Font font = Font.CreateDynamicFontFromOSFont(fontFamily, size);
-        if (font != null) fonts[fontFamily] = font;
+        if (font != null) {
+            ctx.AddObjectToAsset(fontFamily + " Material", font.material);
+            ctx.AddObjectToAsset(fontFamily + " Texture", font.material.mainTexture);
+            ctx.AddObjectToAsset(fontFamily, font);
+            fonts[fontFamily] = font;
+        }
         return font;
     }
 }
