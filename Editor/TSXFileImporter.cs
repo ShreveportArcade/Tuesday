@@ -10,7 +10,6 @@ using System.IO;
 public class TSXFileImporter : ScriptedImporter {
 
     public int pixelsPerUnit = -1;
-    public string tmxFilePath;
     public Tiled.TileSet tileSet;
 
     static Texture2D _icon;
@@ -126,16 +125,13 @@ public class TSXFileImporter : ScriptedImporter {
         foreach (Tile tile in tiles.Values) {
             ctx.AddObjectToAsset(tile.name, tile);
         }
-
-        if (!string.IsNullOrEmpty(tmxFilePath)) {
-            AssetDatabase.ImportAsset(tmxFilePath);
-        }
     }
 
     Dictionary <AnimatedTile, Tiled.Frame[]> animations = new Dictionary<AnimatedTile, Tiled.Frame[]>();
     Dictionary <int, Tile> tiles = new Dictionary<int, Tile>();
     Tile AddTile (AssetImportContext ctx, Tiled.TileSet tileSet, Tiled.Tile tiledTile, Texture2D tex, Rect rect) {
-        Sprite sprite = Sprite.Create(tex, rect, Vector2.zero, pixelsPerUnit, 0, SpriteMeshType.FullRect);
+        Vector2 pivot = GetPivot(rect);
+        Sprite sprite = Sprite.Create(tex, rect, pivot, pixelsPerUnit, 0, SpriteMeshType.FullRect);
         sprite.name = tileSet.name + "_" + tiledTile.id;
         bool phys = AddPhysicsToSprite(tiledTile, sprite);
         ctx.AddObjectToAsset(sprite.name,  sprite);
@@ -186,5 +182,30 @@ public class TSXFileImporter : ScriptedImporter {
 
         sprite.OverridePhysicsShape(physicsShape); 
         return true;
+    }
+
+    Vector2 GetPivot (Rect spriteRect) {
+        switch (tileSet.objectAlignment) {
+            case "topleft":
+                return Vector2.up;
+            case "top":
+                return new Vector2(0.5f, 1);
+            case "topright":
+                return Vector2.one;
+            case "left":
+                return new Vector2(0, 0.5f);
+            case "center":
+                return new Vector2(0.5f, 0.5f);
+            case "right":
+                return new Vector2( 1, 0.5f);
+            case "bottomleft":
+                return Vector2.zero;
+            case "bottom":
+                return new Vector2(0.5f, 0);
+            case "bottomright":
+                return Vector2.right;
+            default:
+                return Vector2.zero;
+        }
     }
 }

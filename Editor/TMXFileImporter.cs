@@ -26,11 +26,12 @@ using UnityEngine.Tilemaps;
 using UnityEditor;
 using UnityEditor.Experimental.AssetImporters;
 
-[ScriptedImporter(1, "tmx", 2)]
+[ScriptedImporter(1, "tmx", 3)]
 [CanEditMultipleObjects]
 public class TMXFileImporter : ScriptedImporter {
 
     public int pixelsPerUnit = -1;
+    public Tiled.TMXFile tmxFile;
 
     static Texture2D _icon;
     static Texture2D icon { 
@@ -64,7 +65,6 @@ public class TMXFileImporter : ScriptedImporter {
         }
     }
 
-    Tiled.TMXFile tmxFile;
     string tmxFilePath;
     int layerIndex;
     public override void OnImportAsset(AssetImportContext ctx) {
@@ -91,7 +91,7 @@ public class TMXFileImporter : ScriptedImporter {
         }
 
         layerIndex = 0;
-        CreateLayers(tmxFile.layers, gameObject.transform);
+        CreateLayers(ctx, tmxFile.layers, gameObject.transform);
         ctx.AddObjectToAsset(Path.GetFileName(ctx.assetPath), gameObject, icon);
         ctx.SetMainObject(gameObject);
 
@@ -127,7 +127,7 @@ public class TMXFileImporter : ScriptedImporter {
         return GridLayout.CellSwizzle.XYZ;
     }
 
-    void CreateLayers (List<Tiled.Layer> layers, Transform parent) {
+    void CreateLayers (AssetImportContext ctx, List<Tiled.Layer> layers, Transform parent) {
         Dictionary<string, int> names = new Dictionary<string, int>();
         foreach (Tiled.Layer layerData in layers) {
             string name = layerData.name;
@@ -138,13 +138,14 @@ public class TMXFileImporter : ScriptedImporter {
             GameObject layer = new GameObject(name);
             if (layerData is Tiled.TileLayer) CreateTileLayer(layerData as Tiled.TileLayer, layer);
             else if (layerData is Tiled.ObjectGroup) CreateObjectGroup(layerData as Tiled.ObjectGroup, layer);
-            else if (layerData is Tiled.GroupLayer) CreateLayers((layerData as Tiled.GroupLayer).layers, layer.transform);
-            SetProperties(layer, layerData.properties);
+            else if (layerData is Tiled.GroupLayer) CreateLayers(ctx, (layerData as Tiled.GroupLayer).layers, layer.transform);
+            TMXFileUtils.SetProperties(layer, layerData.properties);
             
             layer.transform.SetParent(parent);
             layer.transform.localPosition = new Vector3(layerData.offsetX, -layerData.offsetY, 0) / pixelsPerUnit;
             layer.SetActive(layerData.visible);
             layerIndex++;
+            ctx.AddObjectToAsset(name, layer);
         }
     }
 
@@ -191,11 +192,11 @@ public class TMXFileImporter : ScriptedImporter {
         TilemapRenderer renderer = layer.AddComponent<TilemapRenderer>();
         renderer.sortOrder = GetSortOrder();
         renderer.sortingOrder = layerIndex;
-        Color c = TiledColorFromString(layerData.tintColor);
+        Color c = TMXFileUtils.TiledColorFromString(layerData.tintColor);
         c.a *= layerData.opacity;
         tilemap.color = c;
 
-        if (tmxFile.infinite) {
+        if (tmxFile.infinite && layerData.tileData.chunks != null) {
             int right = int.MinValue;
             foreach (Tiled.Chunk chunk in layerData.tileData.chunks) {
                 if (chunk.x + chunk.width > right) right = chunk.x + chunk.width;
@@ -304,38 +305,39 @@ public class TMXFileImporter : ScriptedImporter {
             else name += (++names[name]).ToString();
             
             int index = isIndexOrdered ? layerIndex++ : (int)(tileObject.y * 10);
-            bool isPrefab = tileObject.properties != null && System.Array.Exists(tileObject.properties, (p) => p.name == "prefab");
-            if (isPrefab) CreatePrefabTile(name, tileObject, layer, groupData.opacity, index);
-            else CreateSpriteTile(name, tileObject, layer, groupData.opacity, index);
+            CreateTileObject(name, tileObject, layer, groupData.opacity, index);
         }
     }
 
-    public void CreatePrefabTile (string name, Tiled.TileObject tileObject, GameObject layer, float opacity, int index) {
-        int tileID = (int)tileObject.gid;
-        Tiled.Property prefabProp = System.Array.Find(tileObject.properties, (p) => p.name == "prefab");
-
-        string prefabPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(tmxFilePath), prefabProp.val));
-        string dataPath = Path.GetFullPath(Application.dataPath);
-        prefabPath = prefabPath.Replace(dataPath, "Assets");
-        GameObject prefab = AssetDatabase.LoadAssetAtPath(prefabPath, typeof(GameObject)) as GameObject;
-        GameObject g = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
-        g.name = name;
-        g.SetActive(tileObject.visible);
-        SetProperties(g, tileObject.properties);
-        g.transform.SetParent(layer.transform);
-        float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
-        g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
-        g.transform.localEulerAngles = Vector3.forward * -tileObject.rotation;
-    }
-
-    public void CreateSpriteTile (string name, Tiled.TileObject tileObject, GameObject layer, float opacity, int index) {
+    public void CreateTileObject (string name, Tiled.TileObject tileObject, GameObject layer, float opacity, int index) {
         int tileID = tileObject.tileID;
-        GameObject g = new GameObject(name);
+        GameObject g = null;
+        if (tileObject.templateSpecified) {
+            string templatePath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(tmxFilePath), tileObject.template));
+            Tiled.Template template = Tiled.Template.Load(templatePath);
+
+            string dataPath = Path.GetFullPath(Application.dataPath);
+            templatePath = templatePath.Replace(dataPath, "Assets");
+
+            AssetImporter importer = AssetImporter.GetAtPath(templatePath);
+            GameObject prefab = AssetDatabase.LoadAssetAtPath(templatePath, typeof(GameObject)) as GameObject;
+            AssetImporter.SourceAssetIdentifier id = new AssetImporter.SourceAssetIdentifier(prefab);
+            Dictionary<SourceAssetIdentifier,Object> external = importer.GetExternalObjectMap(); 
+            if (external.ContainsKey(id)) prefab = external[id] as GameObject;
+            
+            g = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            g.name = name;
+            TMXFileUtils.SetProperties(g, template.tileObject.properties);
+        }
+        else {
+            g = new GameObject(name);
+            g.AddComponent<SpriteRenderer>();
+        }
         g.transform.SetParent(layer.transform);
         float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
         g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
 
-        SpriteRenderer sprite = g.AddComponent<SpriteRenderer>();
+        SpriteRenderer sprite = g.GetComponent<SpriteRenderer>();
         sprite.sortingOrder = index;
         Color c = Color.white;
         c.a = opacity;
@@ -371,90 +373,6 @@ public class TMXFileImporter : ScriptedImporter {
             g.transform.RotateAround(origin, Vector3.forward, -tileObject.rotation);
         }
 
-        SetProperties(g, tileObject.properties);
-    }
-
-    public void SetProperties (GameObject g, Tiled.Property[] props) {
-        if (props == null) return;
-        foreach (Tiled.Property prop in props) {
-            if (prop == null || string.IsNullOrEmpty(prop.name)) continue;
-            string[] classVar = prop.name.Split('.');
-            Object o = g as Object;
-            System.Type type = System.Type.GetType(classVar[0]);
-            if (type != null && classVar[0] == "GameObject") {
-                if (classVar[1] == "layer" && !prop.typeSpecified) {
-                    g.layer = LayerMask.NameToLayer(prop.val);
-                    continue;
-                }
-            }
-            else {
-                if (type == null) type = System.Type.GetType("UnityEngine.Rendering."+classVar[0]+",UnityEngine");
-                if (type == null) type = System.Type.GetType("UnityEngine.Tilemaps."+classVar[0]+",UnityEngine");
-                if (type == null) continue;
-                Component c = g.GetComponent(type);
-                if (c == null) c = g.AddComponent(type);
-                o = c as Object;
-            }
-            if (classVar.Length < 2) continue;
-            FieldInfo fieldInfo = type.GetField(classVar[1], BindingFlags.Public | BindingFlags.Instance);
-            if (fieldInfo != null) {
-                switch (prop.type) {
-                    case "float":
-                        fieldInfo.SetValue(o, float.Parse(prop.val));
-                        break;
-                    case "int":
-                        fieldInfo.SetValue(o, int.Parse(prop.val));
-                        break;
-                    case "bool":
-                        fieldInfo.SetValue(o, bool.Parse(prop.val));
-                        break;
-                    case "color":
-                        fieldInfo.SetValue(o, TiledColorFromString(prop.val));
-                        break;
-                    default:
-                        fieldInfo.SetValue(o, prop.val);
-                        break;
-                }
-                continue;
-            }
-            PropertyInfo propInfo = type.GetProperty(classVar[1], BindingFlags.Public | BindingFlags.Instance);
-            if (propInfo != null) {
-                switch (prop.type) {
-                    case "float":
-                        propInfo.SetValue(o, float.Parse(prop.val));
-                        break;
-                    case "int":
-                        propInfo.SetValue(o, int.Parse(prop.val));
-                        break;
-                    case "bool":
-                        propInfo.SetValue(o, bool.Parse(prop.val));
-                        break;
-                    case "color":
-                        propInfo.SetValue(o, TiledColorFromString(prop.val));
-                        break;
-                    default:
-                        propInfo.SetValue(o, prop.val);
-                        break;
-                }
-                continue;
-            }
-        }
-    }
-
-    public static Color TiledColorFromString (string colorStr) {
-        Color color = Color.white;
-        if (colorStr == null) return color;
-        if (colorStr.Length > 8) colorStr = "#" + colorStr.Substring(3) + colorStr.Substring(1, 2);
-        else colorStr = "#" + colorStr;
-        ColorUtility.TryParseHtmlString(colorStr, out color); 
-        return color;
-    }
-
-    public static string TiledColorToString (Color color, bool allowWhite = false) {
-        if (color == Color.white && !allowWhite) return null;
-        if (color.a == 1) return "#" + ColorUtility.ToHtmlStringRGB(color).ToLower();
-        string colorStr = ColorUtility.ToHtmlStringRGBA(color).ToLower();;
-        colorStr = "#" + colorStr.Substring(6, 2) + colorStr.Substring(0, 6);
-        return colorStr;
+        TMXFileUtils.SetProperties(g, tileObject.properties);
     }
 }

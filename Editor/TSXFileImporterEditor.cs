@@ -24,7 +24,6 @@ using System;
 using System.IO;
 using System.Reflection;
 
-namespace Tiled {
 [CustomEditor(typeof(TSXFileImporter))]
 [CanEditMultipleObjects]
 class TSXFileImporterEditor : ScriptedImporterEditor {
@@ -34,12 +33,12 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
     }
 
     string path;
-    TileSet _tsxFile;
-    TileSet tsxFile {
+    Tiled.TileSet _tsxFile;
+    Tiled.TileSet tsxFile {
         get { 
             if (_tsxFile == null) {
                 path = AssetDatabase.GetAssetPath(importer);
-                _tsxFile = TileSet.Load(path);
+                _tsxFile = Tiled.TileSet.Load(path);
             }
             return _tsxFile;
         }
@@ -53,7 +52,7 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
         spacing = tsxFile.spacing;
         margin = tsxFile.margin;
         if (tsxFile.imageSpecified && tsxFile.image != null && tsxFile.image.transSpecified) {
-            transparentColor = TMXFileImporter.TiledColorFromString(tsxFile.image.trans);
+            transparentColor = TMXFileUtils.TiledColorFromString(tsxFile.image.trans);
         }
     }
 
@@ -71,7 +70,7 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
     public override void OnInspectorGUI() {
         base.OnInspectorGUI();
 
-        if (!tsxFile.imageSpecified) return;
+        if (!tsxFile.imageSpecified || tsxFile.image == null) return;
 
         bool padChange = (spacing != tsxFile.spacing || margin != tsxFile.margin);
         GUI.backgroundColor = padChange ? Color.red : Color.white;
@@ -82,24 +81,23 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
         if (GUILayout.Button("Update Texture Padding")) UpdateTexturePadding();   
 
         GUI.enabled = true;
-        if (!tsxFile.imageSpecified && tsxFile.image != null) return;
         
         bool hasTransparency = EditorGUILayout.Toggle("Set Color to Transparent", tsxFile.image.transSpecified);
         if (!hasTransparency && tsxFile.image.transSpecified) {
             tsxFile.image.trans = null;
         }
         else if (hasTransparency && !tsxFile.image.transSpecified) {
-            tsxFile.image.trans = TMXFileImporter.TiledColorToString(transparentColor, true);
+            tsxFile.image.trans = TMXFileUtils.TiledColorToString(transparentColor, true);
         }
         if (!hasTransparency) return;
 
         transparentColor = EditorGUILayout.ColorField("Transparent Color", transparentColor);
-        tsxFile.image.trans = TMXFileImporter.TiledColorToString(transparentColor);
+        tsxFile.image.trans = TMXFileUtils.TiledColorToString(transparentColor);
         if (GUILayout.Button("Write Texture Alpha")) WriteTextureAlpha();
     }
 
     private static Dictionary<string, Texture2D> tileSetTextures = new Dictionary<string, Texture2D>();
-    public static Texture2D GetTileSetTexture (TileSet tileSet, string path) {
+    public static Texture2D GetTileSetTexture (Tiled.TileSet tileSet, string path) {
         if (tileSet.image == null || tileSet.image.source == null) return null;
 
         string texturePath = tileSet.image.source;
@@ -113,7 +111,7 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
         return GetImageTexture(tileSet.image, texturePath);
     }
 
-    public static Texture2D GetImageTexture (Image image, string texturePath) {
+    public static Texture2D GetImageTexture (Tiled.Image image, string texturePath) {
         if (tileSetTextures.ContainsKey(image.source)) return tileSetTextures[image.source];
 
         texturePath = Path.GetFullPath(texturePath);
@@ -127,7 +125,7 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
     }
 
     void UpdateTexturePadding () {
-        TileSet ts = tsxFile;
+        Tiled.TileSet ts = tsxFile;
         Texture2D texture = GetTileSetTexture(ts, path);
         string texturePath = AssetDatabase.GetAssetPath(texture);
 
@@ -181,7 +179,7 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
     }
 
     void WriteTextureAlpha () {
-        TileSet ts = tsxFile;
+        Tiled.TileSet ts = tsxFile;
         Texture2D texture = GetTileSetTexture(ts, path);
         string texturePath = AssetDatabase.GetAssetPath(texture);
 
@@ -208,5 +206,4 @@ class TSXFileImporterEditor : ScriptedImporterEditor {
 
         AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceUpdate);
     }
-}
 }

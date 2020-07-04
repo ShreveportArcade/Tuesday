@@ -14,7 +14,7 @@ To add as a Git submodule:
 
 ## Prefab Replacement
 
-Tiled objects can be replaced with prefabs by adding a custom file property called "prefab" that points to a prefab in your Unity project. Prefab overrides can be set with custom properties named "ClassName.fieldName". For example, you can set the gravity scale of a prefab's Rigidbody2D by adding a float property called "Rigidbody2D.gravityScale".
+Template Group files can be remapped as prefabs. Components can be added and their fields/properties modified using the format "ClassName.fieldName". For example, you can set the gravity scale of a prefab's Rigidbody2D by adding a float property called "Rigidbody2D.gravityScale".
 
 ## Features
 
@@ -27,12 +27,11 @@ Tiled objects can be replaced with prefabs by adding a custom file property call
  * Tiled Object support
  * Prefab replacement
  * Edit your tilemaps in Unity
- * Export your tile layer changes back out as TMX/TSX files
+ * Export your changes back out as TMX/TSX files
  * Infinite map support
+ * Template Group (.tx) support
 
 ## Roadmap
  * Zstd encoding/decoding
  * Wang Tile and Terrain Brushes
- * Template Group (.tx) support
  * Text Support
- * Map Editor Settings support
