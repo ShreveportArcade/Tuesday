@@ -331,29 +331,62 @@ public class TMXFileImporter : ScriptedImporter {
         }
         else {
             g = new GameObject(name);
-            g.AddComponent<SpriteRenderer>();
+            if (tileID != 0) g.AddComponent<SpriteRenderer>();
+            else if (tileObject.textSpecified) g.AddComponent<TextMesh>();
         }
         g.transform.SetParent(layer.transform);
         float y = tmxFile.height * tmxFile.tileHeight - tileObject.y;
         g.transform.localPosition = new Vector3(tileObject.x, y, 0) / pixelsPerUnit;
 
         SpriteRenderer sprite = g.GetComponent<SpriteRenderer>();
-        sprite.sortingOrder = index;
-        Color c = Color.white;
-        c.a = opacity;
-        sprite.color = c;
+        if (sprite != null && tileID > 0) {
+            sprite.sortingOrder = index;
+            Color c = Color.white;
+            c.a = opacity;
+            sprite.color = c;
 
-        Tiled.TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
-        if (tiles.ContainsKey(tileID)) {
-            sprite.sprite = tiles[tileID].sprite;
-            g.transform.localScale = new Vector3(
-                tileObject.width / sprite.sprite.rect.width, 
-                tileObject.height / sprite.sprite.rect.height, 
-                1
-            );
+            Tiled.TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
+            if (tiles.ContainsKey(tileID)) {
+                sprite.sprite = tiles[tileID].sprite;
+                g.transform.localScale = new Vector3(
+                    tileObject.width / sprite.sprite.rect.width, 
+                    tileObject.height / sprite.sprite.rect.height, 
+                    1
+                );
+            }
         }
-        else if (tileID == 0) Debug.LogWarning("TileObjects without Tiles not yet supported");
-        else Debug.LogWarning("Tile" + tileID + " not found at " + tmxFilePath);
+        
+        TextMesh text = g.GetComponent<TextMesh>();
+        if (text != null && tileObject.textSpecified) {
+            text.fontSize = tileObject.text.pixelSize;
+            text.characterSize = (float)text.fontSize / (float)pixelsPerUnit;
+            text.font = GetFont(tileObject.text.fontFamily, text.fontSize);
+            text.color = TMXFileUtils.TiledColorFromString(tileObject.text.color);
+            if (tileObject.text.bold == 1 && tileObject.text.italic == 1) text.fontStyle = FontStyle.BoldAndItalic;
+            else if (tileObject.text.bold == 1) text.fontStyle = FontStyle.Bold;
+            else if (tileObject.text.italic == 1) text.fontStyle = FontStyle.Italic;
+            
+            if (tileObject.text.underline + tileObject.text.strikeout > 0) {
+                Debug.LogWarning("Underline and strikeout font styles not supported");
+            }
+            switch (tileObject.text.halign) {
+                case "center":
+                    text.alignment = TextAlignment.Center;
+                    break;
+                case "right":
+                    text.alignment = TextAlignment.Right;
+                    break;
+                case "justify":
+                    Debug.LogWarning("Justified text not supported");
+                    break;
+                case "left":
+                default:
+                    text.alignment = TextAlignment.Left;
+                    break;
+            }
+            if (tileObject.text.valign != "top") Debug.LogWarning("Vertical text alignment not supported");
+            text.text = tileObject.text.content;
+        }
 
         Vector3 origin = g.transform.position;
         Vector3 center = origin + new Vector3(tileObject.width, tileObject.height, 0) * 0.5f / (float)pixelsPerUnit;
@@ -374,5 +407,13 @@ public class TMXFileImporter : ScriptedImporter {
         }
 
         TMXFileUtils.SetProperties(g, tileObject.properties);
+    }
+
+    Dictionary<string, Font> fonts = new Dictionary<string, Font>();
+    Font GetFont (string fontFamily, int size) {
+        if (fonts.ContainsKey(fontFamily)) return fonts[fontFamily];
+        Font font = Font.CreateDynamicFontFromOSFont(fontFamily, size);
+        if (font != null) fonts[fontFamily] = font;
+        return font;
     }
 }

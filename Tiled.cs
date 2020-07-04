@@ -868,6 +868,7 @@ public class Text {
     [XmlAttribute("kerning")] public int kerning = 1;
     [XmlAttribute("halign")] public string halign = "left";
     [XmlAttribute("valign")] public string valign = "top";
+    [XmlText] public string content;
 }
 
 [System.Serializable]

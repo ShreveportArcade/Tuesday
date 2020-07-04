@@ -229,12 +229,12 @@ public class TMXFileExporter : Editor {
         List<Tiled.TileObject> objects = new List<Tiled.TileObject>();
         for (int i = 0; i < root.childCount; i++) {
             Transform t = root.GetChild(i);
-            // if (PrefabUtility.IsPartOfPrefabInstance(t)) {
-                
-            // }
-            // else {
+            if (PrefabUtility.IsAnyPrefabInstanceRoot(t.gameObject)) {
+                Debug.Log("TODO: find or create .tx file");
+            }
+            else {
                 objects.Add(GetTileObject(t, layer));
-            // }
+            }
         }
         layer.objects = objects.ToArray();
         return layer;
