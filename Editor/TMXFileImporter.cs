@@ -312,18 +312,22 @@ public class TMXFileImporter : ScriptedImporter {
             else name += (++names[name]).ToString();
             
             int index = isIndexOrdered ? layerIndex++ : (int)(tileObject.y * 10);
-            CreateTileObject(ctx, name, tileObject, layer, groupData.opacity, index);
+            CreateTileObject(ctx, name, tileObject, layer, groupData, index);
         }
     }
 
     Dictionary<int, GameObject> gameObjects = new Dictionary<int, GameObject>();
     Dictionary<int, Tiled.TileObject> tiledObjects = new Dictionary<int, Tiled.TileObject>();
-    public void CreateTileObject (AssetImportContext ctx, string name, Tiled.TileObject tileObject, GameObject layer, float opacity, int index) {
+    public void CreateTileObject (AssetImportContext ctx, string name, Tiled.TileObject tileObject, GameObject layer, Tiled.ObjectGroup groupData, int index) {
+        Color groupColor = TMXFileUtils.TiledColorFromString(groupData.tintColor);
+        groupColor.a *= groupData.opacity;
         int tileID = tileObject.tileID;
         GameObject g = null;
         if (tileObject.templateSpecified) {
             string templatePath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(tmxFilePath), tileObject.template));
             Tiled.Template template = Tiled.Template.Load(templatePath);
+            if (string.IsNullOrEmpty(name)) name = template.tileObject.name;
+            if (tileObject.text == null) tileObject.text = template.tileObject.text;
 
             string dataPath = Path.GetFullPath(Application.dataPath);
             templatePath = templatePath.Replace(dataPath, "Assets");
@@ -350,8 +354,8 @@ public class TMXFileImporter : ScriptedImporter {
         SpriteRenderer sprite = g.GetComponent<SpriteRenderer>();
         if (sprite != null && tileID > 0) {
             sprite.sortingOrder = index;
-            Color c = Color.white;
-            c.a = opacity;
+            Color c = sprite.color;
+            c *= groupColor;
             sprite.color = c;
 
             Tiled.TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
@@ -366,12 +370,13 @@ public class TMXFileImporter : ScriptedImporter {
         }
         
         TextMesh text = g.GetComponent<TextMesh>();
-        if (text != null && tileObject.textSpecified) {
+        if (text != null) {
+            text.anchor = TextAnchor.UpperLeft;
             text.fontSize = tileObject.text.pixelSize;
             text.characterSize = 0.1f;
             text.font = GetFont(ctx, tileObject.text.fontFamily, text.fontSize);
             g.GetComponent<MeshRenderer>().sharedMaterial = text.font.material;
-            text.color = TMXFileUtils.TiledColorFromString(tileObject.text.color);
+            text.color = TMXFileUtils.TiledColorFromString(tileObject.text.color) * groupColor;
             if (tileObject.text.bold == 1 && tileObject.text.italic == 1) text.fontStyle = FontStyle.BoldAndItalic;
             else if (tileObject.text.bold == 1) text.fontStyle = FontStyle.Bold;
             else if (tileObject.text.italic == 1) text.fontStyle = FontStyle.Italic;
