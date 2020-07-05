@@ -17,12 +17,15 @@ DEALINGS IN THE SOFTWARE.
 */
 
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using UnityEngine;
 
 public class TMXFileUtils {
-    public static void SetProperties (GameObject g, Tiled.Property[] props) {
+
+    public static void SetProperties (GameObject g, Tiled.Property[] props, Dictionary<int, GameObject> objectMap = null) {
         if (props == null) return;
         foreach (Tiled.Property prop in props) {
             if (prop == null || string.IsNullOrEmpty(prop.name)) continue;
@@ -59,6 +62,12 @@ public class TMXFileUtils {
                     case "color":
                         fieldInfo.SetValue(o, TiledColorFromString(prop.val));
                         break;
+                    case "object":
+                        if (objectMap == null) break;
+                        int id = int.Parse(prop.val);
+                        if (!objectMap.ContainsKey(id)) break;
+                        fieldInfo.SetValue(o, objectMap[id]);
+                        break;
                     default:
                         fieldInfo.SetValue(o, prop.val);
                         break;
@@ -79,6 +88,12 @@ public class TMXFileUtils {
                         break;
                     case "color":
                         propInfo.SetValue(o, TiledColorFromString(prop.val));
+                        break;
+                    case "object":
+                        if (objectMap == null) break;
+                        int id = int.Parse(prop.val);
+                        if (!objectMap.ContainsKey(id)) break;
+                        propInfo.SetValue(o, objectMap[id]);
                         break;
                     default:
                         propInfo.SetValue(o, prop.val);

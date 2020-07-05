@@ -1,0 +1,19 @@
+{
+  "name": "com.shreveportarcade.tuesday",
+  "version": "1.0.0",
+  "displayName": "Tuesday",
+  "description": "A generic C# serializer and deserializer plus a set of Unity editor scripts that allow you to drag and drop TMX files into your scene, make edits, and save back out as TMX files. MIT license.",
+  "unity": "2019.4",
+  "unityRelease": "0f1",
+  "dependencies": {},
+ "keywords": [
+    "TMX",
+    "Tiled",
+    "Tilemap"
+  ],
+  "author": {
+    "name": "Nolan Baker",
+    "email": "nolan@shreveportarcade.com",
+    "url": "https://www.shreveportarcade.com"
+  }
+}

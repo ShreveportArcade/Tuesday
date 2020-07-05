@@ -92,6 +92,13 @@ public class TMXFileImporter : ScriptedImporter {
 
         layerIndex = 0;
         CreateLayers(ctx, tmxFile.layers, gameObject.transform);
+
+        foreach (int id in gameObjects.Keys) {
+            GameObject g = gameObjects[id];
+            Tiled.TileObject tileObject = tiledObjects[id];
+            TMXFileUtils.SetProperties(g, tileObject.properties, gameObjects);
+        }
+
         ctx.AddObjectToAsset(Path.GetFileName(ctx.assetPath), gameObject, icon);
         ctx.SetMainObject(gameObject);
 
@@ -309,6 +316,8 @@ public class TMXFileImporter : ScriptedImporter {
         }
     }
 
+    Dictionary<int, GameObject> gameObjects = new Dictionary<int, GameObject>();
+    Dictionary<int, Tiled.TileObject> tiledObjects = new Dictionary<int, Tiled.TileObject>();
     public void CreateTileObject (AssetImportContext ctx, string name, Tiled.TileObject tileObject, GameObject layer, float opacity, int index) {
         int tileID = tileObject.tileID;
         GameObject g = null;
@@ -407,7 +416,8 @@ public class TMXFileImporter : ScriptedImporter {
             g.transform.RotateAround(origin, Vector3.forward, -tileObject.rotation);
         }
 
-        TMXFileUtils.SetProperties(g, tileObject.properties);
+        gameObjects[tileObject.id] = g;
+        tiledObjects[tileObject.id] = tileObject;
     }
 
     Dictionary<string, Font> fonts = new Dictionary<string, Font>();

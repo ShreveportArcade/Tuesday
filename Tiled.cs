@@ -29,8 +29,8 @@ namespace Tiled {
 [System.Serializable]
 public class TMXFile {
     [XmlIgnore] public bool hasDocType = false;
-    [XmlAttribute("version")] public string version = "1.0";
-    [XmlAttribute("tiledversion")] public string tiledVersion;
+    [XmlAttribute("version")] public string version = "1.4";
+    [XmlAttribute("tiledversion")] public string tiledVersion = "Tuesday";
     [XmlIgnore] public bool tiledVersionSpecified { get { return tiledVersion != null; } set {} }
     
     [XmlAttribute("orientation")] public string orientation = "orthogonal";

@@ -7,31 +7,40 @@ The goals of this project are full support of the TMX file format, feature parit
 
 ## Installation
 
-[To add as a Unitypackage, download it from the itch.io page.](https://318arcade.itch.io/tuesday)
+To add as a Unitypackage, [download it from the itch.io page.](https://318arcade.itch.io/tuesday)
 
-To add as a Git submodule:
-`git submodule add https://github.com/ShreveportArcade/Tuesday.git Assets/Tuesday`
+To add as a Git submodule: 
+ `git submodule add https://github.com/ShreveportArcade/Tuesday.git Assets/Tuesday`
 
-## Prefab Replacement
+To add with Unity's package manager, put the following in your `manifest.json` file:
+ `"com.shreveportarcade.tuesday": "https://github.com/ShreveportArcade/Tuesday.git"`
 
-Template Group files can be remapped as prefabs. Components can be added and their fields/properties modified using the format "ClassName.fieldName". For example, you can set the gravity scale of a prefab's Rigidbody2D by adding a float property called "Rigidbody2D.gravityScale".
 
 ## Features
 
+ * Supports all features of Tiled 1.4 file format:
+   * Orthographic, Hexagonal, and Isometric Maps
+   * Tile Layers, Object Groups, Group Layers, and Image Layers
+   * Infinite and Fixed Maps
+   * Single image and image collection tile sets
+   * Embedded and external tile sets
+   * Layer tint, opacity, and visibility
+   * Object reference properties
+   * Object alignment
  * Drag and Drop TMX files into the Scene View or Hierarchy
- * Converts TMX/TSX files to Unity Tilemaps/Tiles
- * Supports both external and embedded Tile Sets 
+ * Imports TMX/TSX/TX files as native Unity Tilemaps/Tiles/Sprites
+ * Exports native Unity Tilemaps/Tiles/Sprites as TMX/TSX/TX files
  * CSV, Base64, GZIP, and zLib encoding/decoding
  * Collision geometry support
- * Tile layer tint support
- * Tiled Object support
- * Prefab replacement
- * Edit your tilemaps in Unity
- * Export your changes back out as TMX/TSX files
- * Infinite map support
- * Template Group (.tx) support
+ * Template Group (.tx) prefab replacement
+ * Edit your tilemaps in Unity using the standard Unity tools
 
-## Roadmap
- * Zstd encoding/decoding
- * Wang Tile and Terrain Brushes
- * Text Support
+
+## Prefab Replacement
+
+Template Group files can be remapped as prefabs in the inspector by selecting the `.tx` file in the project view and dragging a prefab asset to the prefab slot in the inspector.
+
+
+## Custom Properties
+
+Components can be added and their fields/properties modified using the format "ClassName.fieldName". For example, you can set the gravity scale of a prefab's Rigidbody2D by adding a float property called "Rigidbody2D.gravityScale".
