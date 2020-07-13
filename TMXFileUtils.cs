@@ -22,8 +22,46 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.Tilemaps;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class TMXFileUtils {
+
+    public static Dictionary<int, TileBase> GetTiles(Tiled.TMXFile tmxFile, string tmxFilePath) {
+        Dictionary<int, TileBase> tiles = new Dictionary<int, TileBase>();
+        foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
+            if (tileSet.hasSource) {
+                string tsxPath = tileSet.source;
+                tsxPath = Path.Combine(Path.GetDirectoryName(tmxFilePath), tsxPath);
+                tsxPath = Path.GetFullPath(tsxPath);
+                GetTileAssetsAtPath(tileSet, FileUtil.GetProjectRelativePath(tsxPath), ref tiles);
+            }
+            else {
+                string dir = Path.GetFullPath(Path.GetDirectoryName(tmxFilePath));
+                string name = Path.GetFileNameWithoutExtension(tmxFilePath);
+                string tsxPath = Path.Combine(dir, name + "." + tileSet.name + ".tsx");
+                GetTileAssetsAtPath(tileSet, FileUtil.GetProjectRelativePath(tsxPath), ref tiles);
+            }
+        }
+        return tiles;
+    }
+    
+    static void GetTileAssetsAtPath (Tiled.TileSet tileSet, string path, ref Dictionary<int, TileBase> tiles) {
+#if UNITY_EDITOR
+        UnityEngine.Object[] assets = AssetDatabase.LoadAllAssetRepresentationsAtPath(path);
+        foreach (UnityEngine.Object asset in assets) {
+            if (asset is TileBase) {
+                Tile tile = asset as Tile;
+                string[] splitName = tile.name.Split('_');
+                int gid = tileSet.firstGID + int.Parse(splitName[splitName.Length-1]);
+                tiles[gid] = tile;
+            }
+        }
+#endif
+    }
 
     public static void SetProperties (GameObject g, Tiled.Property[] props, Dictionary<int, GameObject> objectMap = null) {
         if (props == null) return;

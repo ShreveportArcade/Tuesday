@@ -31,6 +31,7 @@ using UnityEditor.Experimental.AssetImporters;
 public class TMXFileImporter : ScriptedImporter {
 
     public int pixelsPerUnit = -1;
+    string tmxFilePath;
     public Tiled.TMXFile tmxFile;
 
     static Texture2D _icon;
@@ -41,31 +42,16 @@ public class TMXFileImporter : ScriptedImporter {
         }
     }  
 
-    Dictionary<int, Tile> _tiles;
-    Dictionary<int, Tile> tiles {
+    Dictionary<int, TileBase> _tiles;
+    Dictionary<int, TileBase> tiles {
         get {
             if (_tiles == null) {
-                _tiles = new Dictionary<int, Tile>();
-                foreach (Tiled.TileSet tileSet in tmxFile.tileSets) {
-                    if (tileSet.hasSource) {
-                        string tsxPath = tileSet.source;
-                        tsxPath = Path.Combine(Path.GetDirectoryName(tmxFilePath), tsxPath);
-                        tsxPath = Path.GetFullPath(tsxPath);
-                        GetTileAssetsAtPath(tileSet, FileUtil.GetProjectRelativePath(tsxPath));
-                    }
-                    else {
-                        string dir = Path.GetFullPath(Path.GetDirectoryName(tmxFilePath));
-                        string name = Path.GetFileNameWithoutExtension(tmxFilePath);
-                        string tsxPath = Path.Combine(dir, name + "." + tileSet.name + ".tsx");
-                        GetTileAssetsAtPath(tileSet, FileUtil.GetProjectRelativePath(tsxPath));
-                    }
-                }
+                _tiles = TMXFileUtils.GetTiles(tmxFile, tmxFilePath);
             }
             return _tiles;
         }
     }
 
-    string tmxFilePath;
     int layerIndex;
     public override void OnImportAsset(AssetImportContext ctx) {
         tmxFilePath = ctx.assetPath;
@@ -103,10 +89,6 @@ public class TMXFileImporter : ScriptedImporter {
         ctx.SetMainObject(gameObject);
 
         if (hasEmbeddedTiles) AssetDatabase.ImportAsset(tmxFilePath);
-    }
-
-    public override bool SupportsRemappedAssetType (System.Type type) {
-        return (type == typeof(GridPalette));
     }
 
     public static GridLayout.CellLayout GetCellLayout (Tiled.TMXFile tmxFile) {
@@ -153,18 +135,6 @@ public class TMXFileImporter : ScriptedImporter {
             layer.SetActive(layerData.visible);
             layerIndex++;
             ctx.AddObjectToAsset(name, layer);
-        }
-    }
-
-    void GetTileAssetsAtPath (Tiled.TileSet tileSet, string path) {
-        Object[] assets = AssetDatabase.LoadAllAssetRepresentationsAtPath(path);
-        foreach (Object asset in assets) {
-            if (asset is Tile) {
-                Tile tile = asset as Tile;
-                string[] splitName = tile.name.Split('_');
-                int gid = tileSet.firstGID + int.Parse(splitName[splitName.Length-1]);
-                _tiles[gid] = tile;
-            }
         }
     }
 
@@ -238,7 +208,7 @@ public class TMXFileImporter : ScriptedImporter {
         
         int tileID = layerData.GetTileID(x, y);
         if (tileID == 0 || !tiles.ContainsKey(tileID)) return;
-        Tile tile = tiles[tileID];
+        Tile tile = tiles[tileID] as Tile;
         Vector3Int pos = new Vector3Int(x, top-1-y, 0);
         if (tmxFile.orientation == "isometric") {
             pos = new Vector3Int(top-1-y, right-1-x, 0);
@@ -360,7 +330,8 @@ public class TMXFileImporter : ScriptedImporter {
 
             Tiled.TileSet tileSet = tmxFile.GetTileSetByTileID(tileID);
             if (tiles.ContainsKey(tileID)) {
-                sprite.sprite = tiles[tileID].sprite;
+                Tile tile = tiles[tileID] as Tile;
+                sprite.sprite = tile.sprite;
                 g.transform.localScale = new Vector3(
                     tileObject.width / sprite.sprite.rect.width, 
                     tileObject.height / sprite.sprite.rect.height, 

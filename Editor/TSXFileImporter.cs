@@ -38,6 +38,10 @@ public class TSXFileImporter : ScriptedImporter {
         tileSet = Tiled.TileSet.Load(assetPath);
     }
 
+    public override bool SupportsRemappedAssetType (System.Type type) {
+        return (type == typeof(Material));
+    }
+
     public override void OnImportAsset(AssetImportContext ctx) {
         string name = Path.GetFileNameWithoutExtension(ctx.assetPath);
         tileSet = Tiled.TileSet.Load(ctx.assetPath);

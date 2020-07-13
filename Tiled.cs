@@ -305,6 +305,9 @@ public class TileSet {
         set {} 
     }
 
+    [XmlElement("grid", typeof(Grid))] public Grid grid; 
+    [XmlIgnore] public bool gridSpecified { get { return grid != null; } set {} }
+
     [XmlElement("image", typeof(Image))]  public Image image;
     [XmlIgnore] public bool imageSpecified { get { return !hasSource; } set {} }
 
@@ -393,6 +396,13 @@ public class TileSet {
 
         return uvs;
     }
+}
+
+[System.Serializable]
+public class Grid {
+    public string orientation = "orthogonal";
+    public int width;
+    public int height;
 }
 
 [System.Serializable]

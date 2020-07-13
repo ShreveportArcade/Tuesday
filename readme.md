@@ -18,6 +18,7 @@ To add with Unity's package manager, put the following in your `manifest.json` f
 
 ## Features
 
+ * Compatible with Tiled files made with any version of Tiled.
  * Supports all features of Tiled 1.4 file format:
    * Orthographic, Hexagonal, and Isometric Maps
    * Tile Layers, Object Groups, Group Layers, and Image Layers

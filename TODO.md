@@ -5,8 +5,9 @@
 
 ## Importers
 
- * Per-layer material remapping
-
+ * Allow TileSets to be added/changed marked embedded/external
+ * Embedded tilesets should stay embedded in the Asset instead of generating TSX files, but the TilePaletteEditor doesn't pick them up when the tileset is a sub asset of a tilemap
+ * Use TSX grid property
 
 ## Exporters
 
