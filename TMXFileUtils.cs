@@ -74,7 +74,7 @@ public class TMXFileUtils {
             string[] classVar = prop.name.Split('.');
             UnityEngine.Object o = g as UnityEngine.Object;
             System.Type type = System.Type.GetType(classVar[0]);
-            if (type != null && classVar[0] == "GameObject") {
+            if (classVar[0] == "GameObject") {
                 if (classVar[1] == "layer" && !prop.typeSpecified) {
                     g.layer = LayerMask.NameToLayer(prop.val);
                     continue;
