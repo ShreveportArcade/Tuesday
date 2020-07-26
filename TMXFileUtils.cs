@@ -37,13 +37,17 @@ public class TMXFileUtils {
                 string tsxPath = tileSet.source;
                 tsxPath = Path.Combine(Path.GetDirectoryName(tmxFilePath), tsxPath);
                 tsxPath = Path.GetFullPath(tsxPath);
-                GetTileAssetsAtPath(tileSet, FileUtil.GetProjectRelativePath(tsxPath), ref tiles);
+                string dataPath = Path.GetFullPath(Application.dataPath);
+                tsxPath = tsxPath.Replace(dataPath, "Assets");
+                GetTileAssetsAtPath(tileSet, tsxPath, ref tiles);
             }
             else {
                 string dir = Path.GetFullPath(Path.GetDirectoryName(tmxFilePath));
                 string name = Path.GetFileNameWithoutExtension(tmxFilePath);
                 string tsxPath = Path.Combine(dir, name + "." + tileSet.name + ".tsx");
-                GetTileAssetsAtPath(tileSet, FileUtil.GetProjectRelativePath(tsxPath), ref tiles);
+                string dataPath = Path.GetFullPath(Application.dataPath);
+                tsxPath = tsxPath.Replace(dataPath, "Assets");
+                GetTileAssetsAtPath(tileSet, tsxPath, ref tiles);
             }
         }
         return tiles;

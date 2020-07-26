@@ -45,8 +45,9 @@ public class TMXFileImporter : ScriptedImporter {
     Dictionary<int, TileBase> _tiles;
     Dictionary<int, TileBase> tiles {
         get {
-            if (_tiles == null) {
+            if (_tiles == null || _tiles.Count == 0) {
                 _tiles = TMXFileUtils.GetTiles(tmxFile, tmxFilePath);
+                
             }
             return _tiles;
         }
@@ -207,7 +208,11 @@ public class TMXFileImporter : ScriptedImporter {
         int staggerIndex = (tmxFile.staggerAxis == "even") ? 0 : 1;
         
         int tileID = layerData.GetTileID(x, y);
-        if (tileID == 0 || !tiles.ContainsKey(tileID)) return;
+        if (tileID == 0) return;
+        else if (!tiles.ContainsKey(tileID)) {
+            Debug.Log("Tile ID " + tileID + " not found.");
+            return;
+        }
         Tile tile = tiles[tileID] as Tile;
         Vector3Int pos = new Vector3Int(x, top-1-y, 0);
         if (tmxFile.orientation == "isometric") {
